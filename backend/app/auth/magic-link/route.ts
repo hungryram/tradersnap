@@ -14,10 +14,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login?error=missing-email", request.url))
   }
 
+  // Use the request URL to construct the redirect URL
+  const redirectUrl = new URL("/auth/callback", request.url).toString()
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+      emailRedirectTo: redirectUrl
     }
   })
 
