@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("Magic link error:", error)
-    return NextResponse.redirect(new URL("/auth/login?error=failed", request.url))
+    return NextResponse.redirect(new URL("/auth/login?error=failed", request.url), 303)
   }
 
-  return NextResponse.redirect(new URL("/auth/check-email", request.url))
+  return NextResponse.redirect(new URL("/auth/check-email", request.url), 303)
 }
