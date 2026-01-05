@@ -16,7 +16,29 @@ export default function AuthSuccessPage() {
     try {
       const supabase = createClient()
       
-      // Get the session (should already be set by callback)
+      // Check if we have tokens in the URL hash (magic link flow)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      
+      if (accessToken && refreshToken) {
+        console.log('[Auth Success] Found tokens in hash, setting session...')
+        setStatus('Setting up your session...')
+        
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        })
+        
+        if (error) {
+          console.error('[Auth Success] Failed to set session:', error)
+          setStatus('Authentication failed. Redirecting...')
+          setTimeout(() => router.push('/auth/login'), 1500)
+          return
+        }
+      }
+      
+      // Get the session
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error || !session) {
@@ -30,7 +52,8 @@ export default function AuthSuccessPage() {
       setStatus('Loading your profile...')
       
       // Check onboarding status
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/me`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`
         }
