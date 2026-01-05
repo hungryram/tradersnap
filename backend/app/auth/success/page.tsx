@@ -44,7 +44,7 @@ export default function AuthSuccessPage() {
       if (error || !session) {
         console.error('[Auth Success] No session found:', error)
         setStatus('Authentication failed. Redirecting...')
-        setTimeout(() => router.push('/auth/login'), 1500)
+        setTimeout(() => router.push('/'), 1500)
         return
       }
       
@@ -77,7 +77,7 @@ export default function AuthSuccessPage() {
     } catch (error) {
       console.error('[Auth Success] Error:', error)
       setStatus('Something went wrong. Redirecting...')
-      setTimeout(() => router.push('/auth/login'), 1500)
+      setTimeout(() => router.push('/'), 1500)
     }
   }
 
