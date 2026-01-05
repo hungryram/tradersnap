@@ -143,7 +143,7 @@ function IndexPopup() {
             className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
             onClick={() => {
               chrome.tabs.create({ 
-                url: `${process.env.PLASMO_PUBLIC_API_URL}/auth/login` 
+                url: `${process.env.PLASMO_PUBLIC_API_URL}` 
               })
             }}
           >
