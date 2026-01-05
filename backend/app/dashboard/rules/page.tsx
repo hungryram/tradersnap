@@ -23,6 +23,7 @@ export default function RulesPage() {
   const [rulesetName, setRulesetName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [userPlan, setUserPlan] = useState<string>("free")
 
   useEffect(() => {
     checkAuthAndLoad()
@@ -42,6 +43,19 @@ export default function RulesPage() {
   async function loadRulesets(token: string) {
     try {
       const origin = window.location.origin
+      
+      // Load user data to get plan
+      const meResponse = await fetch(`${origin}/api/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        setUserPlan(meData.user.plan)
+      }
+      
       const response = await fetch(`${origin}/api/rulesets`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -168,6 +182,40 @@ export default function RulesPage() {
     }
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to delete this ruleset?")) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/")
+        return
+      }
+
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/rulesets/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete ruleset")
+      }
+
+      setSuccess("Ruleset deleted!")
+      await loadRulesets(session.access_token)
+      
+    } catch (err) {
+      console.error("Delete error:", err)
+      setError(err instanceof Error ? err.message : "Failed to delete")
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -212,11 +260,26 @@ export default function RulesPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Trading Rules</h2>
-            <p className="text-slate-600 text-sm">
-              The AI analyzes your charts against these rules. Update them anytime.
-            </p>
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Trading Rules</h2>
+              <p className="text-slate-600 text-sm">
+                The AI analyzes your charts against these rules. Update them anytime.
+              </p>
+              {userPlan && (
+                <p className="text-sm text-slate-500 mt-2">
+                  Rulesets: {rulesets.length}/{userPlan === "free" ? 3 : 20}
+                </p>
+              )}
+            </div>
+            {currentRuleset && rulesets.length > 1 && !currentRuleset.is_primary && (
+              <button
+                onClick={() => handleDelete(currentRuleset.id)}
+                className="text-red-600 hover:text-red-700 text-sm px-3 py-1 border border-red-300 rounded hover:bg-red-50"
+              >
+                🗑️ Delete Ruleset
+              </button>
+            )}
           </div>
 
           {!currentRuleset ? (
@@ -255,6 +318,21 @@ export default function RulesPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {rulesets.length >= 3 && userPlan === "free" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-slate-700">
+                    <strong>💡 Free Plan Limit Reached</strong>
+                    <br />
+                    You've created {rulesets.length} rulesets (maximum for free plan).
+                    <br />
+                    <a href="/dashboard/account" className="text-blue-600 hover:text-blue-700 underline font-medium">
+                      Upgrade to Pro
+                    </a>
+                    {" "}for up to 20 rulesets and 300 analyses per month.
+                  </p>
                 </div>
               )}
               

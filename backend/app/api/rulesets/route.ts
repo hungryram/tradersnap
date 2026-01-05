@@ -70,6 +70,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
+    // Get user's plan
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .single()
+
+    // Check ruleset limit
+    const { count } = await supabase
+      .from("rulesets")
+      .select("*", { count: 'exact', head: true })
+      .eq("user_id", user.id)
+
+    const limit = profile?.plan === "free" ? 3 : 20
+    if (count !== null && count >= limit) {
+      return NextResponse.json(
+        { error: `Ruleset limit reached (${limit} max). Upgrade your plan to create more.` },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const validated = createRulesetSchema.parse(body)
 
