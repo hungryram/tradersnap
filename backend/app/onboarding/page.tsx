@@ -77,13 +77,20 @@ export default function OnboardingPage() {
         throw new Error(error.error || "Failed to create ruleset")
       }
 
-      // Mark user as onboarded
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ onboarded: true })
-        .eq("id", session.user.id)
+      // Mark user as onboarded - call API endpoint to update profile
+      const origin = window.location.origin
+      const updateResponse = await fetch(`${origin}/api/me`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ onboarded: true })
+      })
 
-      if (updateError) throw updateError
+      if (!updateResponse.ok) {
+        throw new Error("Failed to mark as onboarded")
+      }
 
       // Redirect to dashboard
       router.push("/dashboard/rules")

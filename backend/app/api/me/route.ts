@@ -145,3 +145,45 @@ export async function GET(request: NextRequest) {
     return addCorsHeaders(response, origin)
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  
+  try {
+    const authHeader = request.headers.get("authorization")
+    
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { onboarded } = body
+
+    // Update profile
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ onboarded })
+      .eq("id", user.id)
+
+    if (updateError) throw updateError
+
+    return NextResponse.json({ success: true }, {
+      headers: getCorsHeaders(origin)
+    })
+
+  } catch (error) {
+    console.error("API /me PATCH error:", error)
+    const response = NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    )
+    return addCorsHeaders(response, origin)
+  }
+}
