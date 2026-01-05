@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -11,23 +10,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login?error=invalid-link", request.url), 303)
   }
 
-  const cookieStore = await cookies()
+  const response = NextResponse.redirect(new URL("/auth/success", request.url), 303)
+  
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Handle cookies() in Server Component
-          }
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options)
+          })
         },
       },
     }
@@ -43,5 +39,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login?error=invalid-link", request.url), 303)
   }
 
-  return NextResponse.redirect(new URL("/auth/success", request.url), 303)
+  return response
 }
