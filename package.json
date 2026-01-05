@@ -1,0 +1,16 @@
+{
+  "name": "trading-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:extension": "pnpm --filter trading-buddy-extension dev",
+    "dev:backend": "pnpm --filter trading-buddy-backend dev",
+    "build": "pnpm -r build",
+    "build:extension": "pnpm --filter trading-buddy-extension build",
+    "build:backend": "pnpm --filter trading-buddy-backend build"
+  },
+  "devDependencies": {
+    "pnpm": "^8.15.1"
+  }
+}

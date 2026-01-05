@@ -1,0 +1,960 @@
+import type { PlasmoCSConfig } from "plasmo"
+import { useEffect, useState, useRef } from "react"
+import { createClient } from "@supabase/supabase-js"
+import { ChartOverlay } from "./ChartOverlay"
+import { ChartLightbox } from "./ChartLightbox"
+
+import styleText from "data-text:~style.css"
+
+export const getStyle = () => {
+  const style = document.createElement("style")
+  style.textContent = styleText
+  return style
+}
+
+const supabase = createClient(
+  process.env.PLASMO_PUBLIC_SUPABASE_URL!,
+  process.env.PLASMO_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+export const config: PlasmoCSConfig = {
+  matches: ["<all_urls>"],
+  all_frames: false
+}
+
+const TradingBuddyWidget = () => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [position, setPosition] = useState({ x: 20, y: 20 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [messages, setMessages] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [inputText, setInputText] = useState("")
+  const [isSending, setIsSending] = useState(false)
+  const [lastChartImage, setLastChartImage] = useState<string | null>(null)
+  const [size, setSize] = useState({ width: 384, height: 600 })
+  const [isResizing, setIsResizing] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
+  const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const isInitialLoadRef = useRef(true)
+
+  // Load messages and theme from storage on mount
+  useEffect(() => {
+    const loadData = async () => {
+      const result = await chrome.storage.local.get(['chat_messages', 'theme'])
+      if (result.chat_messages) {
+        setMessages(result.chat_messages)
+      }
+      if (result.theme) {
+        setTheme(result.theme)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Save messages to storage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      chrome.storage.local.set({ chat_messages: messages })
+    }
+  }, [messages])
+
+  // Reset scroll flag when widget opens
+  useEffect(() => {
+    if (isOpen) {
+      isInitialLoadRef.current = true
+    }
+  }, [isOpen])
+
+  // Reset scroll flag when widget opens
+  useEffect(() => {
+    if (isOpen) {
+      isInitialLoadRef.current = true
+    }
+  }, [isOpen])
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length === 0) return
+    
+    if (isInitialLoadRef.current) {
+      // On initial load/reopen, wait for render then scroll instantly
+      isInitialLoadRef.current = false
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+        })
+      })
+    } else {
+      // On new messages, smooth scroll
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [messages])
+
+  // Simple markdown-to-HTML converter for chat messages
+  const formatMarkdown = (text: string) => {
+    return text
+      // Headers
+      .replace(/^### (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
+      .replace(/^## (.+)$/gm, '<div class="font-bold text-base mt-2 mb-1">$1</div>')
+      .replace(/^# (.+)$/gm, '<div class="font-bold text-lg mt-2 mb-1">$1</div>')
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // Line breaks
+      .replace(/\n/g, '<br/>')
+  }
+
+  useEffect(() => {
+    // Listen for messages from background script
+    const messageListener = (message) => {
+      if (message.type === "OPEN_WIDGET") {
+        setIsOpen(true)
+        if (message.action === "analyze") {
+          handleAnalyze()
+        }
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(messageListener)
+    return () => chrome.runtime.onMessage.removeListener(messageListener)
+  }, [])
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true)
+    setError(null)
+    
+    // Add user message
+    const userMessage = {
+      type: 'user',
+      content: '📸 Analyzing current chart...',
+      timestamp: new Date()
+    }
+    setMessages(prev => [...prev, userMessage])
+    
+    try {
+      // Get session from chrome.storage (set by popup)
+      const result = await chrome.storage.local.get('supabase_session')
+      
+      const { supabase_session } = result
+      
+      if (!supabase_session?.access_token) {
+        console.log('[Content] No session found or missing access_token')
+        const errorMsg = {
+          type: 'error',
+          content: 'Please sign in to the extension first',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+
+      console.log('[Content] Session found, token expires:', new Date(supabase_session.expires_at * 1000).toLocaleString())
+      
+      // If token is expired, clear session and ask user to sign in again
+      if (supabase_session.expires_at < Date.now() / 1000) {
+        console.log('[Content] Token expired, clearing session')
+        await chrome.storage.local.remove('supabase_session')
+        
+        const errorMsg = {
+          type: 'error',
+          content: 'Session expired. Please sign in again from the extension popup.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+      
+      console.log('[Content] Making API call...')
+
+      // Hide widget before screenshot to avoid capturing it
+      setIsOpen(false)
+      
+      // Wait a bit for the widget to hide
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Request screenshot from background script
+      const response = await chrome.runtime.sendMessage({
+        type: "CAPTURE_SCREENSHOT"
+      })
+      
+      // Show widget again
+      setIsOpen(true)
+
+      console.log('[Content] Screenshot response:', response)
+
+      if (!response.success) {
+        const errorMsg = {
+          type: 'error',
+          content: 'Failed to capture screenshot',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+
+      // Add user message showing they're analyzing a chart
+      const userAnalyzeMessage = {
+        type: 'user',
+        content: '🔍 Analyzing chart...',
+        timestamp: new Date(),
+        chartImage: response.dataUrl
+      }
+      setMessages(prev => [...prev, userAnalyzeMessage])
+
+      // Get user's primary ruleset
+      console.log('[Content] Fetching user data...')
+      const meResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/me`,
+        {
+          headers: {
+            "Authorization": `Bearer ${supabase_session.access_token}`
+          }
+        }
+      )
+
+      if (!meResponse.ok) {
+        const errorMsg = {
+          type: 'error',
+          content: 'Failed to load your rules. Please check your account settings.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+
+      const meData = await meResponse.json()
+      
+      if (!meData.ruleset) {
+        const errorMsg = {
+          type: 'error',
+          content: 'No trading rules found. Please set up your rules in the dashboard first.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+
+      // Call backend API
+      console.log('[Content] Calling backend API with ruleset:', meData.ruleset.id)
+      const apiResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/analyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabase_session.access_token}`
+          },
+          body: JSON.stringify({
+            rulesetId: meData.ruleset.id,
+            context: {
+              symbol: "Unknown",
+              timeframe: "Unknown",
+              notes: "Test analysis"
+            },
+            image: response.dataUrl
+          })
+        }
+      )
+
+      console.log('[Content] API Response status:', apiResponse.status)
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}))
+        
+        let errorMessage = "Analysis failed"
+        if (apiResponse.status === 402) {
+          errorMessage = "Subscription required. Please subscribe to continue."
+        } else if (apiResponse.status === 404) {
+          errorMessage = "No ruleset found. Please create a ruleset first."
+        } else if (apiResponse.status === 429) {
+          errorMessage = "Usage quota exceeded. Please upgrade your plan."
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+        
+        const errorMsg = {
+          type: 'error',
+          content: errorMessage,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
+
+      const analysisResult = await apiResponse.json()
+      
+      // Store the screenshot for conversation context
+      setLastChartImage(response.dataUrl)
+      
+      // Add AI response message as assistant with chart image
+      const aiMessage = {
+        type: 'assistant',
+        content: analysisResult,
+        timestamp: new Date(),
+        hasChart: true,
+        chartImage: response.dataUrl  // Include chart image so overlay can use it
+      }
+      setMessages(prev => [...prev, aiMessage])
+      
+    } catch (error) {
+      console.error("[Content] Analysis failed:", error)
+      const errorMsg = {
+        type: 'error',
+        content: 'Network error. Please check your connection.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMsg])
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const handleSendMessage = async (text: string, includeChart: boolean = false) => {
+    if (!text.trim() || isSending) return
+    
+    setIsSending(true)
+    
+    let chartImage = null
+    
+    // Capture chart if requested
+    if (includeChart) {
+      // Hide widget before screenshot
+      setIsOpen(false)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const screenshotResponse = await chrome.runtime.sendMessage({
+        type: "CAPTURE_SCREENSHOT"
+      })
+      
+      // Show widget again
+      setIsOpen(true)
+      
+      if (screenshotResponse.success) {
+        chartImage = screenshotResponse.dataUrl
+      }
+    }
+    
+    // Add user message with optional chart thumbnail
+    const userMessage = {
+      type: 'user',
+      content: text,
+      timestamp: new Date(),
+      chartImage: chartImage || undefined
+    }
+    setMessages(prev => [...prev, userMessage])
+    setInputText("")
+    
+    try {
+      // Get session
+      const result = await chrome.storage.local.get('supabase_session')
+      let { supabase_session } = result
+      
+      const currentTime = Math.floor(Date.now() / 1000)
+      
+      console.log('[Content] Chat - checking session...', {
+        hasResult: !!result,
+        hasSession: !!supabase_session,
+        hasAccessToken: !!supabase_session?.access_token,
+        sessionKeys: supabase_session ? Object.keys(supabase_session) : [],
+        expiresAt: supabase_session?.expires_at,
+        expiresAtDate: supabase_session?.expires_at ? new Date(supabase_session.expires_at * 1000).toISOString() : null,
+        isExpired: supabase_session?.expires_at ? supabase_session.expires_at < currentTime : null,
+        currentTime,
+        currentTimeDate: new Date(currentTime * 1000).toISOString(),
+        timeUntilExpiry: supabase_session?.expires_at ? Math.floor((supabase_session.expires_at - currentTime) / 60) + ' minutes' : null
+      })
+      
+      if (!supabase_session?.access_token) {
+        console.error('[Content] No valid session found!')
+        
+        // Open popup to sign in
+        chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }).catch(() => {
+          // Fallback if background script not available
+          console.log('[Content] Could not open popup automatically')
+        })
+        
+        const errorMsg = {
+          type: 'error',
+          content: 'Session missing. Please sign in using the extension popup (click the icon in your toolbar).',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsSending(false)
+        return
+      }
+      
+      // Check if token is expired or expiring soon
+      if (supabase_session.expires_at && supabase_session.expires_at < currentTime) {
+        console.log('[Content] Token expired, clearing session')
+        await chrome.storage.local.remove('supabase_session')
+        
+        const errorMsg = {
+          type: 'error',
+          content: 'Session expired. Please sign in again from the extension popup.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsSending(false)
+        return
+      }
+
+      // If token is expired, clear session and ask user to sign in again
+      if (supabase_session.expires_at < Date.now() / 1000) {
+        console.log('[Content] Token expired, clearing session')
+        await chrome.storage.local.remove('supabase_session')
+        
+        const errorMsg = {
+          type: 'error',
+          content: 'Session expired. Please sign in again from the extension popup.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsSending(false)
+        return
+      }
+
+      // Build conversation history (last 10 messages for context)
+      const conversationHistory = messages
+        .slice(-10)
+        .map(msg => {
+          let content = ''
+          if (typeof msg.content === 'string') {
+            content = msg.content
+          } else if (msg.content?.summary) {
+            // For chart analysis, include key info
+            const analysis = msg.content
+            content = `Chart Analysis: ${analysis.summary}. ${analysis.bullets?.join('. ') || ''}`
+          } else {
+            content = JSON.stringify(msg.content)
+          }
+          
+          return {
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content
+          }
+        })
+        .filter(msg => msg.content && msg.content.trim().length > 0) // Remove empty messages
+
+      console.log('[Content] Sending chat request')
+
+      // Build request body
+      const requestBody: any = {
+        message: text,
+        includeChart,
+        conversationHistory
+      }
+      
+      // Include chart image if captured or use last analyzed chart
+      if (chartImage) {
+        requestBody.image = chartImage
+      } else if (lastChartImage && !includeChart) {
+        // Include last chart for context in follow-up questions
+        requestBody.image = lastChartImage
+        requestBody.isContextImage = true
+      }
+      
+      // Call chat API
+      const apiResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/chat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabase_session.access_token}`
+          },
+          body: JSON.stringify(requestBody)
+        }
+      )
+
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}))
+        console.error('[Content] Chat API error:', apiResponse.status, errorData)
+        throw new Error(`API error: ${apiResponse.status}`)
+      }
+
+      const chatResult = await apiResponse.json()
+      
+      // Add assistant message with typing animation
+      const fullResponse = chatResult.message || "I couldn't process that request."
+      
+      // Check if response includes drawings (from chart analysis)
+      const hasDrawings = chatResult.drawings && chatResult.drawings.length > 0
+      const responseChartImage = chartImage || (hasDrawings ? lastChartImage : null)
+      
+      // Add empty message that will be filled with typing animation
+      const assistantMessage = {
+        type: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isTyping: true,
+        fullContent: fullResponse,
+        chartImage: responseChartImage,
+        drawings: hasDrawings ? chatResult.drawings : undefined
+      }
+      setMessages(prev => [...prev, assistantMessage])
+      
+      // Animate typing effect
+      let charIndex = 0
+      const typingInterval = setInterval(() => {
+        charIndex += 2 // Type 2 characters at a time for faster animation
+        if (charIndex >= fullResponse.length) {
+          charIndex = fullResponse.length
+          clearInterval(typingInterval)
+          // Mark typing as complete
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === prev.length - 1 ? { ...msg, isTyping: false, content: fullResponse } : msg
+          ))
+        } else {
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
+          ))
+        }
+      }, 20) // 20ms per iteration = fast but visible typing
+      
+    } catch (error) {
+      console.error("[Content] Chat failed:", error)
+      const errorMsg = {
+        type: 'error',
+        content: 'Failed to send message. Please try again.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMsg])
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setIsDragging(true)
+    }
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - 150,
+        y: e.clientY - 25
+      })
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
+    }
+  }, [isDragging])
+
+  // Resize handlers
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+  }
+
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (isResizing) {
+      const newWidth = Math.max(300, Math.min(800, size.width + e.movementX))
+      const newHeight = Math.max(400, Math.min(900, size.height + e.movementY))
+      setSize({ width: newWidth, height: newHeight })
+    }
+  }
+
+  const handleResizeMouseUp = () => {
+    setIsResizing(false)
+  }
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleResizeMouseMove)
+      document.addEventListener("mouseup", handleResizeMouseUp)
+      return () => {
+        document.removeEventListener("mousemove", handleResizeMouseMove)
+        document.removeEventListener("mouseup", handleResizeMouseUp)
+      }
+    }
+  }, [isResizing, size])
+
+  if (!isOpen) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          right: "20px",
+          zIndex: 2147483647
+        }}
+      >
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium"
+        >
+          🤖 Trading Buddy
+        </button>
+      </div>
+    )
+  }
+
+  const getVerdictColor = (verdict: string) => {
+    switch (verdict) {
+      case "pass": return "text-green-600"
+      case "warn": return "text-yellow-600"
+      case "fail": return "text-red-600"
+      default: return "text-slate-600"
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        zIndex: 2147483647
+      }}
+      className="select-none"
+      onKeyDown={(e) => e.stopPropagation()}
+      onKeyPress={(e) => e.stopPropagation()}
+      onKeyUp={(e) => e.stopPropagation()}
+    >
+      <div className={`${theme === 'dark' ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
+        {/* Header - Draggable */}
+        <div
+          className={`flex items-center justify-between p-4 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
+          onMouseDown={handleMouseDown}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <div>
+              <div className="font-semibold text-white">Trading Buddy</div>
+              <div className="text-xs text-blue-100">AI Psychology Coach</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(!showMenu)
+              }}
+              className="text-white hover:text-blue-100 text-xl px-2"
+              title="Menu"
+            >
+              ⋮
+            </button>
+            {showMenu && (
+              <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                <button
+                  onClick={() => {
+                    window.open('http://localhost:3000/dashboard', '_blank')
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  <span>⚙️</span>
+                  <span>Dashboard</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const newTheme = theme === 'light' ? 'dark' : 'light'
+                    setTheme(newTheme)
+                    chrome.storage.local.set({ theme: newTheme })
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  <span>{theme === 'light' ? '🌙' : '☀️'}</span>
+                  <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+                </button>
+                {messages.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('Clear all chat messages? This will reset the conversation but keep your trading rules.')) {
+                        setMessages([])
+                        chrome.storage.local.remove('chat_messages')
+                        setShowMenu(false)
+                      }
+                    }}
+                    className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  >
+                    <span>🗑️</span>
+                    <span>Clear Chat</span>
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-white hover:text-blue-100 text-xl"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+          {messages.length === 0 && (
+            <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className="text-4xl mb-2">👋</div>
+              <p className="mb-2">Hi! I'm your trading psychology coach.</p>
+              <p className="text-xs">Click "Analyze Chart" below to get started.</p>
+            </div>
+          )}
+
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.type === 'user' && (
+                <div className="max-w-[80%]">
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm">
+                    {msg.content}
+                  </div>
+                  {msg.chartImage && (
+                    <img 
+                      src={msg.chartImage} 
+                      alt="Chart" 
+                      className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
+                      style={{ maxHeight: '200px', cursor: 'pointer' }}
+                      onClick={() => window.open(msg.chartImage, '_blank')}
+                      title="Click to view full size"
+                    />
+                  )}
+                </div>
+              )}
+              
+              {msg.type === 'error' && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
+                  {msg.content}
+                </div>
+              )}
+              
+              {msg.type === 'assistant' && typeof msg.content === 'string' && (
+                <div className="max-w-[85%]">
+                  {/* Show chart with overlay if drawings exist */}
+                  {msg.chartImage && msg.drawings && msg.drawings.length > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>Chart Analysis</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowOverlays(prev => ({ ...prev, [i]: !prev[i] }))}
+                            className={`text-xs px-2 py-1 rounded ${showOverlays[i] ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}
+                          >
+                            {showOverlays[i] ? '👁️ Hide' : '👁️ Show'}
+                          </button>
+                          <button
+                            onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: msg.drawings, messageIndex: i })}
+                            className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          >
+                            🔍 Full Size
+                          </button>
+                        </div>
+                      </div>
+                      <div onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: msg.drawings, messageIndex: i })} className="cursor-pointer">
+                        <ChartOverlay
+                          imageUrl={msg.chartImage}
+                          drawings={msg.drawings}
+                          showOverlay={showOverlays[i] || false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div 
+                    className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'}`}
+                    dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                  />
+                </div>
+              )}
+              
+              {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.verdict && (
+                <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
+                  {/* Show chart with overlay if it exists */}
+                  {msg.chartImage && msg.content.drawings && msg.content.drawings.length > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>Chart Analysis</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowOverlays(prev => ({ ...prev, [i]: !prev[i] }))}
+                            className={`text-xs px-2 py-1 rounded ${showOverlays[i] ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}
+                          >
+                            {showOverlays[i] ? '👁️ Hide' : '👁️ Show'}
+                          </button>
+                          <button
+                            onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: msg.content.drawings, messageIndex: i })}
+                            className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          >
+                            🔍 Full Size
+                          </button>
+                        </div>
+                      </div>
+                      <div onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: msg.content.drawings, messageIndex: i })} className="cursor-pointer">
+                        <ChartOverlay
+                          imageUrl={msg.chartImage}
+                          drawings={msg.content.drawings}
+                          showOverlay={showOverlays[i] || false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.verdict)}`}>
+                    {msg.content.verdict}
+                  </div>
+                  
+                  <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
+                  
+                  {msg.content.bullets && msg.content.bullets.length > 0 && (
+                    <ul className={`text-xs space-y-1 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {msg.content.bullets.map((bullet, idx) => (
+                        <li key={idx}>• {bullet}</li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
+                    <div className="bg-blue-50 rounded-lg p-2 mb-2">
+                      <div className="font-medium text-xs mb-1 text-slate-900">📍 Levels to Watch</div>
+                      {msg.content.levels_to_watch.map((level, idx) => (
+                        <div key={idx} className="text-xs text-slate-700 mb-1">
+                          <div className="font-medium">{level.label}</div>
+                          <div className="text-slate-600">{level.why_it_matters}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {msg.content.behavioral_nudge && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900">
+                      💡 {msg.content.behavioral_nudge}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {/* Auto-scroll anchor */}
+          <div ref={messagesEndRef} />
+          
+          {(isAnalyzing || isSending) && (
+            <div className="flex justify-start">
+              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
+                <div className={`flex gap-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <span className="animate-bounce">●</span>
+                  <span className="animate-bounce delay-100">●</span>
+                  <span className="animate-bounce delay-200">●</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className={`p-4 space-y-2 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
+          {/* Text input for chatting */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter' && inputText.trim() && !isSending) {
+                  e.preventDefault()
+                  handleSendMessage(inputText, false)
+                }
+              }}
+              onKeyPress={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              placeholder="Ask me anything..."
+              disabled={isSending}
+              className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'border-slate-300 disabled:bg-slate-100'}`}
+            />
+            <button
+              onClick={() => {
+                if (inputText.trim() && !isSending) {
+                  handleSendMessage(inputText, false)
+                }
+              }}
+              disabled={isSending || !inputText.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              {isSending ? "..." : "Send"}
+            </button>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (inputText.trim() && !isSending) {
+                  handleSendMessage(inputText, true)
+                }
+              }}
+              disabled={isSending || !inputText.trim()}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <span>📸</span>
+              Send with Chart
+            </button>
+            
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"
+            >
+              <span>🔍</span>
+              {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
+            </button>
+          </div>
+        </div>
+        
+        {/* Resize handle */}
+        <div 
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
+          style={{
+            background: 'linear-gradient(135deg, transparent 50%, #cbd5e1 50%)',
+            borderBottomRightRadius: '8px'
+          }}
+        />
+      </div>
+
+      {/* Lightbox for full-size chart view */}
+      {lightboxData && (
+        <ChartLightbox
+          imageUrl={lightboxData.imageUrl}
+          drawings={lightboxData.drawings}
+          showOverlay={showOverlays[lightboxData.messageIndex] || false}
+          onClose={() => setLightboxData(null)}
+          onToggleOverlay={() => setShowOverlays(prev => ({ 
+            ...prev, 
+            [lightboxData.messageIndex]: !prev[lightboxData.messageIndex] 
+          }))}
+        />
+      )}
+    </div>
+  )
+}
+
+export default TradingBuddyWidget
