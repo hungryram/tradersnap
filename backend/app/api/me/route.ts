@@ -28,6 +28,14 @@ function getCorsHeaders(origin: string | null) {
   }
 }
 
+function addCorsHeaders(response: NextResponse, origin: string | null) {
+  const headers = getCorsHeaders(origin)
+  Object.entries(headers).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+  return response
+}
+
 // Handle OPTIONS preflight
 export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin')
@@ -130,10 +138,10 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error("API /me error:", error)
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 },
-      { headers: getCorsHeaders(origin) }
+      { status: 500 }
     )
+    return addCorsHeaders(response, origin)
   }
 }

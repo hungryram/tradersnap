@@ -16,9 +16,10 @@ const updateRulesetSchema = z.object({
 // GET /api/rulesets/[id] - Get single ruleset
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authHeader = request.headers.get("authorization")
     
     if (!authHeader?.startsWith("Bearer ")) {
@@ -35,7 +36,7 @@ export async function GET(
     const { data: ruleset, error } = await supabase
       .from("rulesets")
       .select("*")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
       .single()
 
@@ -57,9 +58,10 @@ export async function GET(
 // PATCH /api/rulesets/[id] - Update ruleset
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authHeader = request.headers.get("authorization")
     
     if (!authHeader?.startsWith("Bearer ")) {
@@ -82,13 +84,13 @@ export async function PATCH(
         .from("rulesets")
         .update({ is_primary: false })
         .eq("user_id", user.id)
-        .neq("id", params.id)
+        .neq("id", id)
     }
 
     const { data: ruleset, error } = await supabase
       .from("rulesets")
       .update(validated)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
       .select()
       .single()
@@ -119,9 +121,10 @@ export async function PATCH(
 // DELETE /api/rulesets/[id] - Delete ruleset
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authHeader = request.headers.get("authorization")
     
     if (!authHeader?.startsWith("Bearer ")) {
@@ -138,7 +141,7 @@ export async function DELETE(
     const { error } = await supabase
       .from("rulesets")
       .delete()
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
 
     if (error) {

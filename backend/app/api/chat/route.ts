@@ -323,7 +323,7 @@ When in doubt, describe what you see and ask what THEY think.`
     }
 
     const response = NextResponse.json(
-      { error: "Internal server error", message: error.message },
+      { error: "Internal server error", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     )
     return addCorsHeaders(response, origin)
