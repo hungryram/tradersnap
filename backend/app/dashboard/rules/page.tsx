@@ -119,6 +119,15 @@ export default function RulesPage() {
   async function handleSaveAsNew() {
     setError(null)
     setSuccess(null)
+
+    // Prompt for new name
+    const newName = prompt("Enter a name for the new ruleset:", `${rulesetName} - Copy`)
+    
+    if (!newName || newName.trim() === "") {
+      setError("Ruleset name is required")
+      return
+    }
+
     setIsSaving(true)
 
     try {
@@ -129,10 +138,6 @@ export default function RulesPage() {
         return
       }
 
-      // Generate new name
-      const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      const newName = `${rulesetName} (${timestamp})`
-
       const origin = window.location.origin
       const response = await fetch(`${origin}/api/rulesets`, {
         method: "POST",
@@ -141,7 +146,7 @@ export default function RulesPage() {
           Authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          name: newName,
+          name: newName.trim(),
           rules_text: rulesText,
           is_primary: false
         })
@@ -226,6 +231,33 @@ export default function RulesPage() {
             </div>
           ) : (
             <div className="space-y-6">
+              {rulesets.length > 1 && (
+                <div>
+                  <label htmlFor="ruleset-select" className="block text-sm font-medium text-slate-700 mb-2">
+                    Select Ruleset
+                  </label>
+                  <select
+                    id="ruleset-select"
+                    value={currentRuleset.id}
+                    onChange={(e) => {
+                      const selected = rulesets.find(r => r.id === e.target.value)
+                      if (selected) {
+                        setCurrentRuleset(selected)
+                        setRulesText(selected.rules_text)
+                        setRulesetName(selected.name)
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {rulesets.map((ruleset) => (
+                      <option key={ruleset.id} value={ruleset.id}>
+                        {ruleset.name} {ruleset.is_primary && "(Primary)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
                   Ruleset Name
