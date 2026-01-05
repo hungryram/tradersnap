@@ -91,6 +91,43 @@ export default function AccountPage() {
     }
   }
 
+  async function upgradeToProPlan() {
+    setIsLoadingPortal(true)
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/")
+        return
+      }
+
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO,
+          plan: "pro"
+        })
+      })
+
+      if (!response.ok) throw new Error("Failed to create checkout session")
+
+      const data = await response.json()
+      window.location.href = data.url
+      
+    } catch (err) {
+      console.error("Checkout error:", err)
+      alert("Failed to start checkout")
+    } finally {
+      setIsLoadingPortal(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
