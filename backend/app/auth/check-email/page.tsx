@@ -1,3 +1,9 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Check Your Email - Trading Buddy",
+}
+
 export default function CheckEmailPage() {
   return (
     <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
