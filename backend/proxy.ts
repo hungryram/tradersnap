@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Dashboard and onboarding routes require auth
   const protectedPaths = ['/dashboard', '/onboarding']
   const isProtectedPath = protectedPaths.some(path => 
