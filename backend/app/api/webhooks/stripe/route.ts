@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16"
+  apiVersion: "2024-12-18.acacia"
 })
 
 const supabase = createClient(
@@ -62,14 +62,22 @@ export async function POST(request: NextRequest) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session
       
-      // Link Stripe customer to user profile
-      if (session.client_reference_id && session.customer) {
+      // Update profile with plan from metadata
+      if (session.metadata?.supabase_user_id && session.customer) {
+        const updates: any = {
+          stripe_customer_id: session.customer as string
+        }
+        
+        // Set plan if provided in metadata
+        if (session.metadata.plan) {
+          updates.plan = session.metadata.plan
+          updates.subscription_status = "active"
+        }
+        
         await supabase
           .from("profiles")
-          .update({
-            stripe_customer_id: session.customer as string
-          })
-          .eq("id", session.client_reference_id)
+          .update(updates)
+          .eq("id", session.metadata.supabase_user_id)
       }
       
       break

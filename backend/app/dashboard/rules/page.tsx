@@ -323,16 +323,21 @@ export default function RulesPage() {
 
               {rulesets.length >= 3 && userPlan === "free" && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-slate-700">
-                    <strong>💡 Free Plan Limit Reached</strong>
-                    <br />
-                    You've created {rulesets.length} rulesets (maximum for free plan).
-                    <br />
-                    <a href="/dashboard/account" className="text-blue-600 hover:text-blue-700 underline font-medium">
-                      Upgrade to Pro
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm text-slate-700">
+                      <strong>💡 Free Plan Limit Reached</strong>
+                      <br />
+                      You've created {rulesets.length} rulesets (maximum for free plan).
+                      <br />
+                      Upgrade to Pro for up to 20 rulesets and 300 analyses per month.
+                    </p>
+                    <a
+                      href="/dashboard/account"
+                      className="ml-4 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                    >
+                      Upgrade Now
                     </a>
-                    {" "}for up to 20 rulesets and 300 analyses per month.
-                  </p>
+                  </div>
                 </div>
               )}
               

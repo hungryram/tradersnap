@@ -187,16 +187,36 @@ export default function AccountPage() {
           {/* Billing */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Billing</h2>
-            <p className="text-sm text-slate-600 mb-4">
-              Manage your subscription, payment methods, and billing history.
-            </p>
-            <button
-              onClick={openBillingPortal}
-              disabled={isLoadingPortal}
-              className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
-            >
-              {isLoadingPortal ? "Loading..." : "Manage Billing"}
-            </button>
+            
+            {userData?.user.plan === "free" ? (
+              <>
+                <p className="text-sm text-slate-600 mb-4">
+                  Upgrade to Pro for 20 rulesets and 300 chart analyses per month.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={upgradeToProPlan}
+                    disabled={isLoadingPortal}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                  >
+                    {isLoadingPortal ? "Loading..." : "Upgrade to Pro"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600 mb-4">
+                  Manage your subscription, payment methods, and billing history.
+                </p>
+                <button
+                  onClick={openBillingPortal}
+                  disabled={isLoadingPortal}
+                  className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                >
+                  {isLoadingPortal ? "Loading..." : "Manage Billing"}
+                </button>
+              </>
+            )}
           </div>
 
           {/* Extension */}
