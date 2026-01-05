@@ -22,7 +22,8 @@ export default function Home() {
   }, [])
 
   async function checkOnboardingStatus(token: string) {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+    const origin = window.location.origin
+    const response = await fetch(`${origin}/api/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       }

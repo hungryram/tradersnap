@@ -39,7 +39,8 @@ export default function AccountPage() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/me`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`
         }
@@ -67,8 +68,9 @@ export default function AccountPage() {
         return
       }
 
+      const origin = window.location.origin
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing/portal`,
+        `${origin}/api/billing/portal`,
         {
           method: "POST",
           headers: {

@@ -41,7 +41,8 @@ export default function RulesPage() {
 
   async function loadRulesets(token: string) {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rulesets`, {
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/rulesets`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -83,8 +84,9 @@ export default function RulesPage() {
 
       if (!currentRuleset) return
 
+      const origin = window.location.origin
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/rulesets/${currentRuleset.id}`,
+        `${origin}/api/rulesets/${currentRuleset.id}`,
         {
           method: "PATCH",
           headers: {
