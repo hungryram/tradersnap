@@ -1,6 +1,6 @@
 import type { PlasmoCSConfig } from "plasmo"
 import { useEffect, useState, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 
@@ -12,7 +12,7 @@ export const getStyle = () => {
   return style
 }
 
-const supabase = createClient(
+const supabase = createBrowserClient(
   process.env.PLASMO_PUBLIC_SUPABASE_URL!,
   process.env.PLASMO_PUBLIC_SUPABASE_ANON_KEY!
 )

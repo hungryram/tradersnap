@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 
 import "~style.css"
 
-const supabase = createClient(
+const supabase = createBrowserClient(
   process.env.PLASMO_PUBLIC_SUPABASE_URL!,
   process.env.PLASMO_PUBLIC_SUPABASE_ANON_KEY!
 )
