@@ -78,7 +78,6 @@ export default function OnboardingPage() {
       }
 
       // Mark user as onboarded - call API endpoint to update profile
-      const origin = window.location.origin
       const updateResponse = await fetch(`${origin}/api/me`, {
         method: "PATCH",
         headers: {
