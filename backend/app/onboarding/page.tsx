@@ -26,7 +26,8 @@ export default function OnboardingPage() {
     }
 
     // Check if already onboarded
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+    const origin = window.location.origin
+    const response = await fetch(`${origin}/api/me`, {
       headers: {
         Authorization: `Bearer ${session.access_token}`
       }
@@ -57,7 +58,8 @@ export default function OnboardingPage() {
       }
 
       // Create first ruleset
-      const rulesetResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rulesets`, {
+      const origin = window.location.origin
+      const rulesetResponse = await fetch(`${origin}/api/rulesets`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
