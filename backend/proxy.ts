@@ -1,33 +1,43 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-export function proxy(request: NextRequest) {
-  // Dashboard and onboarding routes require auth
+export async function proxy(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/onboarding']
   const isProtectedPath = protectedPaths.some(path => 
     request.nextUrl.pathname.startsWith(path)
   )
 
   if (isProtectedPath) {
-    // Check for any Supabase auth cookies (the name includes the project ID)
-    const allCookies = request.cookies.getAll()
-    const supabaseAuthToken = allCookies.find(cookie => 
-      cookie.name.includes('auth-token') || 
-      cookie.name === 'sb-access-token' ||
-      cookie.name === 'supabase-auth-token'
+    let supabaseResponse = NextResponse.next({ request })
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value)
+              supabaseResponse.cookies.set(name, value, options)
+            })
+          },
+        },
+      }
     )
+
+    const { data: { session } } = await supabase.auth.getSession()
     
-    console.log('[Middleware] Protected path:', request.nextUrl.pathname)
-    console.log('[Middleware] All cookies:', allCookies.map(c => c.name))
-    console.log('[Middleware] Has auth token:', !!supabaseAuthToken)
-    
-    if (!supabaseAuthToken) {
-      console.log('[Middleware] No auth token, redirecting to home')
-      // Redirect to home page if not authenticated
+    if (!session) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)
     }
+
+    return supabaseResponse
   }
 
   return NextResponse.next()
