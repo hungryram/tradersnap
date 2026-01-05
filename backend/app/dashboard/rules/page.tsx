@@ -116,6 +116,53 @@ export default function RulesPage() {
     }
   }
 
+  async function handleSaveAsNew() {
+    setError(null)
+    setSuccess(null)
+    setIsSaving(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/")
+        return
+      }
+
+      // Generate new name
+      const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      const newName = `${rulesetName} (${timestamp})`
+
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/rulesets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          name: newName,
+          rules_text: rulesText,
+          is_primary: false
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to save as new")
+      }
+
+      setSuccess("Saved as new ruleset!")
+      await loadRulesets(session.access_token)
+      
+    } catch (err) {
+      console.error("Save as new error:", err)
+      setError(err instanceof Error ? err.message : "Failed to save as new")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -217,13 +264,23 @@ export default function RulesPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-lg"
-              >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-lg"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+                
+                <button
+                  onClick={handleSaveAsNew}
+                  disabled={isSaving}
+                  className="bg-slate-600 hover:bg-slate-700 disabled:bg-slate-400 text-white font-medium px-6 py-2 rounded-lg"
+                >
+                  Save as New
+                </button>
+              </div>
             </div>
           )}
         </div>
