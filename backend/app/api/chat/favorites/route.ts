@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-client"
+import { createAdminClient } from "@/lib/supabase-admin"
 
 export const runtime = "nodejs"
 
@@ -39,13 +40,20 @@ export async function GET(req: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
+    console.log("[Favorites API] Fetching favorites for user:", user.id)
+
+    // Use admin client to bypass RLS
+    const adminClient = createAdminClient()
+
     // Fetch all favorited messages for this user
-    const { data: messages, error } = await supabase
+    const { data: messages, error } = await adminClient
       .from("chat_messages")
       .select("*")
       .eq("user_id", user.id)
       .eq("is_favorited", true)
       .order("created_at", { ascending: false })
+
+    console.log("[Favorites API] Found messages:", messages?.length || 0)
 
     if (error) {
       console.error("[Favorites API] Error fetching messages:", error)
