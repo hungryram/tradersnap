@@ -78,8 +78,18 @@ function IndexPopup() {
       }
     )
 
-    // Poll for session updates (in case user signs in via magic link)
+    // Poll for session updates (in case user signs in via magic link or web app)
     const pollInterval = setInterval(async () => {
+      // Check chrome.storage first (updated by content script when web app session changes)
+      const storageResult = await chrome.storage.local.get('supabase_session')
+      if (storageResult.supabase_session && !isLoggedIn) {
+        console.log('[Popup] Session found in storage during poll!')
+        setIsLoggedIn(true)
+        setUser(storageResult.supabase_session.user)
+        return
+      }
+      
+      // Fallback to Supabase session check
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (session && !isLoggedIn) {

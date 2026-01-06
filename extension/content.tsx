@@ -23,6 +23,65 @@ export const config: PlasmoCSConfig = {
   all_frames: false
 }
 
+// Inject auth bridge script to communicate with web app
+const injectAuthBridge = () => {
+  const script = document.createElement('script')
+  script.textContent = `
+    console.log('[Auth Bridge] Script loaded');
+    
+    function notifyExtension(session) {
+      if (session) {
+        console.log('[Auth Bridge] Notifying extension of session');
+        window.postMessage({
+          type: 'TRADING_BUDDY_SESSION',
+          session: session
+        }, '*');
+      }
+    }
+    
+    // Check for existing session
+    const storedSession = localStorage.getItem('trading_buddy_session');
+    if (storedSession) {
+      try {
+        const session = JSON.parse(storedSession);
+        notifyExtension(session);
+      } catch (e) {
+        console.error('[Auth Bridge] Failed to parse stored session:', e);
+      }
+    }
+    
+    // Watch for localStorage changes
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'trading_buddy_session' && e.newValue) {
+        try {
+          const session = JSON.parse(e.newValue);
+          notifyExtension(session);
+        } catch (err) {
+          console.error('[Auth Bridge] Failed to parse session:', err);
+        }
+      }
+    });
+    
+    // Poll for session updates
+    setInterval(() => {
+      const stored = localStorage.getItem('trading_buddy_session');
+      if (stored) {
+        try {
+          const session = JSON.parse(stored);
+          notifyExtension(session);
+        } catch (e) {}
+      }
+    }, 2000);
+  `
+  document.documentElement.appendChild(script)
+  script.remove()
+}
+
+// Run auth bridge on admin.tradersnap.com
+if (window.location.origin === process.env.PLASMO_PUBLIC_API_URL) {
+  injectAuthBridge()
+}
+
 const TradingBuddyWidget = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -59,7 +118,7 @@ const TradingBuddyWidget = () => {
     }
     loadData()
 
-    // Listen for session updates
+    // Listen for session updates from chrome.storage
     const handleStorageChange = (changes: any, areaName: string) => {
       if (areaName === 'local' && changes.supabase_session) {
         setSession(changes.supabase_session.newValue)
@@ -67,7 +126,20 @@ const TradingBuddyWidget = () => {
     }
     chrome.storage.onChanged.addListener(handleStorageChange)
 
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange)
+    // Listen for session messages from web app (via auth bridge)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'TRADING_BUDDY_SESSION' && event.data?.session) {
+        console.log('[Content] Received session from web app:', event.data.session)
+        setSession(event.data.session)
+        chrome.storage.local.set({ supabase_session: event.data.session })
+      }
+    }
+    window.addEventListener('message', handleMessage)
+
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange)
+      window.removeEventListener('message', handleMessage)
+    }
   }, [])
 
   // Save messages to storage whenever they change
