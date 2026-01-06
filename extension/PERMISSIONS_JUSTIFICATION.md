@@ -64,19 +64,42 @@ Trading Buddy is an AI-powered trading psychology coach that helps traders analy
 - Provides the coaching interface users interact with
 - Non-intrusive overlay that doesn't affect page functionality
 
-### 5. Host Permissions: `https://*.tradingview.com/*` and `https://admin.tradersnap.com/*`
+### 5. Host Permissions: `<all_urls>`
 
-**TradingView access:**
-- Users analyze charts on TradingView (most popular trading platform)
-- Extension needs to inject widget and capture screenshots on these pages
-- Does NOT access TradingView account data, cookies, or credentials
-- Only visual chart analysis
+**Why this broad permission is necessary:**
 
-**admin.tradersnap.com access:**
-- Our own domain for user authentication and settings
-- Reads user's session from localStorage to maintain login state
-- This is the user's OWN account session, not third-party data
-- Equivalent to how a web app maintains login state
+Chrome's `chrome.tabs.captureVisibleTab()` API has a strict requirement:
+- When called from content script actions (user clicking button in widget), it requires `<all_urls>` permission
+- `activeTab` alone is insufficient because it only works for popup/icon interactions, not content script buttons
+- This is a Chrome API limitation, not our choice
+
+**What we actually do with this access:**
+- **Screenshot capture ONLY** - When user clicks "Analyze Chart" in the widget
+- Widget injection on pages user visits (provides the chat interface)
+- Read session from admin.tradersnap.com localStorage (our own domain for auth sync)
+
+**What we DO NOT do:**
+- ❌ Read any cookies, passwords, or credentials from any site
+- ❌ Access TradingView account data or trading history
+- ❌ Modify page content or automate any actions
+- ❌ Track browsing history
+- ❌ Collect data from non-trading pages
+- ❌ Run in background when widget is closed
+
+**Real-world usage:**
+- Extension is primarily used on TradingView and our admin site
+- Users explicitly open the widget when they want coaching
+- Widget can be closed/minimized anytime
+- Zero impact on pages where user doesn't use the extension
+
+**Similar extensions with this permission:**
+- Loom (screen recording)
+- Awesome Screenshot
+- Nimbus Screenshot
+- Any extension that captures screenshots from content scripts
+
+**Alternative we considered:**
+We tried using specific domain permissions (`https://*.tradingview.com/*`) but Chrome's API requires `<all_urls>` for programmatic screenshot capture from content scripts. This is not a security oversight—it's how the Chrome API is designed.
 
 ## Data Privacy
 
