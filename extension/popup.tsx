@@ -11,45 +11,34 @@ const supabase = createBrowserClient(
 function IndexPopup() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // Check auth state
     console.log('[Popup] Component mounted, checking initial auth state...')
-    console.log('[Popup] Supabase URL:', process.env.PLASMO_PUBLIC_SUPABASE_URL)
-    console.log('[Popup] API URL:', process.env.PLASMO_PUBLIC_API_URL)
     
-    // First, check chrome.storage for existing session
-    const checkStoredSession = async () => {
+    const initializeAuth = async () => {
+      // First, check chrome.storage for existing session
       try {
         const result = await chrome.storage.local.get('supabase_session')
-        console.log('[Popup] Checking storage on mount:', result)
-        if (result.supabase_session) {
+        console.log('[Popup] Storage check:', result)
+        
+        if (result.supabase_session?.user) {
           console.log('[Popup] Found session in storage!')
           setIsLoggedIn(true)
           setUser(result.supabase_session.user)
-          return true
+          setIsLoading(false)
+          return
         }
-        return false
       } catch (error) {
-        console.error('[Popup] Error checking storage:', error)
-        return false
-      }
-    }
-    
-    // Then, try to load session from the auth domain's localStorage
-    const checkAuthDomainSession = async () => {
-      // First check if we already have session in storage
-      const hasStoredSession = await checkStoredSession()
-      if (hasStoredSession) {
-        return
+        console.error('[Popup] Storage check failed:', error)
       }
       
-      console.log('[Popup] No stored session, checking auth domain...')
+      // Fallback: Try auth domain localStorage
       try {
-        // Query the auth domain tab if it's open
         const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
         if (tabs.length > 0) {
-          console.log('[Popup] Auth domain tab found, checking for session...')
+          console.log('[Popup] Auth domain tab found')
           const result = await chrome.scripting.executeScript({
             target: { tabId: tabs[0].id! },
             func: () => localStorage.getItem('trading_buddy_session')
@@ -57,36 +46,32 @@ function IndexPopup() {
           
           if (result[0]?.result) {
             const session = JSON.parse(result[0].result)
-            console.log('[Popup] Found session in auth domain localStorage!')
+            console.log('[Popup] Found session in auth domain!')
             setIsLoggedIn(true)
             setUser(session.user)
             chrome.storage.local.set({ supabase_session: session })
+            setIsLoading(false)
             return
           }
         }
       } catch (error) {
-        console.log('[Popup] Could not access auth domain:', error)
+        console.log('[Popup] Auth domain check failed:', error)
       }
       
-      // Fallback to Supabase session check
-      supabase.auth.getSession().then(({ data: { session }, error }) => {
-        console.log('[Popup] Initial session:', session ? 'Found' : 'None')
-        setIsLoggedIn(!!session)
-        setUser(session?.user || null)
+      // Final fallback: Supabase getSession
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('[Popup] Supabase session:', session ? 'Found' : 'None')
+      setIsLoggedIn(!!session)
+      setUser(session?.user || null)
+      setIsLoading(false)
       
-      // Store session in chrome.storage for content script
       if (session) {
-        chrome.storage.local.set({ 
-          supabase_session: session 
-        })
+        chrome.storage.local.set({ supabase_session: session })
       }
-    })
     }
     
-    // Run initial check
-    checkAuthDomainSession().then(() => {
-      console.log('[Popup] Initial auth check complete')
-    })
+    // Run initialization
+    initializeAuth()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
