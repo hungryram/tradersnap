@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { messageId, isFavorited } = body
 
+    console.log("[Favorite API] Request:", { messageId, isFavorited, userId: user.id })
+
     if (!messageId) {
       const response = NextResponse.json(
         { error: "Message ID required" },
@@ -51,11 +53,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Update the message's favorited status
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("chat_messages")
       .update({ is_favorited: isFavorited })
       .eq("id", messageId)
       .eq("user_id", user.id) // Security: only update own messages
+      .select()
+
+    console.log("[Favorite API] Update result:", { data, error, rowsAffected: data?.length })
 
     if (error) {
       console.error("[Favorite API] Error updating message:", error)
@@ -64,6 +69,10 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
       return addCorsHeaders(response, origin)
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("[Favorite API] No rows updated - message not found or not owned by user")
     }
 
     const response = NextResponse.json({ success: true })
