@@ -83,7 +83,10 @@ function IndexPopup() {
     })
     }
     
-    checkAuthDomainSession()
+    // Run initial check
+    checkAuthDomainSession().then(() => {
+      console.log('[Popup] Initial auth check complete')
+    })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

@@ -69,15 +69,27 @@ export async function POST(request: NextRequest) {
     
     const validatedRequest = chatRequestSchema.parse(body)
 
-    // 3. Fetch user's ruleset
-    const { data: ruleset } = await supabase
+    // 3. Fetch user's ruleset (primary first, then any ruleset)
+    let { data: ruleset } = await supabase
       .from("rulesets")
       .select("*")
       .eq("user_id", user.id)
       .eq("is_primary", true)
-      .single()
+      .maybeSingle()
+
+    // If no primary ruleset, get any ruleset
+    if (!ruleset) {
+      const { data: anyRuleset } = await supabase
+        .from("rulesets")
+        .select("*")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle()
+      ruleset = anyRuleset
+    }
 
     const userRules = ruleset?.rules_text || "No specific rules defined yet."
+    console.log('[Chat API] User rules found:', !!ruleset)
     console.log('[Chat API] User rules length:', userRules.length)
 
     // 4. Build conversation with system prompt
@@ -86,6 +98,8 @@ You help traders build discipline and execute THEIR plan, not hand them signals.
 
 USER'S TRADING RULES:
 ${userRules}
+
+**IMPORTANT:** If the user asks "do you know my rules?" or similar, tell them YES and briefly summarize 2-3 key points from their rules above. They want confirmation you have their rules loaded.
 
 ---
 YOUR PERSONALITY:
