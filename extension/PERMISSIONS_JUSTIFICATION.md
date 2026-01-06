@@ -6,21 +6,37 @@ Trading Buddy is an AI-powered trading psychology coach that helps traders analy
 ## Required Permissions & Justification
 
 ### 1. `activeTab`
-**Purpose:** Capture screenshots of trading charts when user explicitly clicks "Analyze Chart"
+**Purpose:** Access to the currently active tab when user interacts with the extension
+
+**How it's used:**
+- Provides context about which tab user is on
+- Enables screenshot capture workflow
+- Only active when user clicks extension elements
+
+**Why necessary:** 
+- Required for user-initiated actions
+- Provides minimal access (only current tab, only when user interacts)
+
+### 2. `tabs`
+**Purpose:** Capture screenshots of trading charts using `chrome.tabs.captureVisibleTab()`
 
 **How it's used:**
 - User opens extension widget on a trading chart page (e.g., TradingView)
-- User clicks "Analyze Chart" button
-- Extension captures screenshot of current tab using `chrome.tabs.captureVisibleTab()`
+- User clicks "Analyze Chart" button in the widget
+- Extension calls `chrome.tabs.captureVisibleTab()` to screenshot current tab
 - Screenshot is sent to our backend API for AI analysis
 - User receives feedback based on their personal trading rules
 
 **Why necessary:** 
-- Core functionality of the extension - analyzing chart images
-- Only captures when user explicitly requests analysis
+- **Core functionality** - analyzing chart images is the primary purpose
+- `activeTab` alone is insufficient for programmatic screenshot capture
+- Only captures when user explicitly clicks "Analyze Chart" or "Send with chart"
 - No background or automatic screenshots
+- Screenshots are temporary (sent to API, not permanently stored)
 
-### 2. `storage`
+**Important:** Without this permission, the extension cannot capture charts and loses its core value proposition.
+
+### 3. `storage`
 **Purpose:** Store user preferences and chat history locally
 
 **What we store:**
@@ -35,7 +51,7 @@ Trading Buddy is an AI-powered trading psychology coach that helps traders analy
 - No third-party data collected or stored
 - Users can clear data anytime via extension menu
 
-### 3. `scripting`
+### 4. `scripting`
 **Purpose:** Inject chat widget overlay onto trading chart pages
 
 **How it's used:**
@@ -48,7 +64,7 @@ Trading Buddy is an AI-powered trading psychology coach that helps traders analy
 - Provides the coaching interface users interact with
 - Non-intrusive overlay that doesn't affect page functionality
 
-### 4. Host Permissions: `https://*.tradingview.com/*` and `https://admin.tradersnap.com/*`
+### 5. Host Permissions: `https://*.tradingview.com/*` and `https://admin.tradersnap.com/*`
 
 **TradingView access:**
 - Users analyze charts on TradingView (most popular trading platform)
