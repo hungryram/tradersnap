@@ -24,13 +24,18 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = createClient()
 
-    // Get authenticated user
-    const {
-      data: { session }
-    } = await supabase.auth.getSession()
-
-    if (!session) {
+    // Get token from Authorization header
+    const authHeader = req.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return addCorsHeaders(response, origin)
+    }
+
+    const token = authHeader.substring(7)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      const response = NextResponse.json({ error: "Invalid token" }, { status: 401 })
       return addCorsHeaders(response, origin)
     }
 
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
       .from("chat_messages")
       .update({ is_favorited: isFavorited })
       .eq("id", messageId)
-      .eq("user_id", session.user.id) // Security: only update own messages
+      .eq("user_id", user.id) // Security: only update own messages
 
     if (error) {
       console.error("[Favorite API] Error updating message:", error)

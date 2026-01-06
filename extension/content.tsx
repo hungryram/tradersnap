@@ -524,16 +524,23 @@ const TradingBuddyWidget = () => {
   }
 
   const toggleFavorite = async (messageId: string, currentlyFavorited: boolean) => {
-    if (!session) return
-
     try {
+      // Get fresh session from storage
+      const result = await chrome.storage.local.get('supabase_session')
+      const { supabase_session } = result
+
+      if (!supabase_session) {
+        console.error('[Content] No session found for favorite toggle')
+        return
+      }
+
       const response = await fetch(
         `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/favorite`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
+            'Authorization': `Bearer ${supabase_session.access_token}`
           },
           body: JSON.stringify({
             messageId,
@@ -549,6 +556,8 @@ const TradingBuddyWidget = () => {
             ? { ...msg, isFavorited: !currentlyFavorited }
             : msg
         ))
+      } else {
+        console.error('[Content] Failed to toggle favorite:', response.status)
       }
     } catch (error) {
       console.error('[Content] Error toggling favorite:', error)
