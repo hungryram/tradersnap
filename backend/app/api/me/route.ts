@@ -9,7 +9,7 @@ const supabase = createClient(
 // CORS headers helper
 function getCorsHeaders(origin: string | null) {
   const allowedOrigins = [
-    'http://localhost:3000',
+    process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
     'chrome-extension://',
     'https://www.tradingview.com',
     'https://tradingview.com'
@@ -21,7 +21,7 @@ function getCorsHeaders(origin: string | null) {
   )
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'http://localhost:3000',
+    'Access-Control-Allow-Origin': isAllowed ? origin : process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Credentials': 'true'

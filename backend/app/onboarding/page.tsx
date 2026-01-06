@@ -115,7 +115,7 @@ export default function OnboardingPage() {
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">
-              Welcome to Trader Snap! 👋
+              Welcome to Snapchart! 👋
             </h1>
             <p className="text-slate-600">
               Before you start using the extension, let's set up your trading rules.

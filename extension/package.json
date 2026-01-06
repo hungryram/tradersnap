@@ -1,6 +1,6 @@
 {
   "name": "trading-buddy-extension",
-  "displayName": "Trader Snap",
+  "displayName": "Snapchart",
   "version": "0.0.1",
   "description": "AI Trading Psychology Overlay",
   "author": "Your Name",
@@ -46,6 +46,18 @@
         },
         "description": "Analyze current chart"
       }
-    }
+    },
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "assets/icon.png",
+          "assets/icon16.png",
+          "assets/icon32.png",
+          "assets/icon48.png",
+          "assets/icon128.png"
+        ],
+        "matches": ["<all_urls>"]
+      }
+    ]
   }
 }

@@ -46,6 +46,7 @@ const TradingBuddyWidget = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Load messages, theme, and session from storage on mount
   useEffect(() => {
@@ -198,6 +199,10 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     if (isOpen) {
       isInitialLoadRef.current = true
+      // Auto-focus input field when chat opens
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
     }
   }, [isOpen])
 
@@ -246,8 +251,31 @@ const TradingBuddyWidget = () => {
     }
 
     chrome.runtime.onMessage.addListener(messageListener)
-    return () => chrome.runtime.onMessage.removeListener(messageListener)
-  }, [])
+    
+    // Handle keyboard shortcuts - only when chat is open
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when chat is open
+      if (!isOpen) return
+      
+      // Ctrl+A / Cmd+A - Analyze chart
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
+        // Don't prevent default if user is selecting text
+        const selection = window.getSelection()
+        if (selection && selection.toString().length > 0) return
+        
+        e.preventDefault()
+        setIsOpen(true)
+        handleAnalyze()
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true)
@@ -479,6 +507,7 @@ const TradingBuddyWidget = () => {
     }
     setMessages(prev => [...prev, userMessage])
     setInputText("")
+    setTimeout(() => inputRef.current?.focus(), 50)
     
     try {
       // Get session
@@ -747,8 +776,8 @@ const TradingBuddyWidget = () => {
           onClick={() => setIsOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium flex items-center gap-2"
         >
-          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Trader Snap" className="w-6 h-6" />
-          Trader Snap
+          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" />
+          Snapchart
         </button>
       </div>
     )
@@ -783,9 +812,9 @@ const TradingBuddyWidget = () => {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2">
-            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Trader Snap" className="w-8 h-8" />
+            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-8 h-8" />
             <div>
-              <div className="font-semibold text-white">Trader Snap</div>
+              <div className="font-semibold text-white">Snapchart</div>
               <div className="text-xs text-blue-100">AI Psychology Coach</div>
             </div>
           </div>
@@ -805,7 +834,7 @@ const TradingBuddyWidget = () => {
               <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
                 <button
                   onClick={() => {
-                    window.open('http://localhost:3000/dashboard', '_blank')
+                    window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard`, '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
@@ -1043,6 +1072,7 @@ const TradingBuddyWidget = () => {
           {/* Text input for chatting */}
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}

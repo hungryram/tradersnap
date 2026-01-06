@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Check Your Email - Trader Snap",
+  title: "Check Your Email - Snapchart",
 }
 
 export default function CheckEmailPage() {

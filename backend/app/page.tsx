@@ -11,6 +11,7 @@ export default function Home() {
   const [password, setPassword] = useState("")
   const [isSignUp, setIsSignUp] = useState(false)
   const [useMagicLink, setUseMagicLink] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +40,26 @@ export default function Home() {
       } else {
         router.push("/onboarding")
       }
+    }
+  }
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      })
+
+      if (error) throw error
+      setSuccess(true)
+    } catch (err) {
+      console.error("Password reset error:", err)
+      setError(err instanceof Error ? err.message : "Failed to send reset email")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -107,8 +128,8 @@ export default function Home() {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <img src="/icon.png" alt="Trader Snap" className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Trader Snap</h1>
+            <img src="/icon.png" alt="Snapchart" className="w-16 h-16 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Snapchart</h1>
             <p className="text-slate-600">AI Trading Psychology Coach</p>
           </div>
 
@@ -117,12 +138,57 @@ export default function Home() {
               <div className="text-4xl mb-3">📧</div>
               <h3 className="font-bold text-green-900 mb-2">Check Your Email!</h3>
               <p className="text-sm text-green-800">
-                {useMagicLink 
-                  ? "We've sent you a magic link to sign in. Click the link in your email to continue."
-                  : "We've sent you a confirmation email. Click the link to verify your account."
+                {showForgotPassword
+                  ? "We've sent you a password reset link. Click the link in your email to set a new password."
+                  : useMagicLink 
+                    ? "We've sent you a magic link to sign in. Click the link in your email to continue."
+                    : "We've sent you a confirmation email. Click the link to verify your account."
                 }
               </p>
             </div>
+          ) : showForgotPassword ? (
+            <>
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+                    required
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                >
+                  {isLoading ? "Sending..." : "Send Reset Link"}
+                </button>
+              </form>
+
+              <button
+                onClick={() => {
+                  setShowForgotPassword(false)
+                  setError(null)
+                }}
+                className="w-full text-sm text-slate-600 hover:text-slate-900 mt-4"
+              >
+                ← Back to sign in
+              </button>
+            </>
           ) : (
             <>
               <form onSubmit={handleSignIn} className="space-y-4">
@@ -156,9 +222,20 @@ export default function Home() {
                       required
                       minLength={6}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Minimum 6 characters
-                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-slate-500">
+                        Minimum 6 characters
+                      </p>
+                      {!isSignUp && (
+                        <button
+                          type="button"
+                          onClick={() => setShowForgotPassword(true)}
+                          className="text-xs text-blue-600 hover:text-blue-700"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -237,7 +237,7 @@ export default function RulesPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🤖</span>
-            <h1 className="text-xl font-bold text-slate-900">Trader Snap</h1>
+            <h1 className="text-xl font-bold text-slate-900">Snapchart</h1>
           </div>
           <div className="flex items-center gap-4">
             <a
