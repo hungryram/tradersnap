@@ -172,14 +172,14 @@ function IndexPopup() {
           </p>
 
           <button 
-            className="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm"
-            onClick={async () => {
-              const storage = await chrome.storage.local.get('supabase_session')
-              console.log('Storage check:', storage)
-              alert(storage.supabase_session ? 'Session stored ✓' : 'No session in storage ✗')
+            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm"
+            onClick={() => {
+              chrome.tabs.create({ 
+                url: `${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules` 
+              })
             }}
           >
-            Check Storage
+            Open Dashboard
           </button>
           
           <button 
