@@ -39,21 +39,35 @@ const TradingBuddyWidget = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
+  const [session, setSession] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
 
-  // Load messages and theme from storage on mount
+  // Load messages, theme, and session from storage on mount
   useEffect(() => {
     const loadData = async () => {
-      const result = await chrome.storage.local.get(['chat_messages', 'theme'])
+      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session'])
       if (result.chat_messages) {
         setMessages(result.chat_messages)
       }
       if (result.theme) {
         setTheme(result.theme)
       }
+      if (result.supabase_session) {
+        setSession(result.supabase_session)
+      }
     }
     loadData()
+
+    // Listen for session updates
+    const handleStorageChange = (changes: any, areaName: string) => {
+      if (areaName === 'local' && changes.supabase_session) {
+        setSession(changes.supabase_session.newValue)
+      }
+    }
+    chrome.storage.onChanged.addListener(handleStorageChange)
+
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange)
   }, [])
 
   // Save messages to storage whenever they change
@@ -652,7 +666,7 @@ const TradingBuddyWidget = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 relative">
-            <UsageMeter session={supabaseSession} />
+            <UsageMeter session={session} />
             <button
               onClick={(e) => {
                 e.stopPropagation()
