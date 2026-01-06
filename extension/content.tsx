@@ -57,32 +57,8 @@ const TradingBuddyWidget = () => {
         setTheme(result.theme)
       }
       if (result.supabase_session) {
+        console.log('[Content] Loaded session from storage:', result.supabase_session)
         setSession(result.supabase_session)
-      }
-
-      // On admin.tradersnap.com, poll localStorage for session
-      if (window.location.origin === process.env.PLASMO_PUBLIC_API_URL) {
-        const checkLocalStorage = () => {
-          try {
-            const stored = localStorage.getItem('trading_buddy_session')
-            if (stored) {
-              const session = JSON.parse(stored)
-              console.log('[Content] Found session in localStorage:', session)
-              setSession(session)
-              chrome.storage.local.set({ supabase_session: session })
-            }
-          } catch (e) {
-            console.error('[Content] Failed to parse localStorage session:', e)
-          }
-        }
-        
-        // Check immediately
-        checkLocalStorage()
-        
-        // Poll every 2 seconds
-        const interval = setInterval(checkLocalStorage, 2000)
-        
-        return () => clearInterval(interval)
       }
     }
     loadData()
@@ -90,6 +66,7 @@ const TradingBuddyWidget = () => {
     // Listen for session updates from chrome.storage
     const handleStorageChange = (changes: any, areaName: string) => {
       if (areaName === 'local' && changes.supabase_session) {
+        console.log('[Content] Session changed in storage:', changes.supabase_session.newValue)
         setSession(changes.supabase_session.newValue)
       }
     }
@@ -99,6 +76,42 @@ const TradingBuddyWidget = () => {
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
+
+  // Separate effect for localStorage polling on admin domain
+  useEffect(() => {
+    if (window.location.origin !== process.env.PLASMO_PUBLIC_API_URL) {
+      return
+    }
+
+    console.log('[Content] Starting localStorage polling on admin domain')
+
+    const checkLocalStorage = () => {
+      try {
+        const stored = localStorage.getItem('trading_buddy_session')
+        if (stored) {
+          const session = JSON.parse(stored)
+          console.log('[Content] Found session in localStorage, updating...')
+          setSession(session)
+          chrome.storage.local.set({ supabase_session: session })
+        } else {
+          console.log('[Content] No session in localStorage')
+        }
+      } catch (e) {
+        console.error('[Content] Failed to parse localStorage session:', e)
+      }
+    }
+    
+    // Check immediately
+    checkLocalStorage()
+    
+    // Poll every second (more aggressive)
+    const interval = setInterval(checkLocalStorage, 1000)
+    
+    return () => {
+      console.log('[Content] Stopping localStorage polling')
+      clearInterval(interval)
+    }
+  }, []) // Empty deps - runs once and maintains interval
 
   // Save messages to storage whenever they change
   useEffect(() => {
