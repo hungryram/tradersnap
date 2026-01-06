@@ -79,13 +79,18 @@ const TradingBuddyWidget = () => {
 
   // Separate effect for localStorage polling on admin domain
   useEffect(() => {
+    // Only run on admin domain
     if (window.location.origin !== process.env.PLASMO_PUBLIC_API_URL) {
       return
     }
 
     console.log('[Content] Starting localStorage polling on admin domain')
+    let interval: NodeJS.Timeout | null = null
+    let isActive = true
 
     const checkLocalStorage = () => {
+      if (!isActive) return
+      
       try {
         const stored = localStorage.getItem('trading_buddy_session')
         if (stored) {
@@ -104,12 +109,13 @@ const TradingBuddyWidget = () => {
     // Check immediately
     checkLocalStorage()
     
-    // Poll every second (more aggressive)
-    const interval = setInterval(checkLocalStorage, 1000)
+    // Poll every 3 seconds (less aggressive to prevent crashes)
+    interval = setInterval(checkLocalStorage, 3000)
     
     return () => {
       console.log('[Content] Stopping localStorage polling')
-      clearInterval(interval)
+      isActive = false
+      if (interval) clearInterval(interval)
     }
   }, []) // Empty deps - runs once and maintains interval
 
@@ -119,13 +125,6 @@ const TradingBuddyWidget = () => {
       chrome.storage.local.set({ chat_messages: messages })
     }
   }, [messages])
-
-  // Reset scroll flag when widget opens
-  useEffect(() => {
-    if (isOpen) {
-      isInitialLoadRef.current = true
-    }
-  }, [isOpen])
 
   // Reset scroll flag when widget opens
   useEffect(() => {
@@ -545,6 +544,19 @@ const TradingBuddyWidget = () => {
       
       // Add assistant message with typing animation
       const fullResponse = chatResult.message || "I couldn't process that request."
+      
+      // Safety check - if response is empty or too short, don't animate
+      if (!fullResponse || fullResponse.trim().length === 0) {
+        console.error('[Content] Empty response from chat API')
+        const errorMsg = {
+          type: 'error',
+          content: 'Received empty response. Please try again.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsSending(false)
+        return
+      }
       
       // Check if response includes drawings (from chart analysis)
       const hasDrawings = chatResult.drawings && chatResult.drawings.length > 0
