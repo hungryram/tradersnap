@@ -45,16 +45,17 @@ export async function GET(request: NextRequest) {
 
     // 2. Get query params
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '100', 10)
+    const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const offset = parseInt(searchParams.get('offset') || '0', 10)
     const sessionId = searchParams.get('session_id')
 
-    // 3. Fetch chat history
+    // 3. Fetch chat history with pagination
     let query = supabase
       .from('chat_messages')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(Math.min(limit, 500)) // Cap at 500 messages max
+      .order('created_at', { ascending: false }) // Most recent first for pagination
+      .range(offset, offset + limit - 1) // Supabase pagination
 
     // Optional: filter by session_id if provided
     if (sessionId) {
@@ -72,9 +73,9 @@ export async function GET(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 4. Return messages
+    // 4. Return messages (reverse to chronological order for display)
     const response = NextResponse.json({ 
-      messages: messages || [],
+      messages: (messages || []).reverse(), // Reverse back to chronological order
       count: messages?.length || 0
     })
     return addCorsHeaders(response, origin)

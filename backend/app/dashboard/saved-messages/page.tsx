@@ -1,0 +1,183 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase-client"
+
+interface FavoritedMessage {
+  id: string
+  role: string
+  content: string
+  created_at: string
+  is_favorited: boolean
+}
+
+export default function SavedMessagesPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [messages, setMessages] = useState<FavoritedMessage[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    checkAuth()
+    loadFavoritedMessages()
+  }, [])
+
+  async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push("/")
+    }
+  }
+
+  async function loadFavoritedMessages() {
+    setIsLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(
+        `${window.location.origin}/api/chat/favorites`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessages(data.messages || [])
+      }
+    } catch (error) {
+      console.error("Error loading favorited messages:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function unfavoriteMessage(messageId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(
+        `${window.location.origin}/api/chat/favorite`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            messageId,
+            isFavorited: false
+          })
+        }
+      )
+
+      if (response.ok) {
+        // Remove from local state
+        setMessages(prev => prev.filter(msg => msg.id !== messageId))
+      }
+    } catch (error) {
+      console.error("Error unfavoriting message:", error)
+    }
+  }
+
+  const filteredMessages = messages.filter(msg =>
+    msg.content.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Saved Messages</h1>
+            <p className="text-slate-600 text-sm">
+              Messages you've favorited for the AI to remember
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/dashboard/rules")}
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm transition-colors"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="mb-6">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search saved messages..."
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Messages List */}
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="text-slate-600 mt-4">Loading saved messages...</p>
+          </div>
+        ) : filteredMessages.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+            <div className="text-4xl mb-4">⭐</div>
+            <p className="text-slate-600 mb-2">
+              {searchTerm ? "No messages match your search" : "No saved messages yet"}
+            </p>
+            <p className="text-slate-500 text-sm">
+              {!searchTerm && "Star messages in the chat to save them here"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {msg.role === 'user' ? 'You' : 'Coach'}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {new Date(msg.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => unfavoriteMessage(msg.id)}
+                    className="text-slate-400 hover:text-red-600 transition-colors"
+                    title="Unfavorite"
+                  >
+                    ⭐
+                  </button>
+                </div>
+                <p className="text-slate-900 whitespace-pre-wrap">
+                  {msg.content}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

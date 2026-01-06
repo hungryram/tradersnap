@@ -44,6 +44,9 @@ const TradingBuddyWidget = () => {
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [messageOffset, setMessageOffset] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -66,11 +69,11 @@ const TradingBuddyWidget = () => {
         console.log('[Content] Loaded session from storage:', result.supabase_session)
         setSession(result.supabase_session)
 
-        // Fetch full chat history from Supabase
+        // Fetch full chat history from Supabase (initial load: 20 messages)
         setIsLoadingHistory(true)
         try {
           const historyResponse = await fetch(
-            `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=100`,
+            `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=20&offset=0`,
             {
               headers: {
                 "Authorization": `Bearer ${result.supabase_session.access_token}`
@@ -82,11 +85,17 @@ const TradingBuddyWidget = () => {
             const { messages: dbMessages } = await historyResponse.json()
             console.log('[Content] Loaded chat history from Supabase:', dbMessages.length, 'messages')
             
+            // If we got 20 messages, there might be more
+            setHasMoreMessages(dbMessages.length === 20)
+            setMessageOffset(20)
+            
             // Convert DB format to UI format
             const formattedMessages = dbMessages.map(msg => ({
+              id: msg.id,
               type: msg.role === 'user' ? 'user' : 'assistant',
               content: msg.content,
-              timestamp: new Date(msg.created_at)
+              timestamp: new Date(msg.created_at),
+              isFavorited: msg.is_favorited || false
             }))
             
             setMessages(formattedMessages)
@@ -470,6 +479,79 @@ const TradingBuddyWidget = () => {
       setMessages(prev => [...prev, errorMsg])
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const loadOlderMessages = async () => {
+    if (isLoadingMore || !hasMoreMessages || !session) return
+
+    setIsLoadingMore(true)
+    try {
+      const historyResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=20&offset=${messageOffset}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`
+          }
+        }
+      )
+
+      if (historyResponse.ok) {
+        const { messages: dbMessages } = await historyResponse.json()
+        console.log('[Content] Loaded older messages:', dbMessages.length)
+
+        // If we got fewer than 20, we've reached the end
+        setHasMoreMessages(dbMessages.length === 20)
+        setMessageOffset(prev => prev + dbMessages.length)
+
+        // Convert DB format to UI format
+        const formattedMessages = dbMessages.map(msg => ({
+          id: msg.id,
+          type: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          isFavorited: msg.is_favorited || false
+        }))
+
+        // Prepend older messages to the beginning
+        setMessages(prev => [...formattedMessages, ...prev])
+      }
+    } catch (error) {
+      console.error('[Content] Error loading older messages:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
+  const toggleFavorite = async (messageId: string, currentlyFavorited: boolean) => {
+    if (!session) return
+
+    try {
+      const response = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/favorite`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            messageId,
+            isFavorited: !currentlyFavorited
+          })
+        }
+      )
+
+      if (response.ok) {
+        // Update local state
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, isFavorited: !currentlyFavorited }
+            : msg
+        ))
+      }
+    } catch (error) {
+      console.error('[Content] Error toggling favorite:', error)
     }
   }
 
@@ -910,6 +992,23 @@ const TradingBuddyWidget = () => {
 
         {/* Messages */}
         <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+          {/* Load Older Messages Button */}
+          {hasMoreMessages && messages.length > 0 && (
+            <div className="flex justify-center">
+              <button
+                onClick={loadOlderMessages}
+                disabled={isLoadingMore}
+                className={`text-xs px-4 py-2 rounded-full ${
+                  theme === 'dark' 
+                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                } disabled:opacity-50 transition-colors`}
+              >
+                {isLoadingMore ? '↻ Loading...' : '↑ Load older messages'}
+              </button>
+            </div>
+          )}
+
           {messages.length === 0 && (
             <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
               <div className="text-4xl mb-2">👋</div>
@@ -919,32 +1018,47 @@ const TradingBuddyWidget = () => {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.type === 'user' && (
-                <div className="max-w-[80%]">
-                  <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm">
+            <div key={i} className="relative group">
+              {/* Favorite Star Button */}
+              {msg.id && (
+                <button
+                  onClick={() => toggleFavorite(msg.id, msg.isFavorited)}
+                  className={`absolute ${msg.type === 'user' ? 'right-0' : 'left-0'} top-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
+                    theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-200'
+                  }`}
+                  title={msg.isFavorited ? 'Unfavorite' : 'Favorite'}
+                >
+                  <span className="text-lg">
+                    {msg.isFavorited ? '⭐' : '☆'}
+                  </span>
+                </button>
+              )}
+              <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.type === 'user' && (
+                  <div className="max-w-[80%]">
+                    <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm">
+                      {msg.content}
+                    </div>
+                    {msg.chartImage && (
+                      <img 
+                        src={msg.chartImage} 
+                        alt="Chart" 
+                        className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
+                        style={{ maxHeight: '200px', cursor: 'pointer' }}
+                        onClick={() => window.open(msg.chartImage, '_blank')}
+                        title="Click to view full size"
+                      />
+                    )}
+                  </div>
+                )}
+                
+                {msg.type === 'error' && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
                     {msg.content}
                   </div>
-                  {msg.chartImage && (
-                    <img 
-                      src={msg.chartImage} 
-                      alt="Chart" 
-                      className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
-                      style={{ maxHeight: '200px', cursor: 'pointer' }}
-                      onClick={() => window.open(msg.chartImage, '_blank')}
-                      title="Click to view full size"
-                    />
-                  )}
-                </div>
-              )}
-              
-              {msg.type === 'error' && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
-                  {msg.content}
-                </div>
-              )}
-              
-              {msg.type === 'assistant' && typeof msg.content === 'string' && (
+                )}
+                
+                {msg.type === 'assistant' && typeof msg.content === 'string' && (
                 <div className="max-w-[85%]">
                   {/* Show chart with overlay if drawings exist */}
                   {msg.chartImage && msg.drawings && msg.drawings.length > 0 && (
@@ -1048,8 +1162,11 @@ const TradingBuddyWidget = () => {
                   )}
                 </div>
               )}
+              </div>
             </div>
           ))}
+
+
           
           {/* Auto-scroll anchor */}
           <div ref={messagesEndRef} />

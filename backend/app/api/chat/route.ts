@@ -96,6 +96,12 @@ export async function POST(request: NextRequest) {
     const coachingPrompt = `You are a sharp, experienced trading coach—think Mark Douglas meets a brutally honest gym trainer.
 You help traders build discipline and execute THEIR plan, not hand them signals.
 
+**YOUR CAPABILITIES:**
+- You CAN see and analyze chart screenshots when users send them
+- You have vision capabilities to read timeframes, indicators, price levels, and candle patterns
+- When a screenshot is provided, analyze it directly and confidently
+- Never say "I can't see your chart" - you can see it
+
 USER'S TRADING RULES:
 ${userRules}
 
@@ -214,9 +220,26 @@ RESPONSE STYLE:
 
 Remember: You're their accountability partner, not their signal service. Make them think, don't think for them.`
 
+    // Fetch favorited messages to include in context
+    const { data: favoritedMessages } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_favorited', true)
+      .order('created_at', { ascending: true })
+      .limit(10) // Limit to 10 favorited messages to avoid token bloat
+
     const messages: any[] = [
       { role: "system", content: coachingPrompt }
     ]
+
+    // Add favorited messages first (AI's persistent memory)
+    if (favoritedMessages && favoritedMessages.length > 0) {
+      messages.push({
+        role: "system",
+        content: `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n')}`
+      })
+    }
 
     // Add conversation history if provided
     if (validatedRequest.conversationHistory) {
@@ -268,7 +291,7 @@ Remember: You're their accountability partner, not their signal service. Make th
           user_id: user.id,
           role: 'user',
           content: validatedRequest.message,
-          screenshot_url: validatedRequest.image ? 'base64_screenshot' : null // Store indicator, actual image in chrome.storage
+          screenshot_url: null // Chart images stored in extension chrome.storage
         },
         {
           user_id: user.id,
