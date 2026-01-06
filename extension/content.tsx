@@ -745,9 +745,10 @@ const TradingBuddyWidget = () => {
       >
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium flex items-center gap-2"
         >
-          🤖 Trading Buddy
+          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Trader Snap" className="w-6 h-6" />
+          Trader Snap
         </button>
       </div>
     )
@@ -782,9 +783,9 @@ const TradingBuddyWidget = () => {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2">
-            <span className="text-xl">🤖</span>
+            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Trader Snap" className="w-8 h-8" />
             <div>
-              <div className="font-semibold text-white">Trading Buddy</div>
+              <div className="font-semibold text-white">Trader Snap</div>
               <div className="text-xs text-blue-100">AI Psychology Coach</div>
             </div>
           </div>

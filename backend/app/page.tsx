@@ -107,8 +107,8 @@ export default function Home() {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <div className="text-5xl mb-4">🤖</div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Trading Buddy</h1>
+            <img src="/icon.png" alt="Trader Snap" className="w-16 h-16 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Trader Snap</h1>
             <p className="text-slate-600">AI Trading Psychology Coach</p>
           </div>
 

@@ -152,7 +152,7 @@ export default function AccountPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🤖</span>
-            <h1 className="text-xl font-bold text-slate-900">Trading Buddy</h1>
+            <h1 className="text-xl font-bold text-slate-900">Trader Snap</h1>
           </div>
           <div className="flex items-center gap-4">
             <a
@@ -268,7 +268,7 @@ export default function AccountPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
             <h2 className="text-xl font-bold text-slate-900 mb-2">Chrome Extension</h2>
             <p className="text-sm text-slate-600 mb-4">
-              Install the Trading Buddy extension to analyze your charts.
+              Install the Trader Snap extension to analyze your charts.
             </p>
             <a
               href="chrome://extensions"
