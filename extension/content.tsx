@@ -137,9 +137,27 @@ const TradingBuddyWidget = () => {
         const stored = localStorage.getItem('trading_buddy_session')
         if (stored) {
           const session = JSON.parse(stored)
-          console.log('[Content] Found session in localStorage, updating...')
-          setSession(session)
-          chrome.storage.local.set({ supabase_session: session })
+          
+          // Check if session is expired or about to expire (within 5 minutes)
+          const expiresAt = session.expires_at
+          const now = Date.now() / 1000
+          const fiveMinutes = 5 * 60
+          
+          if (expiresAt && expiresAt > now) {
+            console.log('[Content] Session valid, time until expiry:', Math.floor((expiresAt - now) / 60), 'minutes')
+            setSession(session)
+            chrome.storage.local.set({ supabase_session: session })
+            
+            // If expiring soon, log a warning
+            if (expiresAt - now < fiveMinutes) {
+              console.warn('[Content] Session expiring soon! Please refresh the page.')
+            }
+          } else {
+            console.log('[Content] Session expired, clearing...')
+            localStorage.removeItem('trading_buddy_session')
+            chrome.storage.local.remove('supabase_session')
+            setSession(null)
+          }
         } else {
           console.log('[Content] No session in localStorage')
         }
@@ -151,7 +169,7 @@ const TradingBuddyWidget = () => {
     // Check immediately
     checkLocalStorage()
     
-    // Poll every 3 seconds (less aggressive to prevent crashes)
+    // Poll every 3 seconds
     interval = setInterval(checkLocalStorage, 3000)
     
     return () => {
@@ -159,7 +177,7 @@ const TradingBuddyWidget = () => {
       isActive = false
       if (interval) clearInterval(interval)
     }
-  }, []) // Empty deps - runs once and maintains interval
+  }, [])
 
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {

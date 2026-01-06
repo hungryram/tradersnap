@@ -14,113 +14,109 @@ function IndexPopup() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check auth state
-    console.log('[Popup] Component mounted, checking initial auth state...')
+    console.log('[Popup] Component mounted, initializing auth...')
     
     const initializeAuth = async () => {
-      // First, check chrome.storage for existing session
       try {
-        const result = await chrome.storage.local.get('supabase_session')
-        console.log('[Popup] Storage check:', result)
+        // Step 1: Check Supabase session (this will auto-refresh if needed)
+        const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (result.supabase_session?.user) {
-          console.log('[Popup] Found session in storage!')
+        if (error) {
+          console.error('[Popup] Supabase session error:', error)
+        }
+        
+        if (session) {
+          console.log('[Popup] Active Supabase session found')
           setIsLoggedIn(true)
-          setUser(result.supabase_session.user)
+          setUser(session.user)
+          // Update chrome.storage with fresh session
+          await chrome.storage.local.set({ supabase_session: session })
           setIsLoading(false)
           return
         }
-      } catch (error) {
-        console.error('[Popup] Storage check failed:', error)
-      }
-      
-      // Fallback: Try auth domain localStorage
-      try {
-        const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
-        if (tabs.length > 0) {
-          console.log('[Popup] Auth domain tab found')
-          const result = await chrome.scripting.executeScript({
-            target: { tabId: tabs[0].id! },
-            func: () => localStorage.getItem('trading_buddy_session')
-          })
-          
-          if (result[0]?.result) {
-            const session = JSON.parse(result[0].result)
-            console.log('[Popup] Found session in auth domain!')
+        
+        // Step 2: Check chrome.storage (might have session from content script)
+        const result = await chrome.storage.local.get('supabase_session')
+        if (result.supabase_session?.user) {
+          console.log('[Popup] Found cached session')
+          // Verify it's not expired
+          const expiresAt = result.supabase_session.expires_at
+          if (expiresAt && expiresAt > Date.now() / 1000) {
             setIsLoggedIn(true)
-            setUser(session.user)
-            chrome.storage.local.set({ supabase_session: session })
+            setUser(result.supabase_session.user)
             setIsLoading(false)
             return
+          } else {
+            console.log('[Popup] Cached session expired, clearing...')
+            await chrome.storage.local.remove('supabase_session')
           }
         }
+        
+        // No valid session found
+        console.log('[Popup] No valid session found')
+        setIsLoggedIn(false)
+        setUser(null)
+        setIsLoading(false)
       } catch (error) {
-        console.log('[Popup] Auth domain check failed:', error)
-      }
-      
-      // Final fallback: Supabase getSession
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('[Popup] Supabase session:', session ? 'Found' : 'None')
-      setIsLoggedIn(!!session)
-      setUser(session?.user || null)
-      setIsLoading(false)
-      
-      if (session) {
-        chrome.storage.local.set({ supabase_session: session })
+        console.error('[Popup] Error initializing auth:', error)
+        setIsLoading(false)
       }
     }
     
-    // Run initialization
     initializeAuth()
 
-    // Listen for auth changes
+    // Listen for auth changes from Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('[Popup] Auth state changed:', event)
+      async (event, session) => {
+        console.log('[Popup] Auth state changed:', event, session ? 'logged in' : 'logged out')
         setIsLoggedIn(!!session)
         setUser(session?.user || null)
         
         // Update chrome.storage
         if (session) {
-          chrome.storage.local.set({ 
-            supabase_session: session 
-          })
+          await chrome.storage.local.set({ supabase_session: session })
         } else {
-          chrome.storage.local.remove('supabase_session')
+          await chrome.storage.local.remove('supabase_session')
         }
       }
     )
 
-    // Poll for session updates (in case user signs in via magic link or web app)
-    const pollInterval = setInterval(async () => {
-      // Check chrome.storage first (updated by content script when web app session changes)
-      const storageResult = await chrome.storage.local.get('supabase_session')
-      if (storageResult.supabase_session) {
-        console.log('[Popup] Session found in storage during poll!')
-        setIsLoggedIn(true)
-        setUser(storageResult.supabase_session.user)
-        return
-      }
-      
-      // Fallback to Supabase session check
+    // Auto-refresh session every 30 seconds to prevent expiration
+    const refreshInterval = setInterval(async () => {
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (session) {
-        console.log('[Popup] Session found during poll!')
+        // Session exists and is auto-refreshed by Supabase
+        await chrome.storage.local.set({ supabase_session: session })
         setIsLoggedIn(true)
         setUser(session.user)
-        chrome.storage.local.set({ supabase_session: session })
-      } else if (session && isLoggedIn) {
-        // Refresh existing session in storage (updates access token if refreshed)
-        chrome.storage.local.set({ supabase_session: session })
+      } else if (error) {
+        console.error('[Popup] Session refresh error:', error)
       }
-    }, 2000) // Check every 2 seconds
+    }, 30000) // Every 30 seconds
+
+    // Also listen for storage changes (from content script)
+    const handleStorageChange = (changes: any, areaName: string) => {
+      if (areaName === 'local' && changes.supabase_session) {
+        const newSession = changes.supabase_session.newValue
+        if (newSession?.user) {
+          console.log('[Popup] Session updated from storage')
+          setIsLoggedIn(true)
+          setUser(newSession.user)
+        } else {
+          setIsLoggedIn(false)
+          setUser(null)
+        }
+      }
+    }
+    chrome.storage.onChanged.addListener(handleStorageChange)
 
     return () => {
       subscription.unsubscribe()
-      clearInterval(pollInterval)
+      clearInterval(refreshInterval)
+      chrome.storage.onChanged.removeListener(handleStorageChange)
     }
-  }, [isLoggedIn])
+  }, [])
 
   const handleSignOut = async () => {
     try {
