@@ -312,11 +312,12 @@ Remember: You're their accountability partner, not their signal service. Make th
         console.error('[Chat API] Failed to save messages:', dbError)
         // Don't fail the request if DB save fails - user still gets response
       } else {
-        console.log('[Chat API] Messages saved to database')
+        console.log('[Chat API] Messages saved to database:', savedMessages)
         // Extract message IDs
         if (savedMessages && savedMessages.length === 2) {
           userMessageId = savedMessages.find(m => m.role === 'user')?.id || null
           assistantMessageId = savedMessages.find(m => m.role === 'assistant')?.id || null
+          console.log('[Chat API] Extracted IDs:', { userMessageId, assistantMessageId })
         }
       }
     } catch (dbError) {
@@ -325,6 +326,7 @@ Remember: You're their accountability partner, not their signal service. Make th
     }
 
     // 6. Return response with message IDs
+    console.log('[Chat API] Returning response with IDs:', { userMessageId, assistantMessageId })
     const response = NextResponse.json({ 
       message: aiResponse,
       userMessageId,
