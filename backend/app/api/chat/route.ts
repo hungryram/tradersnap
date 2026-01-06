@@ -261,7 +261,38 @@ Remember: You're their accountability partner, not their signal service. Make th
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
 
-    // 5. Return response
+    // 5. Save messages to database for audit trail
+    try {
+      const messagesToSave = [
+        {
+          user_id: user.id,
+          role: 'user',
+          content: validatedRequest.message,
+          screenshot_url: validatedRequest.image ? 'base64_screenshot' : null // Store indicator, actual image in chrome.storage
+        },
+        {
+          user_id: user.id,
+          role: 'assistant',
+          content: aiResponse
+        }
+      ]
+
+      const { error: dbError } = await supabase
+        .from('chat_messages')
+        .insert(messagesToSave)
+
+      if (dbError) {
+        console.error('[Chat API] Failed to save messages:', dbError)
+        // Don't fail the request if DB save fails - user still gets response
+      } else {
+        console.log('[Chat API] Messages saved to database')
+      }
+    } catch (dbError) {
+      console.error('[Chat API] Error saving to database:', dbError)
+      // Continue anyway - chat works even if audit trail fails
+    }
+
+    // 6. Return response
     const response = NextResponse.json({ 
       message: aiResponse
     })

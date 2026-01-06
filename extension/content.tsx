@@ -43,6 +43,7 @@ const TradingBuddyWidget = () => {
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
 
@@ -50,15 +51,56 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     const loadData = async () => {
       const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session'])
+      
+      // Load cached messages for instant display
       if (result.chat_messages) {
         setMessages(result.chat_messages)
       }
+      
       if (result.theme) {
         setTheme(result.theme)
       }
+      
       if (result.supabase_session) {
         console.log('[Content] Loaded session from storage:', result.supabase_session)
         setSession(result.supabase_session)
+
+        // Fetch full chat history from Supabase
+        setIsLoadingHistory(true)
+        try {
+          const historyResponse = await fetch(
+            `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=100`,
+            {
+              headers: {
+                "Authorization": `Bearer ${result.supabase_session.access_token}`
+              }
+            }
+          )
+
+          if (historyResponse.ok) {
+            const { messages: dbMessages } = await historyResponse.json()
+            console.log('[Content] Loaded chat history from Supabase:', dbMessages.length, 'messages')
+            
+            // Convert DB format to UI format
+            const formattedMessages = dbMessages.map(msg => ({
+              type: msg.role === 'user' ? 'user' : 'assistant',
+              content: msg.content,
+              timestamp: new Date(msg.created_at)
+            }))
+            
+            setMessages(formattedMessages)
+            
+            // Update cache
+            chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
+          } else {
+            console.error('[Content] Failed to load chat history:', historyResponse.status)
+          }
+        } catch (error) {
+          console.error('[Content] Error loading chat history:', error)
+          // Keep using cached messages if API fails
+        } finally {
+          setIsLoadingHistory(false)
+        }
       }
     }
     loadData()
@@ -766,11 +808,39 @@ const TradingBuddyWidget = () => {
                 </button>
                 {messages.length > 0 && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (confirm('Clear all chat messages? This will reset the conversation but keep your trading rules.')) {
-                        setMessages([])
-                        chrome.storage.local.remove('chat_messages')
-                        setShowMenu(false)
+                        try {
+                          // Clear from Supabase
+                          if (session?.access_token) {
+                            const response = await fetch(
+                              `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/clear`,
+                              {
+                                method: 'DELETE',
+                                headers: {
+                                  'Authorization': `Bearer ${session.access_token}`
+                                }
+                              }
+                            )
+                            
+                            if (!response.ok) {
+                              console.error('[Content] Failed to clear chat from database')
+                            } else {
+                              console.log('[Content] Chat cleared from database')
+                            }
+                          }
+                          
+                          // Clear from local state and storage
+                          setMessages([])
+                          chrome.storage.local.remove('chat_messages')
+                          setShowMenu(false)
+                        } catch (error) {
+                          console.error('[Content] Error clearing chat:', error)
+                          // Still clear locally even if API fails
+                          setMessages([])
+                          chrome.storage.local.remove('chat_messages')
+                          setShowMenu(false)
+                        }
                       }
                     }}
                     className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
