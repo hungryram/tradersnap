@@ -62,6 +62,10 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
     }
 
+    // Get the base URL (strip any path from origin header)
+    const origin = request.headers.get("origin") || ""
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(origin).origin
+
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -73,8 +77,8 @@ export async function POST(request: NextRequest) {
           quantity: 1
         }
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin")}/dashboard/account?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin")}/dashboard/account`,
+      success_url: `${baseUrl}/dashboard/account?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard/account`,
       metadata: {
         supabase_user_id: user.id,
         plan: plan
