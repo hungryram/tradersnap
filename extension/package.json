@@ -30,13 +30,13 @@
   },
   "manifest": {
     "host_permissions": [
-      "<all_urls>"
+      "https://*.tradingview.com/*",
+      "https://admin.tradersnap.com/*"
     ],
     "permissions": [
       "activeTab",
       "storage",
-      "scripting",
-      "tabs"
+      "scripting"
     ]
   }
 }
