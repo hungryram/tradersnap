@@ -167,9 +167,11 @@ function IndexPopup() {
             <p className="text-sm font-medium truncate">{user?.email}</p>
           </div>
           
-          <p className="text-sm text-slate-300">
-            Use <span className="font-mono bg-slate-800 px-1 rounded">Cmd/Ctrl + Shift + A</span> to analyze charts
-          </p>
+          <div className="text-xs text-slate-300 space-y-1">
+            <p>Keyboard shortcuts:</p>
+            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + A</span> - Analyze chart</p>
+            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Enter</span> - Send with chart</p>
+          </div>
 
           <button 
             className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm"

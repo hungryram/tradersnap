@@ -951,9 +951,15 @@ const TradingBuddyWidget = () => {
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 e.stopPropagation()
-                if (e.key === 'Enter' && inputText.trim() && !isSending) {
+                if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending) {
                   e.preventDefault()
-                  handleSendMessage(inputText, false)
+                  if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+Enter or Cmd+Enter: Send with chart
+                    handleSendMessage(inputText, true)
+                  } else {
+                    // Regular Enter: Send without chart
+                    handleSendMessage(inputText, false)
+                  }
                 }
               }}
               onKeyPress={(e) => e.stopPropagation()}
