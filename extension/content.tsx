@@ -531,6 +531,12 @@ const TradingBuddyWidget = () => {
 
       if (!supabase_session) {
         console.error('[Content] No session found for favorite toggle')
+        // Show error to user
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: 'Session expired. Please reload the extension to continue.',
+          timestamp: new Date()
+        }])
         return
       }
 

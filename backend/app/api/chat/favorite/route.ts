@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-client"
+import { createAdminClient } from "@/lib/supabase-admin"
 
 export const runtime = "nodejs"
 
@@ -52,8 +53,11 @@ export async function POST(req: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
+    // Use admin client to bypass RLS (we manually check user_id for security)
+    const adminClient = createAdminClient()
+
     // Update the message's favorited status
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("chat_messages")
       .update({ is_favorited: isFavorited })
       .eq("id", messageId)
