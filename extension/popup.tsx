@@ -18,8 +18,33 @@ function IndexPopup() {
     console.log('[Popup] Supabase URL:', process.env.PLASMO_PUBLIC_SUPABASE_URL)
     console.log('[Popup] API URL:', process.env.PLASMO_PUBLIC_API_URL)
     
-    // First, try to load session from the auth domain's localStorage
+    // First, check chrome.storage for existing session
+    const checkStoredSession = async () => {
+      try {
+        const result = await chrome.storage.local.get('supabase_session')
+        console.log('[Popup] Checking storage on mount:', result)
+        if (result.supabase_session) {
+          console.log('[Popup] Found session in storage!')
+          setIsLoggedIn(true)
+          setUser(result.supabase_session.user)
+          return true
+        }
+        return false
+      } catch (error) {
+        console.error('[Popup] Error checking storage:', error)
+        return false
+      }
+    }
+    
+    // Then, try to load session from the auth domain's localStorage
     const checkAuthDomainSession = async () => {
+      // First check if we already have session in storage
+      const hasStoredSession = await checkStoredSession()
+      if (hasStoredSession) {
+        return
+      }
+      
+      console.log('[Popup] No stored session, checking auth domain...')
       try {
         // Query the auth domain tab if it's open
         const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
@@ -82,7 +107,7 @@ function IndexPopup() {
     const pollInterval = setInterval(async () => {
       // Check chrome.storage first (updated by content script when web app session changes)
       const storageResult = await chrome.storage.local.get('supabase_session')
-      if (storageResult.supabase_session && !isLoggedIn) {
+      if (storageResult.supabase_session) {
         console.log('[Popup] Session found in storage during poll!')
         setIsLoggedIn(true)
         setUser(storageResult.supabase_session.user)
@@ -92,7 +117,7 @@ function IndexPopup() {
       // Fallback to Supabase session check
       const { data: { session }, error } = await supabase.auth.getSession()
       
-      if (session && !isLoggedIn) {
+      if (session) {
         console.log('[Popup] Session found during poll!')
         setIsLoggedIn(true)
         setUser(session.user)
