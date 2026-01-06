@@ -119,10 +119,18 @@ const TradingBuddyWidget = () => {
     }
   }, []) // Empty deps - runs once and maintains interval
 
-  // Save messages to storage whenever they change
+  // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {
     if (messages.length > 0) {
-      chrome.storage.local.set({ chat_messages: messages })
+      // Keep only last 20 messages to avoid storage quota exceeded errors
+      const recentMessages = messages.slice(-20)
+      chrome.storage.local.set({ chat_messages: recentMessages }).catch(err => {
+        console.error('[Content] Failed to save messages:', err)
+        // If storage fails, try saving just last 10
+        chrome.storage.local.set({ chat_messages: messages.slice(-10) }).catch(() => {
+          console.error('[Content] Storage quota critically exceeded')
+        })
+      })
     }
   }, [messages])
 

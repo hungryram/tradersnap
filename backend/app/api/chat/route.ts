@@ -214,27 +214,14 @@ Remember: You're their accountability partner, not their signal service. Make th
       model: "gpt-4o",
       messages,
       max_tokens: 1200,
-      temperature: 0.7,
-      response_format: validatedRequest.includeChart ? { type: "json_object" } : undefined
+      temperature: 0.7
     })
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
 
-    // Parse response if it's JSON (contains drawings)
-    let responseData: any = { message: aiResponse }
-    if (validatedRequest.includeChart || validatedRequest.image) {
-      try {
-        responseData = JSON.parse(aiResponse)
-      } catch {
-        // If not valid JSON, treat as plain text
-        responseData = { message: aiResponse }
-      }
-    }
-
     // 5. Return response
     const response = NextResponse.json({ 
-      ...responseData,
-      includesChart: validatedRequest.includeChart || false
+      message: aiResponse
     })
     return addCorsHeaders(response, origin)
 
