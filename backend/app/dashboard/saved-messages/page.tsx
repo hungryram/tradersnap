@@ -202,9 +202,22 @@ export default function SavedMessagesPage() {
                     ⭐
                   </button>
                 </div>
-                <p className="text-slate-900 whitespace-pre-wrap">
-                  {msg.content}
-                </p>
+                <div className="text-slate-900 prose prose-sm max-w-none">
+                  {msg.content.split('\n').map((line, i) => {
+                    // Parse markdown-style bold
+                    const parts = line.split(/(\*\*.*?\*\*)/g)
+                    return (
+                      <p key={i} className="mb-2 last:mb-0">
+                        {parts.map((part, j) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={j}>{part.slice(2, -2)}</strong>
+                          }
+                          return <span key={j}>{part}</span>
+                        })}
+                      </p>
+                    )
+                  })}
+                </div>
               </div>
             ))}
           </div>
