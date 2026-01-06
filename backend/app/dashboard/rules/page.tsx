@@ -37,6 +37,13 @@ export default function RulesPage() {
       return
     }
 
+    // Save session to localStorage for extension to detect
+    try {
+      localStorage.setItem('trading_buddy_session', JSON.stringify(session))
+    } catch (e) {
+      console.error('Failed to save session to localStorage:', e)
+    }
+
     await loadRulesets(session.access_token)
   }
 

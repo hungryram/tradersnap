@@ -48,7 +48,17 @@ export default function AuthSuccessPage() {
         return
       }
       
-      console.log('[Auth Success] Session found, checking onboarding status...')
+      console.log('[Auth Success] Session found, saving to localStorage...')
+      
+      // Save session to localStorage for extension to detect
+      try {
+        localStorage.setItem('trading_buddy_session', JSON.stringify(session))
+        console.log('[Auth Success] Session saved to localStorage')
+      } catch (e) {
+        console.error('[Auth Success] Failed to save to localStorage:', e)
+      }
+      
+      console.log('[Auth Success] Checking onboarding status...')
       setStatus('Loading your profile...')
       
       // Check onboarding status
