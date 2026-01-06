@@ -721,6 +721,13 @@ const TradingBuddyWidget = () => {
 
       const chatResult = await apiResponse.json()
       
+      // Update user message with database ID
+      if (chatResult.userMessageId) {
+        setMessages(prev => prev.map(msg => 
+          msg === userMessage ? { ...msg, id: chatResult.userMessageId, isFavorited: false } : msg
+        ))
+      }
+      
       // Add assistant message with typing animation
       const fullResponse = chatResult.message || "I couldn't process that request."
       
@@ -749,7 +756,9 @@ const TradingBuddyWidget = () => {
         isTyping: true,
         fullContent: fullResponse,
         chartImage: responseChartImage,
-        drawings: hasDrawings ? chatResult.drawings : undefined
+        drawings: hasDrawings ? chatResult.drawings : undefined,
+        id: chatResult.assistantMessageId,
+        isFavorited: false
       }
       setMessages(prev => [...prev, assistantMessage])
       

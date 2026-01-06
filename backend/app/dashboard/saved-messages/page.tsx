@@ -91,8 +91,46 @@ export default function SavedMessagesPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50">
+      <nav className="bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🤖</span>
+            <h1 className="text-xl font-bold text-slate-900">Snapchart</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <a
+              href="/dashboard/rules"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Rules
+            </a>
+            <a
+              href="/dashboard/account"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Account
+            </a>
+            <button
+              onClick={async () => {
+                try {
+                  await supabase.auth.signOut()
+                  localStorage.removeItem('trading_buddy_session')
+                  window.location.href = '/'
+                } catch (error) {
+                  console.error('Sign out error:', error)
+                  window.location.href = '/'
+                }
+              }}
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-5xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -101,12 +139,6 @@ export default function SavedMessagesPage() {
               Messages you've favorited for the AI to remember
             </p>
           </div>
-          <button
-            onClick={() => router.push("/dashboard/rules")}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm transition-colors"
-          >
-            ← Back to Dashboard
-          </button>
         </div>
 
         {/* Search */}

@@ -241,6 +241,12 @@ export default function RulesPage() {
           </div>
           <div className="flex items-center gap-4">
             <a
+              href="/dashboard/saved-messages"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Saved Messages
+            </a>
+            <a
               href="/dashboard/account"
               className="text-sm text-slate-600 hover:text-slate-900"
             >

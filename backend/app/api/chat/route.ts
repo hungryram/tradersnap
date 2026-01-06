@@ -285,6 +285,9 @@ Remember: You're their accountability partner, not their signal service. Make th
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
 
     // 5. Save messages to database for audit trail
+    let userMessageId: string | null = null
+    let assistantMessageId: string | null = null
+    
     try {
       const messagesToSave = [
         {
@@ -300,24 +303,32 @@ Remember: You're their accountability partner, not their signal service. Make th
         }
       ]
 
-      const { error: dbError } = await supabase
+      const { data: savedMessages, error: dbError } = await supabase
         .from('chat_messages')
         .insert(messagesToSave)
+        .select('id, role')
 
       if (dbError) {
         console.error('[Chat API] Failed to save messages:', dbError)
         // Don't fail the request if DB save fails - user still gets response
       } else {
         console.log('[Chat API] Messages saved to database')
+        // Extract message IDs
+        if (savedMessages && savedMessages.length === 2) {
+          userMessageId = savedMessages.find(m => m.role === 'user')?.id || null
+          assistantMessageId = savedMessages.find(m => m.role === 'assistant')?.id || null
+        }
       }
     } catch (dbError) {
       console.error('[Chat API] Error saving to database:', dbError)
       // Continue anyway - chat works even if audit trail fails
     }
 
-    // 6. Return response
+    // 6. Return response with message IDs
     const response = NextResponse.json({ 
-      message: aiResponse
+      message: aiResponse,
+      userMessageId,
+      assistantMessageId
     })
     return addCorsHeaders(response, origin)
 

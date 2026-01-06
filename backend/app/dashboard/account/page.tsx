@@ -161,6 +161,12 @@ export default function AccountPage() {
             >
               Rules
             </a>
+            <a
+              href="/dashboard/saved-messages"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              Saved Messages
+            </a>
             <button
               onClick={async () => {
                 try {
