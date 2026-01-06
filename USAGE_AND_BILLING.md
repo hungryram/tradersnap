@@ -2,7 +2,27 @@
 
 ## Current Usage Implementation
 
-### How Usage is Tracked
+### What Counts Against Usage?
+
+**✅ Chart Analyses** (Limited per plan):
+- Every request to `/api/analyze` endpoint
+- Triggered when user clicks "Analyze Chart" in extension
+- Includes full AI analysis with vision + rule checking
+
+**✅ Chat Messages** (Currently UNLIMITED):
+- Requests to `/api/chat` endpoint
+- Follow-up questions about charts
+- Trading psychology coaching
+- **NO usage tracking implemented yet**
+
+### Usage Limits by Plan
+- **Free**: 10 chart analyses/month, unlimited chat
+- **Pro**: 300 chart analyses/month, unlimited chat
+- **Unlimited**: No limits on anything
+
+---
+
+## How Usage is Tracked
 
 **Per Analysis Request** (`/api/analyze` endpoint):
 ```typescript
@@ -251,3 +271,88 @@ If you want to **monetize overages for Pro users only**:
 This gives pro users flexibility without cutting them off, while encouraging free users to upgrade.
 
 Let me know which approach you prefer and I can implement it!
+
+---
+
+## Chat Usage: Should It Be Limited?
+
+### Current State
+Chat messages to `/api/chat` are **completely unlimited** - no tracking or enforcement exists.
+
+### Arguments FOR Limiting Chat
+
+**Pros:**
+- ✅ Prevents abuse (endless automated conversations)
+- ✅ OpenAI charges per token - unlimited chat = unbounded costs
+- ✅ Encourages upgrades if users love the coaching feature
+- ✅ Fairer resource distribution across users
+
+**Cons:**
+- ❌ Chat is the engagement hook - limiting it might reduce retention
+- ❌ Harder to measure value (one chart analysis >> multiple chat messages)
+- ❌ Users expect chat to be "free" in most apps
+
+### Arguments AGAINST Limiting Chat
+
+**Pros:**
+- ✅ Higher engagement = more likely to upgrade for chart analyses
+- ✅ Simpler mental model: "Analyses are limited, chat is free"
+- ✅ Chat builds habit/stickiness before hitting paywall
+- ✅ Most coaching apps don't limit text conversations
+
+**Cons:**
+- ❌ Risk of OpenAI cost explosion if abused
+- ❌ No natural upgrade trigger for chat-only users
+
+### Recommended Approach: Soft Chat Limits
+
+**Free Plan:**
+- 10 chart analyses/month (hard limit)
+- 50 chat messages/month (soft limit with grace period)
+- Shows warning at 40 messages: "10 more free messages this month"
+
+**Pro Plan:**
+- 300 chart analyses/month
+- Unlimited chat
+
+**Unlimited Plan:**
+- Everything unlimited
+
+**Why this works:**
+- Prevents abuse on free tier
+- Protects against OpenAI cost spikes
+- Pro plan becomes more attractive ("unlimited coaching")
+- Most users won't hit 50 chat messages anyway
+
+### Alternative: Ignore Chat Usage Entirely
+
+If OpenAI costs are manageable (~$0.002 per message), you could:
+- Keep chat completely unlimited for all plans
+- Use it as a lead magnet / engagement tool
+- Only monetize chart analyses (the "premium" feature)
+- Monitor costs and add limits only if abuse occurs
+
+**This is the simplest approach and I'd recommend starting here.**
+
+---
+
+## Implementation Status
+
+### ✅ Completed
+- Chart analysis usage tracking
+- Monthly usage limits (10 free, 300 pro)
+- Hard limit enforcement
+- Usage display in dashboard
+
+### 🔄 In Progress
+- UsageMeter component for extension chat widget
+- Visual progress bars in popover
+- Real-time usage display
+
+### ⏳ Not Yet Implemented
+- Chat message usage tracking
+- Soft limits with grace periods
+- Warning notifications
+- Metered billing for overages
+
+Let me know which direction you want to go with chat usage!

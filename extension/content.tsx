@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
+import { UsageMeter } from "~components/UsageMeter"
 
 import styleText from "data-text:~style.css"
 
@@ -651,6 +652,7 @@ const TradingBuddyWidget = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 relative">
+            <UsageMeter session={supabaseSession} />
             <button
               onClick={(e) => {
                 e.stopPropagation()
