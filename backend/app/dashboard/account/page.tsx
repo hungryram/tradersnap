@@ -82,7 +82,8 @@ export default function AccountPage() {
       if (!response.ok) throw new Error("Failed to create portal session")
 
       const data = await response.json()
-      window.location.href = data.url
+      window.open(data.url, '_blank')
+      setIsLoadingPortal(false)
       
     } catch (err) {
       console.error("Portal error:", err)
