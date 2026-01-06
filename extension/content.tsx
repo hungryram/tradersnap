@@ -523,7 +523,7 @@ const TradingBuddyWidget = () => {
     }
   }
 
-  const toggleFavorite = async (messageId: string, currentlyFavorited: boolean) => {
+  const toggleFavorite = async (messageId: string, currentlyFavorited: boolean | undefined) => {
     try {
       // Get fresh session from storage
       const result = await chrome.storage.local.get('supabase_session')
@@ -533,6 +533,12 @@ const TradingBuddyWidget = () => {
         console.error('[Content] No session found for favorite toggle')
         return
       }
+
+      // Treat undefined as false
+      const wasFavorited = currentlyFavorited === true
+      const willBeFavorited = !wasFavorited
+
+      console.log('[Content] Toggling favorite:', { messageId, wasFavorited, willBeFavorited })
 
       const response = await fetch(
         `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/favorite`,
@@ -544,20 +550,23 @@ const TradingBuddyWidget = () => {
           },
           body: JSON.stringify({
             messageId,
-            isFavorited: !currentlyFavorited
+            isFavorited: willBeFavorited
           })
         }
       )
 
       if (response.ok) {
+        console.log('[Content] Favorite toggled successfully')
         // Update local state
         setMessages(prev => prev.map(msg => 
           msg.id === messageId 
-            ? { ...msg, isFavorited: !currentlyFavorited }
+            ? { ...msg, isFavorited: willBeFavorited }
             : msg
         ))
       } else {
         console.error('[Content] Failed to toggle favorite:', response.status)
+        const errorText = await response.text()
+        console.error('[Content] Error response:', errorText)
       }
     } catch (error) {
       console.error('[Content] Error toggling favorite:', error)
