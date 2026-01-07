@@ -79,6 +79,9 @@ const TradingBuddyWidget = () => {
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messageOffset, setMessageOffset] = useState(0)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isTimedOut, setIsTimedOut] = useState(false)
+  const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
+  const [timeoutReason, setTimeoutReason] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -86,7 +89,7 @@ const TradingBuddyWidget = () => {
   // Load messages, theme, and session from storage on mount
   useEffect(() => {
     const loadData = async () => {
-      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session'])
+      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session', 'timeout_end'])
       
       console.log('[Content] Loading from chrome.storage:', {
         hasMessages: !!result.chat_messages,
@@ -94,6 +97,24 @@ const TradingBuddyWidget = () => {
         hasSession: !!result.supabase_session,
         sessionKeys: result.supabase_session ? Object.keys(result.supabase_session) : []
       })
+      
+      // Check for active timeout
+      if (result.timeout_end) {
+        const now = Date.now()
+        const endTime = result.timeout_end.endTime
+        const reason = result.timeout_end.reason
+        
+        if (endTime > now) {
+          console.log('[Content] Active timeout found, ends in:', Math.floor((endTime - now) / 1000), 'seconds')
+          setIsTimedOut(true)
+          setTimeoutEndTime(endTime)
+          setTimeoutReason(reason || 'Take a break to reset')
+        } else {
+          // Timeout expired, clear it
+          console.log('[Content] Timeout expired, clearing')
+          chrome.storage.local.remove('timeout_end')
+        }
+      }
       
       // Load cached messages for instant display
       if (result.chat_messages) {
@@ -167,6 +188,26 @@ const TradingBuddyWidget = () => {
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
+
+  // Timeout countdown timer
+  useEffect(() => {
+    if (!isTimedOut || !timeoutEndTime) return
+
+    const interval = setInterval(() => {
+      const now = Date.now()
+      if (now >= timeoutEndTime) {
+        // Timeout expired, unlock chat
+        console.log('[Content] Timeout expired, unlocking chat')
+        setIsTimedOut(false)
+        setTimeoutEndTime(null)
+        setTimeoutReason('')
+        chrome.storage.local.remove('timeout_end')
+        clearInterval(interval)
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isTimedOut, timeoutEndTime])
 
   // Listen for login messages from backend (no polling!)
   useEffect(() => {
@@ -823,6 +864,25 @@ const TradingBuddyWidget = () => {
 
       const chatResult = await apiResponse.json()
       
+      // Check for timeout action
+      if (chatResult.action && chatResult.action.type === 'timeout') {
+        console.log('[Content] Timeout action received:', chatResult.action)
+        const endTime = Date.now() + (chatResult.action.duration * 1000)
+        
+        // Store timeout in chrome.storage
+        chrome.storage.local.set({
+          timeout_end: {
+            endTime,
+            reason: chatResult.action.reason
+          }
+        })
+        
+        // Set timeout state
+        setIsTimedOut(true)
+        setTimeoutEndTime(endTime)
+        setTimeoutReason(chatResult.action.reason)
+      }
+      
       // Update user message with database ID
       if (chatResult.userMessageId) {
         setMessages(prev => prev.map(msg => 
@@ -1295,6 +1355,34 @@ const TradingBuddyWidget = () => {
           )}
         </div>
 
+        {/* Timeout Overlay */}
+        {isTimedOut && timeoutEndTime && (
+          <div className={`absolute inset-0 flex items-center justify-center ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-sm z-50`}>
+            <div className="text-center p-8 max-w-sm">
+              <div className="text-6xl mb-4">⏸️</div>
+              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Mandatory Break
+              </h3>
+              <p className={`text-sm mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {timeoutReason}
+              </p>
+              <div className={`text-4xl font-mono font-bold mb-6 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                {(() => {
+                  const remaining = Math.max(0, Math.floor((timeoutEndTime - Date.now()) / 1000))
+                  const minutes = Math.floor(remaining / 60)
+                  const seconds = remaining % 60
+                  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                })()}
+              </div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                Take this time to step away, hydrate, and reset your mindset.
+                <br />
+                The chat will unlock automatically when the timer ends.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className={`p-4 space-y-2 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
           {/* Text input for chatting */}
@@ -1320,7 +1408,7 @@ const TradingBuddyWidget = () => {
               onKeyPress={(e) => e.stopPropagation()}
               onKeyUp={(e) => e.stopPropagation()}
               placeholder="Ask me anything..."
-              disabled={isSending}
+              disabled={isSending || isTimedOut}
               className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'border-slate-300 disabled:bg-slate-100'}`}
             />
             <button
@@ -1329,7 +1417,7 @@ const TradingBuddyWidget = () => {
                   handleSendMessage(inputText, false)
                 }
               }}
-              disabled={isSending || !inputText.trim()}
+              disabled={isSending || !inputText.trim() || isTimedOut}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
             >
               {isSending ? "..." : "Send"}
@@ -1343,7 +1431,7 @@ const TradingBuddyWidget = () => {
                   handleSendMessage(inputText, true)
                 }
               }}
-              disabled={isSending || !inputText.trim()}
+              disabled={isSending || !inputText.trim() || isTimedOut}
               className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
             >
               <span>📸</span>
