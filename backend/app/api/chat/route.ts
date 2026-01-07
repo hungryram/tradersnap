@@ -219,6 +219,16 @@ RESPONSE STYLE:
   - ✗ "\frac{20}{80}" or "\[" or "\text{}"
 
 ---
+SAVED MESSAGES (YOUR MEMORY):
+
+When a user asks "what messages have I saved?" or mentions saved content:
+- Check if any SAVED MESSAGES appear in your context above
+- If you see them, summarize what they've saved
+- If you don't see any, say: "You haven't favorited any messages yet. To save important insights or rules, hover over a message and click the star ⭐ icon. Those will persist across sessions so I can always remember them."
+- The user can favorite messages by clicking the star that appears when hovering over any message
+- Favorited messages are included in every conversation so you always remember their key rules and insights
+
+---
 FEATURE REQUESTS:
 
 If a user asks about features that don't exist in Snapchart (like portfolio tracking, alerts, backtesting, multiple charts, etc.):
@@ -231,7 +241,7 @@ Keep it friendly and helpful - don't just say "no" and stop the conversation.
 Remember: You're their accountability partner, not their signal service. Make them think, don't think for them.`
 
     // Fetch favorited messages to include in context
-    const { data: favoritedMessages } = await supabase
+    const { data: favoritedMessages, error: favoritesError } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('user_id', user.id)
@@ -239,16 +249,26 @@ Remember: You're their accountability partner, not their signal service. Make th
       .order('created_at', { ascending: true })
       .limit(10) // Limit to 10 favorited messages to avoid token bloat
 
+    console.log('[Chat API] Favorited messages:', {
+      count: favoritedMessages?.length || 0,
+      error: favoritesError,
+      userId: user.id
+    })
+
     const messages: any[] = [
       { role: "system", content: coachingPrompt }
     ]
 
     // Add favorited messages first (AI's persistent memory)
     if (favoritedMessages && favoritedMessages.length > 0) {
+      const favoritedContext = `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
+      console.log('[Chat API] Adding favorited messages to context:', favoritedContext.substring(0, 200) + '...')
       messages.push({
         role: "system",
-        content: `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n')}`
+        content: favoritedContext
       })
+    } else {
+      console.log('[Chat API] No favorited messages found for user')
     }
 
     // Add conversation history if provided
