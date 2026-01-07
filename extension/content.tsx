@@ -19,7 +19,39 @@ const supabase = createBrowserClient(
 )
 
 export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"],
+  matches: [
+    // Trading platforms
+    "*://*.tradingview.com/*",
+    "*://*.tradovate.com/*",
+    "*://*.thinkorswim.com/*",
+    "*://*.tdameritrade.com/*",
+    "*://*.ninjatrader.com/*",
+    "*://*.tradestation.com/*",
+    "*://*.interactivebrokers.com/*",
+    "*://*.etrade.com/*",
+    "*://*.schwab.com/*",
+    "*://*.fidelity.com/*",
+    "*://*.robinhood.com/*",
+    "*://*.webull.com/*",
+    "*://*.tastytrade.com/*",
+    "*://*.tastyworks.com/*",
+    "*://*.metatrader4.com/*",
+    "*://*.metatrader5.com/*",
+    "*://*.ctrader.com/*",
+    "*://*.tradier.com/*",
+    "*://*.lightspeed.com/*",
+    "*://*.speedtrader.com/*",
+    "*://*.topstepx.com/*",
+    "*://*.rithmic.com/*",
+    // Crypto exchanges with charts
+    "*://*.binance.com/*",
+    "*://*.coinbase.com/*",
+    "*://*.kraken.com/*",
+    "*://*.bybit.com/*",
+    // Your backend for login (add your domain here)
+    "*://localhost/*",
+    "*://localhost:*/*"
+  ],
   all_frames: false
 }
 
@@ -129,20 +161,16 @@ const TradingBuddyWidget = () => {
     }
   }, [])
 
-  // Separate effect for localStorage polling on admin domain
+  // Listen for login messages from backend (no polling!)
   useEffect(() => {
     // Only run on admin domain
     if (window.location.origin !== process.env.PLASMO_PUBLIC_API_URL) {
       return
     }
 
-    console.log('[Content] Starting localStorage polling on admin domain')
-    let interval: NodeJS.Timeout | null = null
-    let isActive = true
+    console.log('[Content] Setting up message listener for login events')
 
     const checkLocalStorage = () => {
-      if (!isActive) return
-      
       try {
         const stored = localStorage.getItem('trading_buddy_session')
         if (stored) {
@@ -168,24 +196,33 @@ const TradingBuddyWidget = () => {
             chrome.storage.local.remove('supabase_session')
             setSession(null)
           }
-        } else {
-          console.log('[Content] No session in localStorage')
         }
       } catch (e) {
         console.error('[Content] Failed to parse localStorage session:', e)
       }
     }
     
-    // Check immediately
+    // Check once on mount
     checkLocalStorage()
     
-    // Poll every 3 seconds
-    interval = setInterval(checkLocalStorage, 3000)
+    // Listen for login messages from the website (no polling!)
+    const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from same origin for security
+      if (event.origin !== window.location.origin) return
+      
+      if (event.data.type === 'TRADING_BUDDY_LOGIN' && event.data.session) {
+        console.log('[Content] Received login message from website')
+        const session = event.data.session
+        setSession(session)
+        chrome.storage.local.set({ supabase_session: session })
+      }
+    }
+    
+    window.addEventListener('message', handleMessage)
     
     return () => {
-      console.log('[Content] Stopping localStorage polling')
-      isActive = false
-      if (interval) clearInterval(interval)
+      console.log('[Content] Removing message listener')
+      window.removeEventListener('message', handleMessage)
     }
   }, [])
 
@@ -261,7 +298,13 @@ const TradingBuddyWidget = () => {
       }
     }
 
-    chrome.runtime.onMessage.addListener(messageListener)
+    // Check if extension context is still valid
+    try {
+      chrome.runtime.onMessage.addListener(messageListener)
+    } catch (err) {
+      console.error('[Content] Extension context invalidated on mount. Page needs refresh.')
+      return
+    }
     
     // Handle keyboard shortcuts - only when chat is open
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -283,7 +326,11 @@ const TradingBuddyWidget = () => {
     document.addEventListener('keydown', handleKeyDown)
     
     return () => {
-      chrome.runtime.onMessage.removeListener(messageListener)
+      try {
+        chrome.runtime.onMessage.removeListener(messageListener)
+      } catch (err) {
+        // Extension context invalidated during cleanup - ignore
+      }
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
@@ -343,10 +390,24 @@ const TradingBuddyWidget = () => {
       // Wait a bit for the widget to hide
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Request screenshot from background script
-      const response = await chrome.runtime.sendMessage({
-        type: "CAPTURE_SCREENSHOT"
-      })
+      // Request screenshot from background script with error handling
+      let response
+      try {
+        response = await chrome.runtime.sendMessage({
+          type: "CAPTURE_SCREENSHOT"
+        })
+      } catch (err) {
+        console.error('[Content] Extension context invalidated:', err)
+        setIsOpen(true)
+        const errorMsg = {
+          type: 'error',
+          content: 'Extension was reloaded. Please refresh the page and try again.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+        setIsAnalyzing(false)
+        return
+      }
       
       // Show widget again
       setIsOpen(true)

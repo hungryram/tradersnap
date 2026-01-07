@@ -54,6 +54,23 @@ export default function AuthSuccessPage() {
       try {
         localStorage.setItem('trading_buddy_session', JSON.stringify(session))
         console.log('[Auth Success] Session saved to localStorage')
+        
+        // Notify extension that user has logged in
+        window.postMessage({
+          type: 'TRADING_BUDDY_LOGIN',
+          session: session
+        }, window.location.origin)
+        console.log('[Auth Success] Posted login message to extension')
+        
+        // Also try to save directly to chrome.storage if extension is available
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+          try {
+            await chrome.storage.local.set({ supabase_session: session })
+            console.log('[Auth Success] Saved session to chrome.storage')
+          } catch (e) {
+            console.log('[Auth Success] Could not save to chrome.storage (extension may not be installed):', e)
+          }
+        }
       } catch (e) {
         console.error('[Auth Success] Failed to save to localStorage:', e)
       }

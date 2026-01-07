@@ -95,7 +95,23 @@ export default function Home() {
           if (error) throw error
           
           if (data.session) {
-            // Signed up and logged in
+            // Signed up and logged in - save to localStorage and notify extension
+            try {
+              localStorage.setItem('trading_buddy_session', JSON.stringify(data.session))
+              window.postMessage({
+                type: 'TRADING_BUDDY_LOGIN',
+                session: data.session
+              }, window.location.origin)
+              
+              // Also save to chrome.storage if extension is available
+              if (typeof chrome !== 'undefined' && chrome.storage) {
+                await chrome.storage.local.set({ supabase_session: data.session })
+                console.log('Saved session to chrome.storage')
+              }
+            } catch (e) {
+              console.error('Failed to save session:', e)
+            }
+            
             await checkOnboardingStatus(data.session.access_token)
           } else {
             // Email confirmation required
@@ -111,6 +127,23 @@ export default function Home() {
           if (error) throw error
           
           if (data.session) {
+            // Save to localStorage and notify extension
+            try {
+              localStorage.setItem('trading_buddy_session', JSON.stringify(data.session))
+              window.postMessage({
+                type: 'TRADING_BUDDY_LOGIN',
+                session: data.session
+              }, window.location.origin)
+              
+              // Also save to chrome.storage if extension is available
+              if (typeof chrome !== 'undefined' && chrome.storage) {
+                await chrome.storage.local.set({ supabase_session: data.session })
+                console.log('Saved session to chrome.storage')
+              }
+            } catch (e) {
+              console.error('Failed to save session:', e)
+            }
+            
             await checkOnboardingStatus(data.session.access_token)
           }
         }
