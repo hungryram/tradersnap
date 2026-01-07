@@ -31,8 +31,78 @@ function IndexPopup() {
           setUser(session.user)
           // Update chrome.storage with fresh session
           await chrome.storage.local.set({ supabase_session: session })
+          
+          // Broadcast to all tabs immediately
+          console.log('[Popup] Broadcasting session to all tabs...')
+          const tabs = await chrome.tabs.query({})
+          for (const tab of tabs) {
+            if (tab.id) {
+              try {
+                await chrome.tabs.sendMessage(tab.id, {
+                  type: 'SESSION_UPDATED',
+                  session: session
+                })
+                console.log('[Popup] Broadcasted to tab:', tab.id, tab.url?.substring(0, 50))
+              } catch (err) {
+                // Tab might not have content script - ignore
+              }
+            }
+          }
+          
           setIsLoading(false)
           return
+        }
+        
+        // Step 2: If no extension session, check if user logged in via website
+        console.log('[Popup] No extension session, checking website localStorage...')
+        try {
+          const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
+          if (tabs.length > 0 && tabs[0].id) {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: tabs[0].id },
+              func: () => localStorage.getItem('trading_buddy_session')
+            })
+            
+            if (results?.[0]?.result) {
+              const webSession = JSON.parse(results[0].result)
+              console.log('[Popup] Found session in website localStorage, importing...')
+              
+              // Set session in extension's Supabase client
+              const { error: setError } = await supabase.auth.setSession({
+                access_token: webSession.access_token,
+                refresh_token: webSession.refresh_token
+              })
+              
+              if (!setError) {
+                console.log('[Popup] Successfully imported session from website')
+                setIsLoggedIn(true)
+                setUser(webSession.user)
+                await chrome.storage.local.set({ supabase_session: webSession })
+                
+                // Broadcast to all tabs
+                const allTabs = await chrome.tabs.query({})
+                for (const tab of allTabs) {
+                  if (tab.id) {
+                    try {
+                      await chrome.tabs.sendMessage(tab.id, {
+                        type: 'SESSION_UPDATED',
+                        session: webSession
+                      })
+                    } catch (err) {
+                      // Ignore
+                    }
+                  }
+                }
+                
+                setIsLoading(false)
+                return
+              } else {
+                console.error('[Popup] Failed to import session:', setError)
+              }
+            }
+          }
+        } catch (e) {
+          console.log('[Popup] Could not check website localStorage:', e)
         }
         
         // Step 2: Check chrome.storage (might have session from content script)
@@ -75,6 +145,22 @@ function IndexPopup() {
         // Update chrome.storage
         if (session) {
           await chrome.storage.local.set({ supabase_session: session })
+          
+          // Broadcast to all tabs that session has been updated
+          const tabs = await chrome.tabs.query({})
+          for (const tab of tabs) {
+            if (tab.id) {
+              try {
+                await chrome.tabs.sendMessage(tab.id, {
+                  type: 'SESSION_UPDATED',
+                  session: session
+                })
+                console.log('[Popup] Broadcasted session to tab:', tab.id)
+              } catch (err) {
+                // Tab might not have content script - ignore
+              }
+            }
+          }
         } else {
           await chrome.storage.local.remove('supabase_session')
         }
@@ -90,6 +176,21 @@ function IndexPopup() {
         await chrome.storage.local.set({ supabase_session: session })
         setIsLoggedIn(true)
         setUser(session.user)
+        
+        // Broadcast to all tabs
+        const tabs = await chrome.tabs.query({})
+        for (const tab of tabs) {
+          if (tab.id) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, {
+                type: 'SESSION_UPDATED',
+                session: session
+              })
+            } catch (err) {
+              // Tab might not have content script - ignore
+            }
+          }
+        }
       } else if (error) {
         console.error('[Popup] Session refresh error:', error)
       }

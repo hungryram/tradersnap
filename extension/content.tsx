@@ -88,6 +88,13 @@ const TradingBuddyWidget = () => {
     const loadData = async () => {
       const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session'])
       
+      console.log('[Content] Loading from chrome.storage:', {
+        hasMessages: !!result.chat_messages,
+        hasTheme: !!result.theme,
+        hasSession: !!result.supabase_session,
+        sessionKeys: result.supabase_session ? Object.keys(result.supabase_session) : []
+      })
+      
       // Load cached messages for instant display
       if (result.chat_messages) {
         setMessages(result.chat_messages)
@@ -98,7 +105,7 @@ const TradingBuddyWidget = () => {
       }
       
       if (result.supabase_session) {
-        console.log('[Content] Loaded session from storage:', result.supabase_session)
+        console.log('[Content] Found session in storage, expires:', new Date(result.supabase_session.expires_at * 1000).toLocaleString())
         setSession(result.supabase_session)
 
         // Fetch full chat history from Supabase (initial load: 20 messages)
@@ -295,6 +302,12 @@ const TradingBuddyWidget = () => {
         if (message.action === "analyze") {
           handleAnalyze()
         }
+      }
+      
+      // Listen for session updates from popup
+      if (message.type === "SESSION_UPDATED" && message.session) {
+        console.log('[Content] Received session update from popup')
+        setSession(message.session)
       }
     }
 
