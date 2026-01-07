@@ -83,6 +83,7 @@ const TradingBuddyWidget = () => {
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
   const [timeoutReason, setTimeoutReason] = useState<string>('')
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
+  const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -329,8 +330,10 @@ const TradingBuddyWidget = () => {
       .replace(/^### (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
       .replace(/^## (.+)$/gm, '<div class="font-bold text-base mt-2 mb-1">$1</div>')
       .replace(/^# (.+)$/gm, '<div class="font-bold text-lg mt-2 mb-1">$1</div>')
-      // Links - [text](url)
+      // Markdown links - [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
+      // Plain URLs (http/https)
+      .replace(/(?<!href="|">)(https?:\/\/[^\s<]+[^<.,\s])/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
       // Bold
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       // Italic
@@ -690,6 +693,12 @@ const TradingBuddyWidget = () => {
             ? { ...msg, isFavorited: willBeFavorited }
             : msg
         ))
+        
+        // Trigger glow animation only when favoriting (not unfavoriting)
+        if (willBeFavorited) {
+          setGlowingMessageId(messageId)
+          setTimeout(() => setGlowingMessageId(null), 800) // Clear after animation
+        }
       } else {
         console.error('[Content] Failed to toggle favorite:', response.status)
         const errorText = await response.text()
@@ -1211,7 +1220,11 @@ const TradingBuddyWidget = () => {
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.type === 'user' && (
                   <div className="max-w-[80%]">
-                    <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm">
+                    <div className={`bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm transition-all ${
+                      msg.isFavorited ? 'border-l-4 border-amber-400' : ''
+                    } ${
+                      glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
+                    }`}>
                       {msg.content}
                     </div>
                     {msg.chartImage && (
@@ -1266,7 +1279,11 @@ const TradingBuddyWidget = () => {
                   )}
                   
                   <div 
-                    className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'}`}
+                    className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
+                      msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
+                    } ${
+                      glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
+                    }`}
                     dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
                   />
                 </div>

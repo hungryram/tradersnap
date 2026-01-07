@@ -1,3 +1,18 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes borderGlow {
+  0% {
+    border-left-color: rgb(251, 191, 36);
+    box-shadow: -4px 0 12px rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    border-left-color: rgb(245, 158, 11);
+    box-shadow: -4px 0 20px rgba(245, 158, 11, 0.8);
+  }
+  100% {
+    border-left-color: rgb(251, 191, 36);
+    box-shadow: -4px 0 12px rgba(251, 191, 36, 0);
+  }
+}

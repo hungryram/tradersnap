@@ -63,7 +63,37 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 2. Parse request
+    // 2. Fetch user profile with usage data
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, message_count, screenshot_count, usage_reset_date')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('[Chat API] Profile fetch error:', profileError)
+      const response = NextResponse.json({ error: "Profile not found" }, { status: 404 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // Check if usage needs to be reset
+    const today = new Date().toISOString().split('T')[0]
+    if (profile.usage_reset_date < today) {
+      await supabase
+        .from('profiles')
+        .update({ 
+          message_count: 0, 
+          screenshot_count: 0, 
+          usage_reset_date: today 
+        })
+        .eq('id', user.id)
+      profile.message_count = 0
+      profile.screenshot_count = 0
+    }
+
+    console.log('[Chat API] Profile:', { plan: profile.plan, message_count: profile.message_count, screenshot_count: profile.screenshot_count })
+
+    // 3. Parse request
     const body = await request.json()
     console.log('[Chat API] Request body keys:', Object.keys(body))
     console.log('[Chat API] Message length:', body.message?.length)
@@ -71,7 +101,47 @@ export async function POST(request: NextRequest) {
     
     const validatedRequest = chatRequestSchema.parse(body)
 
-    // 3. Fetch user's ruleset (primary first, then any ruleset)
+    // 4. Define usage limits based on plan
+    const limits = {
+      maxMessages: profile.plan === 'pro' ? 500 : 100,
+      maxScreenshots: profile.plan === 'pro' ? 50 : 2,
+      maxFavoritesInContext: profile.plan === 'pro' ? 20 : 3
+    }
+
+    // 5. Check usage limits
+    const hasImage = !!validatedRequest.image
+    
+    // Check message limit
+    if (profile.message_count >= limits.maxMessages) {
+      console.log('[Chat API] Message limit exceeded:', profile.message_count, '>=', limits.maxMessages)
+      const response = NextResponse.json({
+        error: "Daily message limit reached",
+        message: profile.plan === 'pro' 
+          ? "You've reached your daily limit of 500 messages. Your limit resets at midnight UTC."
+          : "You've used all 100 free messages today. Upgrade to Pro for 500 messages/day.",
+        limit: limits.maxMessages,
+        current: profile.message_count,
+        requiresUpgrade: profile.plan !== 'pro'
+      }, { status: 429 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // Check screenshot limit
+    if (hasImage && profile.screenshot_count >= limits.maxScreenshots) {
+      console.log('[Chat API] Screenshot limit exceeded:', profile.screenshot_count, '>=', limits.maxScreenshots)
+      const response = NextResponse.json({
+        error: "Daily screenshot limit reached",
+        message: profile.plan === 'pro'
+          ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
+          : "You've used both free chart analyses today. Upgrade to Pro for 50 charts/day.",
+        limit: limits.maxScreenshots,
+        current: profile.screenshot_count,
+        requiresUpgrade: profile.plan !== 'pro'
+      }, { status: 429 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // 6. Fetch user's ruleset (primary first, then any ruleset)
     let { data: ruleset } = await supabase
       .from("rulesets")
       .select("*")
@@ -140,7 +210,7 @@ SAVED MESSAGES
 Quote favorited messages. Use user's language. Call out patterns.
 
 FEATURE REQUESTS
-If user asks for missing features: "Not available yet. Request it: https://snapchart.canny.io/feature-requests"
+If user asks for missing features, link them to: https://snapchart.canny.io/feature-requests
 
 RESPONSE
 Quick: MAX 2 sentences
@@ -149,17 +219,18 @@ Cut fluff.
 
 Make them think, not follow.`
 
-    // Fetch favorited messages to include in context
+    // Fetch favorited messages to include in context (limited by plan)
     const { data: favoritedMessages, error: favoritesError } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_favorited', true)
-      .order('created_at', { ascending: true })
-      .limit(10) // Limit to 10 favorited messages to avoid token bloat
+      .order('created_at', { ascending: false }) // Most recent first
+      .limit(limits.maxFavoritesInContext) // 3 for free, 20 for pro
 
     console.log('[Chat API] Favorited messages:', {
       count: favoritedMessages?.length || 0,
+      limit: limits.maxFavoritesInContext,
       error: favoritesError,
       userId: user.id
     })
@@ -200,9 +271,11 @@ Note: When discussing candle close times, use approximate language ("Next 5m can
       console.log('[Chat API] No favorited messages found for user')
     }
 
-    // Add conversation history if provided
+    // Add conversation history if provided (limit to last 20 messages for token control)
     if (validatedRequest.conversationHistory) {
-      messages.push(...validatedRequest.conversationHistory)
+      const limitedHistory = validatedRequest.conversationHistory.slice(-20)
+      messages.push(...limitedHistory)
+      console.log('[Chat API] Conversation history:', validatedRequest.conversationHistory.length, 'total,', limitedHistory.length, 'sent')
     }
 
     // Add current message
@@ -297,13 +370,32 @@ Note: When discussing candle close times, use approximate language ("Next 5m can
       console.log('[Chat API] Timeout action detected:', action)
     }
 
-    // 7. Return response with message IDs and action
+    // 7. Increment usage counters
+    await supabase
+      .from('profiles')
+      .update({
+        message_count: profile.message_count + 1,
+        screenshot_count: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count
+      })
+      .eq('id', user.id)
+
+    console.log('[Chat API] Usage incremented:', { 
+      messages: profile.message_count + 1, 
+      screenshots: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count 
+    })
+
+    // 8. Return response with message IDs and action
     console.log('[Chat API] Returning response with IDs:', { userMessageId, assistantMessageId })
     const response = NextResponse.json({ 
       message: aiResponse,
       userMessageId,
       assistantMessageId,
-      action
+      action,
+      usage: {
+        messages: profile.message_count + 1,
+        screenshots: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count,
+        limits: limits
+      }
     })
     return addCorsHeaders(response, origin)
 
