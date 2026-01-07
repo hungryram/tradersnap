@@ -20,7 +20,9 @@ const chatRequestSchema = z.object({
   conversationHistory: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string()
-  })).optional()
+  })).optional(),
+  timestamp: z.string().optional(), // ISO timestamp from client
+  timezone: z.string().optional() // IANA timezone (e.g., "America/New_York")
 })
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
@@ -196,6 +198,27 @@ When they're hesitating on a valid setup:
 - "This looks textbook per your rules. Trust the process or change the rules."
 
 ---
+TIME AWARENESS:
+
+Use time context to coach discipline and patience:
+
+**Session Duration Awareness:**
+- Reference how long they've been trading when relevant
+- "You've been at this for 47 minutes. How's your focus?"
+- "Three hours in—time to step back for 10 minutes?"
+
+**Candle Countdown Coaching:**
+- When they're impatient or want to enter early: "Next 5m candle closes in about 3 minutes. Can you wait?"
+- When discussing setups: "That's 4 candles away. Walk me through what needs to happen on each one."
+- Make discipline tangible: "You're asking for relief, not confirmation. The next candle closes in 90 seconds—can you sit on your hands that long?"
+
+**Timeframe Perspective:**
+- "You're on 5m candles. That last move was ONE candle. Zoom out."
+- "If you're trading 15m timeframe, why are you stressing about a 1m wick?"
+
+Use time as a reality check, not a countdown timer. Make impatience feel silly and patience feel doable.
+
+---
 PRICE REFERENCES:
 
 Be specific but frame it as observation, not instruction:
@@ -258,6 +281,26 @@ Remember: You're their accountability partner, not their signal service. Make th
     const messages: any[] = [
       { role: "system", content: coachingPrompt }
     ]
+
+    // Add time context for coaching
+    if (validatedRequest.timestamp && validatedRequest.timezone) {
+      const clientTime = new Date(validatedRequest.timestamp)
+      const timeContext = `TIME CONTEXT:
+- Current time (user's local): ${clientTime.toLocaleString('en-US', { timeZone: validatedRequest.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
+- Timezone: ${validatedRequest.timezone}
+
+When the user asks about patience, waiting for the next candle, or time-related discipline questions, you can:
+1. Calculate session duration from conversation timestamps ("You've been at this for 47 minutes")
+2. Remind them about specific timeframes (e.g., "Next 5m candle closes in ~3 minutes")
+3. Use time-based coaching: "That's 12 candles from now. Do you really think the market will care what you did after 12 candles?"
+
+Note: When discussing candle close times, use approximate language ("Next 5m candle in about 2 minutes") since you don't have exact candle open time. Session duration can be more precise based on conversation history.`
+      
+      messages.push({
+        role: "system",
+        content: timeContext
+      })
+    }
 
     // Add favorited messages first (AI's persistent memory)
     if (favoritedMessages && favoritedMessages.length > 0) {

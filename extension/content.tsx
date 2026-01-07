@@ -788,7 +788,9 @@ const TradingBuddyWidget = () => {
       const requestBody: any = {
         message: text,
         includeChart,
-        conversationHistory
+        conversationHistory,
+        timestamp: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       }
       
       // Include chart image if captured or use last analyzed chart
