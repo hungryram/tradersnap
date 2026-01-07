@@ -63,8 +63,10 @@ export default function AuthSuccessPage() {
         console.log('[Auth Success] Posted login message to extension')
         
         // Also try to save directly to chrome.storage if extension is available
+        // @ts-ignore - chrome API only available when extension is installed
         if (typeof chrome !== 'undefined' && chrome.storage) {
           try {
+            // @ts-ignore
             await chrome.storage.local.set({ supabase_session: session })
             console.log('[Auth Success] Saved session to chrome.storage')
           } catch (e) {

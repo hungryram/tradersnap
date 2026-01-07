@@ -104,7 +104,9 @@ export default function Home() {
               }, window.location.origin)
               
               // Also save to chrome.storage if extension is available
+              // @ts-ignore - chrome API only available when extension is installed
               if (typeof chrome !== 'undefined' && chrome.storage) {
+                // @ts-ignore
                 await chrome.storage.local.set({ supabase_session: data.session })
                 console.log('Saved session to chrome.storage')
               }
@@ -136,7 +138,9 @@ export default function Home() {
               }, window.location.origin)
               
               // Also save to chrome.storage if extension is available
+              // @ts-ignore - chrome API only available when extension is installed
               if (typeof chrome !== 'undefined' && chrome.storage) {
+                // @ts-ignore
                 await chrome.storage.local.set({ supabase_session: data.session })
                 console.log('Saved session to chrome.storage')
               }
