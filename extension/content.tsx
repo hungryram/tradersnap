@@ -82,6 +82,7 @@ const TradingBuddyWidget = () => {
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
   const [timeoutReason, setTimeoutReason] = useState<string>('')
+  const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -203,6 +204,9 @@ const TradingBuddyWidget = () => {
         setTimeoutReason('')
         chrome.storage.local.remove('timeout_end')
         clearInterval(interval)
+      } else {
+        // Force re-render to update countdown display
+        setForceUpdate(prev => prev + 1)
       }
     }, 1000)
 
