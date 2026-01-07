@@ -291,7 +291,7 @@ Note: When discussing candle close times, use approximate language ("Next 5m can
 
     // 4. Call OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       messages,
       max_tokens: 1200,
       temperature: 0.7

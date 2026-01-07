@@ -1359,85 +1359,87 @@ const TradingBuddyWidget = () => {
           )}
         </div>
 
-        {/* Timeout Overlay */}
-        {isTimedOut && timeoutEndTime && (
-          <div className={`absolute inset-0 flex items-center justify-center ${theme === 'dark' ? 'bg-slate-900/95' : 'bg-white/95'} backdrop-blur-sm z-50`}>
-            <div className="text-center p-8 max-w-sm">
-              <div className="text-6xl mb-4">⏸️</div>
-              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Mandatory Break
-              </h3>
-              <p className={`text-sm mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                {timeoutReason}
-              </p>
-              <div className={`text-4xl font-mono font-bold mb-6 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
-                {(() => {
-                  const remaining = Math.max(0, Math.floor((timeoutEndTime - Date.now()) / 1000))
-                  const minutes = Math.floor(remaining / 60)
-                  const seconds = remaining % 60
-                  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-                })()}
-              </div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                Take this time to step away, hydrate, and reset your mindset.
-                <br />
-                The chat will unlock automatically when the timer ends.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Actions */}
         <div className={`p-4 space-y-2 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
-          {/* Text input for chatting */}
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending) {
-                  e.preventDefault()
-                  if (e.ctrlKey || e.metaKey) {
-                    // Ctrl+Enter or Cmd+Enter: Send with chart
-                    handleSendMessage(inputText, true)
-                  } else {
-                    // Regular Enter: Send without chart
-                    handleSendMessage(inputText, false)
-                  }
-                }
-              }}
-              onKeyPress={(e) => e.stopPropagation()}
-              onKeyUp={(e) => e.stopPropagation()}
-              placeholder="Ask me anything..."
-              disabled={isSending || isTimedOut}
-              className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'border-slate-300 disabled:bg-slate-100'}`}
-            />
-            <button
-              onClick={() => {
-                if (inputText.trim() && !isSending) {
-                  handleSendMessage(inputText, false)
-                }
-              }}
-              disabled={isSending || !inputText.trim() || isTimedOut}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              {isSending ? "..." : "Send"}
-            </button>
-          </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (inputText.trim() && !isSending) {
-                  handleSendMessage(inputText, true)
-                }
-              }}
-              disabled={isSending || !inputText.trim() || isTimedOut}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-            >
+          {/* Timeout Timer (replaces input when active) */}
+          {isTimedOut && timeoutEndTime ? (
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">⏸️</div>
+                  <div>
+                    <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Mandatory Break
+                    </div>
+                    <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {timeoutReason}
+                    </div>
+                  </div>
+                </div>
+                <div className={`text-2xl font-mono font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                  {(() => {
+                    const remaining = Math.max(0, Math.floor((timeoutEndTime - Date.now()) / 1000))
+                    const minutes = Math.floor(remaining / 60)
+                    const seconds = remaining % 60
+                    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                  })()}
+                </div>
+              </div>
+              <div className={`mt-2 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                Step away and reset. Chat unlocks automatically when timer ends.
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Text input for chatting */}
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending) {
+                      e.preventDefault()
+                      if (e.ctrlKey || e.metaKey) {
+                        // Ctrl+Enter or Cmd+Enter: Send with chart
+                        handleSendMessage(inputText, true)
+                      } else {
+                        // Regular Enter: Send without chart
+                        handleSendMessage(inputText, false)
+                      }
+                    }
+                  }}
+                  onKeyPress={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
+                  placeholder="Ask me anything..."
+                  disabled={isSending}
+                  className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'border-slate-300 disabled:bg-slate-100'}`}
+                />
+                <button
+                  onClick={() => {
+                    if (inputText.trim() && !isSending) {
+                      handleSendMessage(inputText, false)
+                    }
+                  }}
+                  disabled={isSending || !inputText.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  {isSending ? "..." : "Send"}
+                </button>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (inputText.trim() && !isSending) {
+                      handleSendMessage(inputText, true)
+                    }
+                  }}
+                  disabled={isSending || !inputText.trim()}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
               <span>📸</span>
               Send with Chart
             </button>
@@ -1451,6 +1453,8 @@ const TradingBuddyWidget = () => {
               {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
             </button>
           </div>
+          </>
+          )}
         </div>
         
         {/* Resize handle */}
