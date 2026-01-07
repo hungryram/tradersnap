@@ -242,16 +242,9 @@ Make them think, not follow.`
     // Add time context for coaching
     if (validatedRequest.timestamp && validatedRequest.timezone) {
       const clientTime = new Date(validatedRequest.timestamp)
-      const timeContext = `TIME CONTEXT:
-- Current time (user's local): ${clientTime.toLocaleString('en-US', { timeZone: validatedRequest.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
-- Timezone: ${validatedRequest.timezone}
+      const timeContext = `CURRENT TIME: ${clientTime.toLocaleString('en-US', { timeZone: validatedRequest.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
 
-When the user asks about patience, waiting for the next candle, or time-related discipline questions, you can:
-1. Calculate session duration from conversation timestamps ("You've been at this for 47 minutes")
-2. Remind them about specific timeframes (e.g., "Next 5m candle closes in ~3 minutes")
-3. Use time-based coaching: "That's 12 candles from now. Do you really think the market will care what you did after 12 candles?"
-
-Note: When discussing candle close times, use approximate language ("Next 5m candle in about 2 minutes") since you don't have exact candle open time. Session duration can be more precise based on conversation history.`
+Use for time-based coaching when they ask about the next candle or how long they've been trading.`
       
       messages.push({
         role: "system",
