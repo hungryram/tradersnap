@@ -514,15 +514,26 @@ const TradingBuddyWidget = () => {
       const { ruleset } = await rulesetResponse.json()
 
       // Check screenshot limit before capturing
-      if (userData?.usage.screenshots.used >= userData?.usage.screenshots.limit) {
-        setMessages(prev => [...prev, {
-          type: 'error',
-          content: userData.user.plan === 'pro' 
-            ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-            : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
-          timestamp: new Date()
-        }])
-        return
+      // Fetch current usage from /api/me
+      const meResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/me`,
+        {
+          headers: { "Authorization": `Bearer ${supabase_session.access_token}` }
+        }
+      )
+      
+      if (meResponse.ok) {
+        const userData = await meResponse.json()
+        if (userData?.usage.screenshots.used >= userData?.usage.screenshots.limit) {
+          setMessages(prev => [...prev, {
+            type: 'error',
+            content: userData.user.plan === 'pro' 
+              ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
+              : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
+            timestamp: new Date()
+          }])
+          return
+        }
       }
 
       // Capture screenshot
