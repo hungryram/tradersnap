@@ -289,7 +289,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const completion = await openai.chat.completions.create({
       model,
       messages,
-      max_tokens: 1200,
+      max_completion_tokens: 1200,
       temperature: 0.7
     })
 
