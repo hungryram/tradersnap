@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import DashboardNav from "../components/DashboardNav"
 
 interface Ruleset {
   id: string
@@ -279,49 +280,7 @@ export default function RulesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/icon.png" alt="Snapchart" className="w-8 h-8" />
-            <h1 className="text-xl font-bold text-slate-900">Snapchart</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <a
-              href="/dashboard/rules"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              Rules
-            </a>
-            <a
-              href="/dashboard/saved-messages"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              Favorites
-            </a>
-            <a
-              href="/dashboard/account"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              My Account
-            </a>
-            <button
-              onClick={async () => {
-                try {
-                  await supabase.auth.signOut()
-                  localStorage.removeItem('trading_buddy_session')
-                  window.location.href = '/'
-                } catch (error) {
-                  console.error('Sign out error:', error)
-                  window.location.href = '/'
-                }
-              }}
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </nav>
+      <DashboardNav />
 
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="bg-white rounded-lg shadow-sm p-8">

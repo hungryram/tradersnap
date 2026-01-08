@@ -418,6 +418,8 @@ const TradingBuddyWidget = () => {
       .replace(/^### (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
       .replace(/^## (.+)$/gm, '<div class="font-bold text-base mt-2 mb-1">$1</div>')
       .replace(/^# (.+)$/gm, '<div class="font-bold text-lg mt-2 mb-1">$1</div>')
+      // Blockquotes - handle multi-line by converting > lines to a blockquote block
+      .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-3 py-1 my-1 text-gray-700 italic">$1</blockquote>')
       // Markdown links - [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
       // Plain URLs (http/https)
@@ -1252,6 +1254,15 @@ const TradingBuddyWidget = () => {
                   </button>
                 )}
                 <div className={`border-t my-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+                <button
+                  onClick={() => {
+                    window.open('https://snapchart.canny.io/', '_blank')
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  Feature Requests
+                </button>
                 <button
                   onClick={() => {
                     window.open('https://www.snapchartapp.com/privacy', '_blank')
