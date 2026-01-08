@@ -34,6 +34,6 @@ async function captureScreenshot(tabId?: number) {
     return { success: true, dataUrl }
   } catch (error) {
     console.error("[Background] Screenshot capture failed:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: (error as Error).message }
   }
 }

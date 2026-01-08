@@ -212,7 +212,7 @@ const TradingBuddyWidget = () => {
             setMessageOffset(20)
             
             // Convert DB format to UI format
-            const formattedMessages = dbMessages.map(msg => ({
+            const formattedMessages = dbMessages.map((msg: any) => ({
               id: msg.id,
               type: msg.role === 'user' ? 'user' : 'assistant',
               content: msg.content,
@@ -619,7 +619,7 @@ const TradingBuddyWidget = () => {
         setMessageOffset(prev => prev + dbMessages.length)
 
         // Convert DB format to UI format
-        const formattedMessages = dbMessages.map(msg => ({
+        const formattedMessages = dbMessages.map((msg: any) => ({
           id: msg.id,
           type: msg.role === 'user' ? 'user' : 'assistant',
           content: msg.content,
@@ -1406,7 +1406,7 @@ const TradingBuddyWidget = () => {
                   
                   {msg.content.bullets && msg.content.bullets.length > 0 && (
                     <ul className={`text-xs space-y-1 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {msg.content.bullets.map((bullet, idx) => (
+                      {msg.content.bullets.map((bullet: string, idx: number) => (
                         <li key={idx}>• {bullet}</li>
                       ))}
                     </ul>
@@ -1415,7 +1415,7 @@ const TradingBuddyWidget = () => {
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
                     <div className="bg-blue-50 rounded-lg p-2 mb-2">
                       <div className="font-medium text-xs mb-1 text-slate-900">📍 Levels to Watch</div>
-                      {msg.content.levels_to_watch.map((level, idx) => (
+                      {msg.content.levels_to_watch.map((level: any, idx: number) => (
                         <div key={idx} className="text-xs text-slate-700 mb-1">
                           <div className="font-medium">{level.label}</div>
                           <div className="text-slate-600">{level.why_it_matters}</div>
