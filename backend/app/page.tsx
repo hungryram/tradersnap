@@ -270,6 +270,14 @@ function HomeContent() {
                   />
                 </div>
 
+                {useMagicLink && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Magic link sign-in:</strong> We'll email you a secure link to sign in instantly. No password needed!
+                    </p>
+                  </div>
+                )}
+
                 {!useMagicLink && (
                   <div>
                     <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
@@ -360,9 +368,9 @@ function HomeContent() {
 
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="text-center space-y-2 text-sm text-slate-600">
-              <p>✓ Fast, secure authentication</p>
-              <p>✓ Analyze charts against your trading rules</p>
-              <p>✓ Stay disciplined with AI coaching</p>
+              <p>✓ Never break your trading rules again</p>
+              <p>✓ Make smarter trading decisions</p>
+              <p>✓ Trade with confidence and discipline</p>
             </div>
           </div>
         </div>
