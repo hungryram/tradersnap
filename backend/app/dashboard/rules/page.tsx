@@ -281,10 +281,16 @@ export default function RulesPage() {
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="mb-6 flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Trading Rules</h2>
-              <p className="text-slate-600 text-sm">
-                The AI analyzes your charts against these rules. Update them anytime.
-              </p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Trading Rules and Strategy</h2>
+              <div className="text-slate-600 text-sm space-y-2">
+                <p>The AI can't read your mind—it needs clear rules to coach you effectively.</p>
+                <p className="font-mono text-xs">
+                  <span className="text-green-600">✓ Good rule:</span> "Wait for 5-min candle close above resistance"<br />
+                  <span className="text-red-600">✗ Weak rule:</span> "Be patient"
+                </p>
+                <p>Keep it simple. 3-5 clear rules beat 20 vague ones. You can always refine them as you learn what works.</p>
+                <p>Switch between rulesets anytime for different strategies or timeframes.</p>
+              </div>
               {userPlan && (
                 <p className="text-sm text-slate-500 mt-2">
                   Rulesets: {rulesets.length}/{userPlan === "free" ? 3 : 20}
