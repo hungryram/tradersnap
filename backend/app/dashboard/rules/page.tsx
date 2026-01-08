@@ -137,6 +137,52 @@ export default function RulesPage() {
     }
   }
 
+  async function handleSetPrimary() {
+    setError(null)
+    setSuccess(null)
+    setIsSaving(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/")
+        return
+      }
+
+      if (!currentRuleset) return
+
+      const origin = window.location.origin
+      const response = await fetch(
+        `${origin}/api/rulesets/${currentRuleset.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            is_primary: true
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to set as primary")
+      }
+
+      setSuccess("Set as primary ruleset!")
+      await loadRulesets(session.access_token)
+      
+    } catch (err) {
+      console.error("Set primary error:", err)
+      setError(err instanceof Error ? err.message : "Failed to set as primary")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   async function handleSaveAsNew() {
     setError(null)
     setSuccess(null)
@@ -416,6 +462,16 @@ export default function RulesPage() {
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
+                
+                {!currentRuleset.is_primary && (
+                  <button
+                    onClick={handleSetPrimary}
+                    disabled={isSaving}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium px-6 py-2 rounded-lg"
+                  >
+                    Set as Primary
+                  </button>
+                )}
                 
                 <button
                   onClick={handleSaveAsNew}
