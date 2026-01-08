@@ -329,9 +329,9 @@ export default function RulesPage() {
             <div>
               <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Trading Rules and Strategy</h2>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-slate-600 text-sm space-y-2">
-                <p>The AI can't read your mind—it needs clear rules to coach you effectively.</p>
+                <p>The AI can't read your mind—it needs to understand your rules and strategy to coach you effectively.</p>
                 <p className="font-mono text-xs">
-                  <span className="text-green-600">✓ Good rule:</span> "Wait for 5-min candle close above resistance"<br />
+                  <span className="text-green-600">✓ Good rule:</span> "Wait for 5-min candle close above resistance, then enter on next candle"<br />
                   <span className="text-red-600">✗ Weak rule:</span> "Be patient"
                 </p>
                 <p>Keep it simple. 3-5 clear rules beat 20 vague ones. You can always refine them as you learn what works.</p>
