@@ -321,6 +321,17 @@ Use for time-based coaching when they ask about the next candle or how long they
     const completion = await openai.chat.completions.create(completionParams)
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
+    
+    // Log if response is empty
+    if (!completion.choices[0]?.message?.content) {
+      console.error('[Chat API] Empty response from OpenAI:', {
+        model,
+        plan: profile.plan,
+        finishReason: completion.choices[0]?.finish_reason,
+        choices: completion.choices.length,
+        hasContent: !!completion.choices[0]?.message?.content
+      })
+    }
 
     // Track token usage (model-agnostic - check OpenAI dashboard for actual costs)
     const usage = completion.usage
