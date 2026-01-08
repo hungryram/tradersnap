@@ -834,7 +834,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session missing. Please sign in using the extension popup (click the icon in your toolbar).',
+          content: 'Session missing. Please [sign in](https://admin.snapchartapp.com/) using the extension popup (click the icon in your toolbar).',
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
