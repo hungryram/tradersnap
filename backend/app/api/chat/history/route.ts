@@ -7,10 +7,25 @@ const supabase = createClient(
 )
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
+    'https://www.tradingview.com',
+    'https://tradingview.com'
+  ]
+  
+  const isAllowed = origin && (
+    allowedOrigins.includes(origin) ||
+    origin.startsWith('chrome-extension://') ||
+    origin.includes('tradingview.com') ||
+    origin.includes('tradovate.com') ||
+    origin.includes('thinkorswim.com')
+  )
+  
+  if (isAllowed && origin) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    response.headers.set("Access-Control-Allow-Credentials", "true")
   }
   return response
 }

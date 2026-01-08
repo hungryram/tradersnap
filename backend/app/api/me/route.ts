@@ -77,14 +77,16 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get("authorization")
     
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return addCorsHeaders(response, origin)
     }
 
     const token = authHeader.substring(7)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
     if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+      const response = NextResponse.json({ error: "Invalid token" }, { status: 401 })
+      return addCorsHeaders(response, origin)
     }
 
     // Fetch user profile
@@ -109,7 +111,8 @@ export async function GET(request: NextRequest) {
 
       if (createError) {
         console.error('[API /me] Failed to create profile:', createError)
-        return NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
+        const response = NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
+        return addCorsHeaders(response, origin)
       }
 
       profile = newProfile
@@ -183,14 +186,16 @@ export async function PATCH(request: NextRequest) {
     const authHeader = request.headers.get("authorization")
     
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return addCorsHeaders(response, origin)
     }
 
     const token = authHeader.substring(7)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
     if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+      const response = NextResponse.json({ error: "Invalid token" }, { status: 401 })
+      return addCorsHeaders(response, origin)
     }
 
     const body = await request.json()
