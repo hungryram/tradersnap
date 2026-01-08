@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Check usage limits
     const hasImage = !!validatedRequest.image
+    const isNewScreenshot = hasImage && !validatedRequest.isContextImage
     
     // Check message limit
     if (profile.message_count >= limits.maxMessages) {
@@ -117,8 +118,8 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // Check screenshot limit
-    if (hasImage && profile.screenshot_count >= limits.maxScreenshots) {
+    // Check screenshot limit (only for new screenshots, not context images)
+    if (isNewScreenshot && profile.screenshot_count >= limits.maxScreenshots) {
       const response = NextResponse.json({
         error: "Daily screenshot limit reached",
         message: profile.plan === 'pro'
@@ -367,7 +368,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       .from('profiles')
       .update({
         message_count: profile.message_count + 1,
-        screenshot_count: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count
+        screenshot_count: isNewScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
       })
       .eq('id', user.id)
 
@@ -379,7 +380,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       action,
       usage: {
         messages: profile.message_count + 1,
-        screenshots: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count,
+        screenshots: isNewScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count,
         limits: limits
       }
     })
