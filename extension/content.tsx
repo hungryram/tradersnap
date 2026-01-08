@@ -412,14 +412,14 @@ const TradingBuddyWidget = () => {
   }, [messages])
 
   // Simple markdown-to-HTML converter for chat messages
-  const formatMarkdown = (text: string) => {
+  const formatMarkdown = (text: string, isDark: boolean = false) => {
     return text
       // Headers
       .replace(/^### (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
       .replace(/^## (.+)$/gm, '<div class="font-bold text-base mt-2 mb-1">$1</div>')
       .replace(/^# (.+)$/gm, '<div class="font-bold text-lg mt-2 mb-1">$1</div>')
-      // Blockquotes - handle multi-line by converting > lines to a blockquote block
-      .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-3 py-1 my-1 text-gray-700 italic">$1</blockquote>')
+      // Blockquotes - theme-aware styling
+      .replace(/^> (.+)$/gm, `<blockquote class="border-l-4 ${isDark ? 'border-slate-500 text-slate-300' : 'border-gray-300 text-gray-700'} pl-3 py-1 my-1 italic">$1</blockquote>`)
       // Markdown links - [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
       // Plain URLs (http/https)
@@ -1420,7 +1420,7 @@ const TradingBuddyWidget = () => {
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
                     }`}
-                    dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                    dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content, theme === 'dark') }}
                   />
                   {msg.timestamp && (
                     <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
