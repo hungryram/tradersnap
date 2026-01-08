@@ -302,12 +302,20 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // 4. Call OpenAI with plan-based model selection
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
-    const completion = await openai.chat.completions.create({
+    
+    // Some models (like gpt-5-mini) don't support custom temperature
+    const completionParams: any = {
       model,
       messages,
-      max_completion_tokens: 1200,
-      temperature: 0.7
-    })
+      max_completion_tokens: 1200
+    }
+    
+    // Only add temperature for models that support it (gpt-5.1)
+    if (model === 'gpt-5.1') {
+      completionParams.temperature = 0.7
+    }
+    
+    const completion = await openai.chat.completions.create(completionParams)
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
 
