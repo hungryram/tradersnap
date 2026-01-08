@@ -824,8 +824,6 @@ const TradingBuddyWidget = () => {
       const currentTime = Math.floor(Date.now() / 1000)
       
       if (!supabase_session?.access_token) {
-        console.error('[Content] No valid session found!')
-        
         // Open popup to sign in
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }).catch(() => {
           // Fallback if background script not available
