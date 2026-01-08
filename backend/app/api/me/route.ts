@@ -11,13 +11,38 @@ function getCorsHeaders(origin: string | null) {
   const allowedOrigins = [
     process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
     'chrome-extension://',
-    'https://www.tradingview.com',
-    'https://tradingview.com'
+    // Trading platforms
+    'tradingview.com',
+    'tradovate.com',
+    'thinkorswim.com',
+    'tdameritrade.com',
+    'ninjatrader.com',
+    'tradestation.com',
+    'interactivebrokers.com',
+    'etrade.com',
+    'schwab.com',
+    'fidelity.com',
+    'robinhood.com',
+    'webull.com',
+    'tastytrade.com',
+    'tastyworks.com',
+    'metatrader4.com',
+    'metatrader5.com',
+    'ctrader.com',
+    'tradier.com',
+    'lightspeed.com',
+    'speedtrader.com',
+    'topstepx.com',
+    'rithmic.com',
+    // Crypto exchanges
+    'binance.com',
+    'coinbase.com',
+    'kraken.com',
+    'bybit.com'
   ]
   
-  const isAllowed = origin && (
-    allowedOrigins.some(allowed => origin.startsWith(allowed)) ||
-    origin.includes('chrome-extension://')
+  const isAllowed = origin && allowedOrigins.some(allowed => 
+    origin.includes(allowed) || origin.startsWith('chrome-extension://')
   )
   
   return {
