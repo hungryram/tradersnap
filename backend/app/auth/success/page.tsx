@@ -77,31 +77,11 @@ export default function AuthSuccessPage() {
         console.error('[Auth Success] Failed to save to localStorage:', e)
       }
       
-      console.log('[Auth Success] Checking onboarding status...')
-      setStatus('Loading your profile...')
+      console.log('[Auth Success] Redirecting to dashboard...')
+      setStatus('Redirecting to dashboard...')
       
-      // Check onboarding status
-      const origin = window.location.origin
-      const response = await fetch(`${origin}/api/me`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        
-        if (data.user.onboarded) {
-          setStatus('Redirecting to dashboard...')
-          router.push('/dashboard/rules')
-        } else {
-          setStatus('Redirecting to onboarding...')
-          router.push('/onboarding')
-        }
-      } else {
-        setStatus('Redirecting to onboarding...')
-        router.push('/onboarding')
-      }
+      // Skip onboarding, go straight to dashboard
+      router.push('/dashboard/rules')
       
     } catch (error) {
       console.error('[Auth Success] Error:', error)

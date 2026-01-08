@@ -737,6 +737,8 @@ const TradingBuddyWidget = () => {
       )
 
       if (response.ok) {
+        // Prevent auto-scroll on favorite toggle
+        isInitialLoadRef.current = true
 
         // Update local state
         setMessages(prev => prev.map(msg => 
@@ -750,6 +752,13 @@ const TradingBuddyWidget = () => {
           setGlowingMessageId(messageId)
           setTimeout(() => setGlowingMessageId(null), 800) // Clear after animation
         }
+      } else if (response.status === 429) {
+        const errorData = await response.json()
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: errorData.error || 'Favorite limit reached.',
+          timestamp: new Date()
+        }])
       } else {
         console.error('[Content] Failed to toggle favorite:', response.status)
         const errorText = await response.text()
@@ -1675,6 +1684,12 @@ const TradingBuddyWidget = () => {
                   {isSending ? "..." : "Send"}
                 </button>
               </div>
+              {inputText.length > 0 && (
+                <div className={`text-xs ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {inputText.length}/500 characters{inputText.length >= 500 && ' (limit reached)'}
+                </div>
+              )}
+              <div/>
               
               <div className="flex gap-2">
                 <button

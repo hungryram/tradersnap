@@ -54,6 +54,35 @@ export async function POST(req: NextRequest) {
     // Use admin client to bypass RLS (we manually check user_id for security)
     const adminClient = createAdminClient()
 
+    // If favoriting (not unfavoriting), check limits for free users
+    if (isFavorited) {
+      // Get user profile to check plan
+      const { data: profile, error: profileError } = await adminClient
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single()
+
+      if (profile && profile.plan === 'free') {
+        // Count current favorites
+        const { count, error: countError } = await adminClient
+          .from("chat_messages")
+          .select("*", { count: 'exact', head: true })
+          .eq("user_id", user.id)
+          .eq("is_favorited", true)
+
+        if (countError) {
+          console.error("[Favorite API] Error counting favorites:", countError)
+        } else if (count !== null && count >= 3) {
+          const response = NextResponse.json(
+            { error: "Free plan limited to 3 saved messages. Upgrade to Pro for unlimited." },
+            { status: 429 }
+          )
+          return addCorsHeaders(response, origin)
+        }
+      }
+    }
+
     // Update the message's favorited status
     const { data, error } = await adminClient
       .from("chat_messages")

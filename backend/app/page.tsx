@@ -41,21 +41,8 @@ function HomeContent() {
   }, [searchParams])
 
   async function checkOnboardingStatus(token: string) {
-    const origin = window.location.origin
-    const response = await fetch(`${origin}/api/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      if (data.user.onboarded) {
-        router.push("/dashboard/rules")
-      } else {
-        router.push("/onboarding")
-      }
-    }
+    // Skip onboarding, go straight to dashboard
+    router.push("/dashboard/rules")
   }
 
   async function handlePasswordReset(e: React.FormEvent) {
