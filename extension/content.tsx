@@ -444,7 +444,11 @@ const TradingBuddyWidget = () => {
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       // Italic
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Line breaks
+      // Unordered lists (-, *, +)
+      .replace(/^[\-\*\+] (.+)$/gm, '<div class="ml-4 my-0.5">• $1</div>')
+      // Numbered lists (1., 2., etc.)
+      .replace(/^(\d+)\. (.+)$/gm, '<div class="ml-4 my-0.5">$1. $2</div>')
+      // Line breaks (but preserve breaks between list items)
       .replace(/\n/g, '<br/>')
   }
 
@@ -1734,7 +1738,7 @@ const TradingBuddyWidget = () => {
                       <span>Messages</span>
                       <span>{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
                       <div
                         className={`h-full transition-all ${
                           currentUsage.messages >= currentUsage.limits.maxMessages
@@ -1754,7 +1758,7 @@ const TradingBuddyWidget = () => {
                       <span>Screenshots</span>
                       <span>{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
                       <div
                         className={`h-full transition-all ${
                           currentUsage.screenshots >= currentUsage.limits.maxScreenshots
