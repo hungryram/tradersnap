@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
+import { createClient } from '@/lib/supabase-client'
 
 export default function DashboardNav() {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const supabase = createClient()
 
   const handleSignOut = async () => {
     try {
