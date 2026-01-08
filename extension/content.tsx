@@ -78,6 +78,7 @@ const TradingBuddyWidget = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messageOffset, setMessageOffset] = useState(0)
+  const [currentUsage, setCurrentUsage] = useState<any>(null) // Track usage from chat responses
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
@@ -686,6 +687,11 @@ const TradingBuddyWidget = () => {
 
       const chatResult = await apiResponse.json()
       
+      // Update usage tracking
+      if (chatResult.usage) {
+        setCurrentUsage(chatResult.usage)
+      }
+      
       // Check for timeout action
       if (chatResult.action && chatResult.action.type === 'timeout') {
         console.log('[Content] Timeout action received:', chatResult.action)
@@ -894,7 +900,7 @@ const TradingBuddyWidget = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 relative">
-            <UsageMeter session={session} />
+            <UsageMeter session={session} latestUsage={currentUsage} />
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -1274,19 +1280,64 @@ const TradingBuddyWidget = () => {
                   disabled={isSending || !inputText.trim()}
                   className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
                 >
-              <span>📸</span>
-              Send with Chart
-            </button>
-            
-            <button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"
-            >
-              <span>🔍</span>
-              {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
-            </button>
-          </div>
+                  <span>📸</span>
+                  Send with Chart
+                </button>
+                
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"
+                >
+                  <span>🔍</span>
+                  {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
+                </button>
+              </div>
+
+              {/* Usage Progress Bars */}
+              {currentUsage && (
+                <div className="space-y-1.5 text-xs">
+                  {/* Messages Progress */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1 text-slate-600">
+                      <span>💬 Messages</span>
+                      <span className="font-medium">{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          currentUsage.messages >= currentUsage.limits.maxMessages
+                            ? "bg-red-500"
+                            : currentUsage.messages / currentUsage.limits.maxMessages >= 0.8
+                            ? "bg-amber-500"
+                            : "bg-blue-600"
+                        }`}
+                        style={{ width: `${Math.min((currentUsage.messages / currentUsage.limits.maxMessages) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Screenshots Progress */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1 text-slate-600">
+                      <span>📸 Screenshots</span>
+                      <span className="font-medium">{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          currentUsage.screenshots >= currentUsage.limits.maxScreenshots
+                            ? "bg-red-500"
+                            : currentUsage.screenshots / currentUsage.limits.maxScreenshots >= 0.8
+                            ? "bg-amber-500"
+                            : "bg-green-600"
+                        }`}
+                        style={{ width: `${Math.min((currentUsage.screenshots / currentUsage.limits.maxScreenshots) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
           </>
           )}
         </div>

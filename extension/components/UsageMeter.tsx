@@ -2,16 +2,23 @@ import { useState, useEffect } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 
 interface UsageData {
-  used: number
-  limit: number
-  period_start: string
+  messages: {
+    used: number
+    limit: number
+  }
+  screenshots: {
+    used: number
+    limit: number
+  }
+  resetDate: string
 }
 
 interface UsageMeterProps {
   session: any
+  latestUsage?: { messages: number; screenshots: number; limits: any } // From chat API response
 }
 
-export function UsageMeter({ session }: UsageMeterProps) {
+export function UsageMeter({ session, latestUsage }: UsageMeterProps) {
   const [usage, setUsage] = useState<UsageData | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -21,6 +28,23 @@ export function UsageMeter({ session }: UsageMeterProps) {
       fetchUsage()
     }
   }, [session])
+
+  // Update usage when new data comes from chat API
+  useEffect(() => {
+    if (latestUsage) {
+      setUsage({
+        messages: {
+          used: latestUsage.messages,
+          limit: latestUsage.limits.maxMessages
+        },
+        screenshots: {
+          used: latestUsage.screenshots,
+          limit: latestUsage.limits.maxScreenshots
+        },
+        resetDate: new Date().toISOString()
+      })
+    }
+  }, [latestUsage])
 
   async function fetchUsage() {
     if (!session?.access_token) return
@@ -34,11 +58,7 @@ export function UsageMeter({ session }: UsageMeterProps) {
 
       if (response.ok) {
         const data = await response.json()
-        setUsage({
-          used: data.usage.used,
-          limit: data.usage.limit,
-          period_start: data.usage.period_start
-        })
+        setUsage(data.usage)
       }
     } catch (err) {
       console.error("Failed to fetch usage:", err)
@@ -51,9 +71,10 @@ export function UsageMeter({ session }: UsageMeterProps) {
     return null
   }
 
-  const percentage = (usage.used / usage.limit) * 100
-  const isNearLimit = percentage >= 80
-  const isAtLimit = percentage >= 100
+  const messagePercent = (usage.messages.used / usage.messages.limit) * 100
+  const screenshotPercent = (usage.screenshots.used / usage.screenshots.limit) * 100
+  const isNearLimit = messagePercent >= 80 || screenshotPercent >= 80
+  const isAtLimit = messagePercent >= 100 || screenshotPercent >= 100
 
   return (
     <div className="relative">
@@ -100,11 +121,11 @@ export function UsageMeter({ session }: UsageMeterProps) {
           />
 
           {/* Popover Content */}
-          <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-slate-200 p-4 z-50">
-            <div className="space-y-3">
+          <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-lg border border-slate-200 p-4 z-50">
+            <div className="space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">Usage This Month</h3>
+                <h3 className="font-semibold text-slate-900">Usage Today</h3>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-slate-400 hover:text-slate-600"
@@ -115,48 +136,67 @@ export function UsageMeter({ session }: UsageMeterProps) {
                 </button>
               </div>
 
-              {/* Chart Analyses */}
+              {/* Messages */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600">Chart Analyses</span>
+                  <span className="text-sm text-slate-600">💬 Messages</span>
                   <span className="text-sm font-medium text-slate-900">
-                    {usage.used} / {usage.limit}
+                    {usage.messages.used} / {usage.messages.limit}
                   </span>
                 </div>
-                
-                {/* Progress Bar */}
                 <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                   <div
                     className={`h-full transition-all rounded-full ${
-                      isAtLimit
+                      messagePercent >= 100
                         ? "bg-red-500"
-                        : isNearLimit
+                        : messagePercent >= 80
                         ? "bg-amber-500"
                         : "bg-blue-600"
                     }`}
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                    style={{ width: `${Math.min(messagePercent, 100)}%` }}
                   />
                 </div>
-
-                {/* Warning Messages */}
-                {isAtLimit && (
-                  <p className="text-xs text-red-600 mt-2">
-                    ⚠️ Limit reached. Upgrade to continue analyzing charts.
-                  </p>
-                )}
-                {isNearLimit && !isAtLimit && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    ⚠️ Running low on analyses. Consider upgrading your plan.
-                  </p>
-                )}
               </div>
 
-              {/* Chat Usage (Unlimited for now) */}
-              <div className="pt-3 border-t border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Chat Messages</span>
-                  <span className="text-sm font-medium text-green-600">Unlimited ✓</span>
+              {/* Screenshots */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-600">📸 Chart Screenshots</span>
+                  <span className="text-sm font-medium text-slate-900">
+                    {usage.screenshots.used} / {usage.screenshots.limit}
+                  </span>
                 </div>
+                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full transition-all rounded-full ${
+                      screenshotPercent >= 100
+                        ? "bg-red-500"
+                        : screenshotPercent >= 80
+                        ? "bg-amber-500"
+                        : "bg-green-600"
+                    }`}
+                    style={{ width: `${Math.min(screenshotPercent, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Warning Messages */}
+              {isAtLimit && (
+                <p className="text-xs text-red-600">
+                  ⚠️ Daily limit reached. Resets at midnight UTC.
+                </p>
+              )}
+              {isNearLimit && !isAtLimit && (
+                <p className="text-xs text-amber-600">
+                  ⚠️ Running low. Upgrade to Pro for 500 messages and 50 screenshots per day.
+                </p>
+              )}
+
+              {/* Reset info */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-xs text-slate-500">
+                  Usage resets daily at midnight UTC
+                </p>
               </div>
 
               {/* Upgrade Button */}
