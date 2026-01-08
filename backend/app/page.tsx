@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 
 export default function Home() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -17,13 +18,27 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Check if signout query parameter is present
+    const shouldSignOut = searchParams.get('signout')
+    
+    if (shouldSignOut === 'true') {
+      console.log('[Home] Sign out requested via query param')
+      supabase.auth.signOut().then(() => {
+        console.log('[Home] Signed out, clearing localStorage')
+        localStorage.removeItem('trading_buddy_session')
+        // Remove the query param
+        window.history.replaceState({}, '', '/')
+      })
+      return
+    }
+    
     // Check if already signed in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         checkOnboardingStatus(session.access_token)
       }
     })
-  }, [])
+  }, [searchParams])
 
   async function checkOnboardingStatus(token: string) {
     const origin = window.location.origin

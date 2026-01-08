@@ -121,24 +121,33 @@ function IndexPopup() {
     try {
       console.log('[Popup] Signing out...')
       
-      // Clear chrome.storage
+      // Clear chrome.storage first
       await chrome.storage.local.remove('supabase_session')
       
-      // Also try to clear from admin domain localStorage
+      // Force sign out by navigating to admin domain with logout query
       try {
         const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
         if (tabs.length > 0 && tabs[0].id) {
-          console.log('[Popup] Clearing localStorage from admin tab')
+          console.log('[Popup] Found admin tab, injecting sign-out script...')
           await chrome.scripting.executeScript({
             target: { tabId: tabs[0].id },
             func: () => {
+              // Clear localStorage
               localStorage.removeItem('trading_buddy_session')
-              console.log('Cleared trading_buddy_session from localStorage')
+              // Redirect to trigger Supabase sign out
+              window.location.href = '/?signout=true'
             }
+          })
+        } else {
+          console.log('[Popup] No admin tab, opening one to trigger sign out...')
+          // Create a tab that will trigger sign out
+          await chrome.tabs.create({ 
+            url: `${process.env.PLASMO_PUBLIC_API_URL}/?signout=true`,
+            active: false 
           })
         }
       } catch (error) {
-        console.error('[Popup] Could not clear admin localStorage:', error)
+        console.error('[Popup] Could not sign out from admin:', error)
       }
       
       console.log('[Popup] Sign out complete')
