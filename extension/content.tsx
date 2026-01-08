@@ -513,6 +513,18 @@ const TradingBuddyWidget = () => {
 
       const { ruleset } = await rulesetResponse.json()
 
+      // Check screenshot limit before capturing
+      if (userData?.usage.screenshots.used >= userData?.usage.screenshots.limit) {
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: userData.user.plan === 'pro' 
+            ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
+            : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
+          timestamp: new Date()
+        }])
+        return
+      }
+
       // Capture screenshot
       setIsOpen(false)
       await new Promise(resolve => setTimeout(resolve, 100))
