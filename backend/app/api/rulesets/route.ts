@@ -9,13 +9,13 @@ const supabase = createClient(
 
 const createRulesetSchema = z.object({
   name: z.string().min(1).max(100),
-  rules_text: z.string().min(10),
+  rules_text: z.string().min(10).max(5000),
   is_primary: z.boolean().optional()
 })
 
 const updateRulesetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  rules_text: z.string().min(10).optional(),
+  rules_text: z.string().min(10).max(5000).optional(),
   is_primary: z.boolean().optional()
 })
 
@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single()
 
+    const userPlan = profile?.plan || "free"
+    const maxRulesLength = userPlan === "pro" ? 5000 : 1000
+
     // Check ruleset limit
     const { count } = await supabase
       .from("rulesets")
@@ -93,6 +96,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validated = createRulesetSchema.parse(body)
+
+    // Check plan-based character limit
+    if (validated.rules_text.length > maxRulesLength) {
+      return NextResponse.json(
+        { error: `Rules text exceeds ${maxRulesLength} character limit for ${userPlan} plan` },
+        { status: 400 }
+      )
+    }
 
     // If this is marked as primary, unset any existing primary
     if (validated.is_primary) {

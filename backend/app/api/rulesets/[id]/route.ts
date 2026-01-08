@@ -9,7 +9,7 @@ const supabase = createClient(
 
 const updateRulesetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  rules_text: z.string().min(10).optional(),
+  rules_text: z.string().min(10).max(5000).optional(),
   is_primary: z.boolean().optional()
 })
 
@@ -75,8 +75,26 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
+    // Get user's plan
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .single()
+
+    const userPlan = profile?.plan || "free"
+    const maxRulesLength = userPlan === "pro" ? 5000 : 1000
+
     const body = await request.json()
     const validated = updateRulesetSchema.parse(body)
+
+    // Check plan-based character limit if rules_text is being updated
+    if (validated.rules_text && validated.rules_text.length > maxRulesLength) {
+      return NextResponse.json(
+        { error: `Rules text exceeds ${maxRulesLength} character limit for ${userPlan} plan` },
+        { status: 400 }
+      )
+    }
 
     // If setting as primary, unset any existing primary
     if (validated.is_primary) {

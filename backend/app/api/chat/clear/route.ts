@@ -43,11 +43,12 @@ export async function DELETE(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 2. Delete all chat messages for this user
+    // 2. Delete all non-favorited chat messages for this user
     const { error: deleteError } = await supabase
       .from('chat_messages')
       .delete()
       .eq('user_id', user.id)
+      .eq('is_favorited', false)
 
     if (deleteError) {
       console.error('[Chat Clear API] Delete error:', deleteError)
@@ -58,7 +59,7 @@ export async function DELETE(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    console.log('[Chat Clear API] Cleared all messages for user:', user.id)
+    console.log('[Chat Clear API] Cleared non-favorited messages for user:', user.id)
 
     // 3. Return success
     const response = NextResponse.json({ 

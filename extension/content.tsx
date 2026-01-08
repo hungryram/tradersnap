@@ -81,14 +81,28 @@ const TradingBuddyWidget = () => {
   const [currentUsage, setCurrentUsage] = useState<any>(null) // Track usage from chat responses
   const [showUsage, setShowUsage] = useState(false) // Toggle for usage progress bars
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
   const [timeoutReason, setTimeoutReason] = useState<string>('')
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Handle scroll to show/hide scroll-to-bottom button
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 10
+    setShowScrollButton(!isNearBottom)
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   // Load messages, theme, and session from storage on mount
   useEffect(() => {
@@ -911,27 +925,23 @@ const TradingBuddyWidget = () => {
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
-      <div className={`${theme === 'dark' ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
+      <div className={`${theme === 'dark' ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
         {/* Header - Draggable */}
         <div
-          className={`flex items-center justify-between p-4 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
+          className={`flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
           onMouseDown={handleMouseDown}
         >
-          <div className="flex items-center gap-2">
-            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-8 h-8" />
-            <div>
-              <div className="font-semibold text-white">Snapchart</div>
-              <div className="text-xs text-blue-100">AI Psychology Coach</div>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" />
+            <div className="text-sm font-medium text-white">Snapchart</div>
           </div>
-          <div className="flex items-center gap-2 relative">
-            <UsageMeter session={session} latestUsage={currentUsage} />
+          <div className="flex items-center gap-1 relative">
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(!showMenu)
               }}
-              className="text-white hover:text-blue-100 text-xl px-2"
+              className="text-white hover:text-blue-100 text-base px-1"
               title="Menu"
             >
               ⋮
@@ -943,10 +953,9 @@ const TradingBuddyWidget = () => {
                     window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard`, '_blank')
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
-                  <span>⚙️</span>
-                  <span>Dashboard</span>
+                  Dashboard
                 </button>
                 <button
                   onClick={() => {
@@ -955,10 +964,9 @@ const TradingBuddyWidget = () => {
                     chrome.storage.local.set({ theme: newTheme })
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
-                  <span>{theme === 'light' ? '🌙' : '☀️'}</span>
-                  <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+                  {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
                 </button>
                 {messages.length > 0 && (
                   <button
@@ -984,30 +992,39 @@ const TradingBuddyWidget = () => {
                             }
                           }
                           
-                          // Clear from local state and storage
-                          setMessages([])
-                          chrome.storage.local.remove('chat_messages')
+                          // Keep only favorited messages in local state and storage
+                          const favoritedMessages = messages.filter(msg => msg.isFavorited)
+                          setMessages(favoritedMessages)
+                          if (favoritedMessages.length > 0) {
+                            chrome.storage.local.set({ chat_messages: favoritedMessages })
+                          } else {
+                            chrome.storage.local.remove('chat_messages')
+                          }
                           setShowMenu(false)
                         } catch (error) {
                           console.error('[Content] Error clearing chat:', error)
-                          // Still clear locally even if API fails
-                          setMessages([])
-                          chrome.storage.local.remove('chat_messages')
+                          // Still clear locally even if API fails, but keep favorites
+                          const favoritedMessages = messages.filter(msg => msg.isFavorited)
+                          setMessages(favoritedMessages)
+                          if (favoritedMessages.length > 0) {
+                            chrome.storage.local.set({ chat_messages: favoritedMessages })
+                          } else {
+                            chrome.storage.local.remove('chat_messages')
+                          }
                           setShowMenu(false)
                         }
                       }
                     }}
-                    className={`w-full text-left px-4 py-2 flex items-center gap-2 ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                    className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                   >
-                    <span>🗑️</span>
-                    <span>Clear Chat</span>
+                    Clear Chat
                   </button>
                 )}
               </div>
             )}
             <button
               onClick={() => setIsOpen(false)}
-              className="text-white hover:text-blue-100 text-xl"
+              className="text-white hover:text-blue-100 text-base"
             >
               ✕
             </button>
@@ -1015,7 +1032,11 @@ const TradingBuddyWidget = () => {
         </div>
 
         {/* Messages */}
-        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+        <div 
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className={`flex-1 overflow-y-auto p-4 space-y-4 relative ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}
+        >
           {/* Load Older Messages Button */}
           {hasMoreMessages && messages.length > 0 && (
             <div className="flex justify-center">
@@ -1210,6 +1231,21 @@ const TradingBuddyWidget = () => {
           
           {/* Auto-scroll anchor */}
           <div ref={messagesEndRef} />
+
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className={`sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto w-8 h-8 flex items-center justify-center rounded-full shadow-md transition-all hover:scale-110 hover:opacity-100 z-50 opacity-70 ${
+                theme === 'dark' 
+                  ? 'bg-slate-800 text-white border border-slate-600' 
+                  : 'bg-white text-slate-700 border border-slate-300'
+              }`}
+              title="Scroll to bottom"
+            >
+              ↓
+            </button>
+          )}
           
           {(isAnalyzing || isSending) && (
             <div className="flex justify-start">
@@ -1225,7 +1261,7 @@ const TradingBuddyWidget = () => {
         </div>
 
         {/* Actions */}
-        <div className={`p-4 space-y-2 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
+        <div className={`p-3 space-y-1.5 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
           {/* Timeout Timer (replaces input when active) */}
           {isTimedOut && timeoutEndTime ? (
             <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-amber-50 border border-amber-200'}`}>
@@ -1280,7 +1316,8 @@ const TradingBuddyWidget = () => {
                   onKeyUp={(e) => e.stopPropagation()}
                   placeholder="Ask me anything..."
                   disabled={isSending}
-                  className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'border-slate-300 disabled:bg-slate-100'}`}
+                  maxLength={500}
+                  className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
                 />
                 <button
                   onClick={() => {
@@ -1289,7 +1326,7 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
                 >
                   {isSending ? "..." : "Send"}
                 </button>
@@ -1303,18 +1340,18 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
                 >
-                  <span>📸</span>
+                  <span className="text-sm">📸</span>
                   Send with Chart
                 </button>
                 
                 <button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 text-xs"
                 >
-                  <span>🔍</span>
+                  <span className="text-sm">🔍</span>
                   {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
                 </button>
               </div>
@@ -1331,12 +1368,12 @@ const TradingBuddyWidget = () => {
 
               {/* Usage Progress Bars */}
               {currentUsage && showUsage && (
-                <div className="space-y-1.5 text-xs">
+                <div className="space-y-1.5">
                   {/* Messages Progress */}
                   <div>
-                    <div className="flex items-center justify-between mb-1 text-slate-600">
-                      <span>💬 Messages</span>
-                      <span className="font-medium">{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
+                    <div className="flex items-center justify-between mb-0.5 text-slate-500 text-[10px]">
+                      <span>Messages</span>
+                      <span>{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                       <div
@@ -1354,9 +1391,9 @@ const TradingBuddyWidget = () => {
 
                   {/* Screenshots Progress */}
                   <div>
-                    <div className="flex items-center justify-between mb-1 text-slate-600">
-                      <span>📸 Screenshots</span>
-                      <span className="font-medium">{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
+                    <div className="flex items-center justify-between mb-0.5 text-slate-500 text-[10px]">
+                      <span>Screenshots</span>
+                      <span>{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                       <div

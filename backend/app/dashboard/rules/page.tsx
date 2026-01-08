@@ -370,11 +370,15 @@ export default function RulesPage() {
               <div>
                 <label htmlFor="rules" className="block text-sm font-medium text-slate-700 mb-2">
                   Rules
+                  <span className="text-slate-500 text-xs ml-2">
+                    ({rulesText.length}/{userPlan === 'pro' ? 5000 : 1000} characters)
+                  </span>
                 </label>
                 <textarea
                   id="rules"
                   value={rulesText}
                   onChange={(e) => setRulesText(e.target.value)}
+                  maxLength={userPlan === 'pro' ? 5000 : 1000}
                   rows={16}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                 />
