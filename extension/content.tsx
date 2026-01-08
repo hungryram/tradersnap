@@ -473,8 +473,127 @@ const TradingBuddyWidget = () => {
   }, [isOpen, inputText, isSending])
 
   const handleAnalyze = async () => {
-    // Use the chat endpoint, which properly tracks screenshot usage
-    await handleSendMessage('📸 Analyze this chart', true)
+    if (isSending || isAnalyzing) return
+
+    setIsAnalyzing(true)
+    setIsSending(true)
+
+    try {
+      // Get fresh session
+      const result = await chrome.storage.local.get('supabase_session')
+      const { supabase_session } = result
+
+      if (!supabase_session) {
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: 'Session expired. Please reload the extension.',
+          timestamp: new Date()
+        }])
+        return
+      }
+
+      // Get active ruleset
+      const rulesetResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/rulesets/active`,
+        {
+          headers: { "Authorization": `Bearer ${supabase_session.access_token}` }
+        }
+      )
+
+      if (!rulesetResponse.ok) {
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: 'No active ruleset found. Please set one in the dashboard.',
+          timestamp: new Date()
+        }])
+        return
+      }
+
+      const { ruleset } = await rulesetResponse.json()
+
+      // Capture screenshot
+      setIsOpen(false)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const screenshotResponse = await chrome.runtime.sendMessage({
+        type: "CAPTURE_SCREENSHOT"
+      })
+      
+      setIsOpen(true)
+
+      if (!screenshotResponse.success || !screenshotResponse.dataUrl) {
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: 'Failed to capture chart. Please try again.',
+          timestamp: new Date()
+        }])
+        return
+      }
+
+      const chartImage = screenshotResponse.dataUrl
+      setLastChartImage(chartImage)
+
+      // Add user message
+      const userMessage = {
+        type: 'user',
+        content: '📸 Analyze this chart',
+        timestamp: new Date(),
+        chartImage: chartImage
+      }
+      setMessages(prev => [...prev, userMessage])
+
+      // Call analyze endpoint
+      const analyzeResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/analyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabase_session.access_token}`
+          },
+          body: JSON.stringify({
+            rulesetId: ruleset.id,
+            sessionId: session,
+            image: chartImage
+          })
+        }
+      )
+
+      if (!analyzeResponse.ok) {
+        const errorData = await analyzeResponse.json().catch(() => ({}))
+        setMessages(prev => [...prev, {
+          type: 'error',
+          content: errorData.error || 'Analysis failed. Please try again.',
+          timestamp: new Date()
+        }])
+        return
+      }
+
+      const analysis = await analyzeResponse.json()
+
+      // Add analysis result as assistant message
+      const assistantMessage = {
+        type: 'assistant',
+        content: analysis,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, assistantMessage])
+
+      // Scroll to bottom
+      setTimeout(() => scrollToBottom(), 100)
+
+    } catch (error) {
+      console.error('[Content] Analysis error:', error)
+      setMessages(prev => [...prev, {
+        type: 'error',
+        content: 'An error occurred during analysis.',
+        timestamp: new Date()
+      }])
+    } finally {
+      setIsAnalyzing(false)
+      setIsSending(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
   }
 
   const loadOlderMessages = async () => {
