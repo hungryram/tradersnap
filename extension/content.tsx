@@ -346,6 +346,12 @@ const TradingBuddyWidget = () => {
     // Check once on mount
     checkLocalStorage()
     
+    // Periodically check localStorage every 2 seconds (only on admin domain)
+    // This ensures session syncs even if postMessage is missed during sign-in
+    const intervalId = setInterval(() => {
+      checkLocalStorage()
+    }, 2000)
+    
     // Listen for login messages from the website (no polling!)
     const handleMessage = (event: MessageEvent) => {
       // Only accept messages from same origin for security
@@ -363,6 +369,7 @@ const TradingBuddyWidget = () => {
     
     return () => {
 
+      clearInterval(intervalId)
       window.removeEventListener('message', handleMessage)
     }
   }, [])
