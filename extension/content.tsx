@@ -563,7 +563,7 @@ const TradingBuddyWidget = () => {
             type: 'error',
             content: userData.user.plan === 'pro' 
               ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-              : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
+              : "You've used all 5 free chart analyses today. [Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account) for 50 charts/day.",
             timestamp: new Date()
           }])
           return
