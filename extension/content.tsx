@@ -553,7 +553,6 @@ const TradingBuddyWidget = () => {
           },
           body: JSON.stringify({
             rulesetId: ruleset.id,
-            sessionId: session,
             image: chartImage
           })
         }
