@@ -305,7 +305,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Free plan gets shorter responses but still functional
-    const maxTokens = profile.plan === 'pro' ? 1200 : 800
+    const maxTokens = profile.plan === 'pro' ? 1500 : 1000
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
