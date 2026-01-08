@@ -420,9 +420,23 @@ export default function RulesPage() {
                 </button>
               </div>
             </div>
-          )}
-        </div>
+          )}        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 py-6 mt-12">
+        <div className="max-w-5xl mx-auto px-6 text-center">
+          <div className="flex justify-center gap-6 text-sm text-slate-600">
+            <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
+              Privacy Policy
+            </a>
+            <span className="text-slate-400">|</span>
+            <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
+              Terms of Service
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

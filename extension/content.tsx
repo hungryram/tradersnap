@@ -86,6 +86,7 @@ const TradingBuddyWidget = () => {
   const [timeoutReason, setTimeoutReason] = useState<string>('')
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
@@ -95,12 +96,39 @@ const TradingBuddyWidget = () => {
   const handleScroll = () => {
     if (!messagesContainerRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 10
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
     setShowScrollButton(!isNearBottom)
   }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  // Format timestamp like iPhone messages
+  const formatMessageTime = (timestamp: Date) => {
+    const now = new Date()
+    const msgDate = new Date(timestamp)
+    const diffMs = now.getTime() - msgDate.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    
+    // Less than 1 hour: show "X min ago" or "Just now"
+    if (diffMins < 1) return "Just now"
+    if (diffMins < 60) return `${diffMins}m ago`
+    
+    // Same day: show time like "2:30 PM"
+    if (msgDate.toDateString() === now.toDateString()) {
+      return msgDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    }
+    
+    // Yesterday
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    if (msgDate.toDateString() === yesterday.toDateString()) {
+      return `Yesterday ${msgDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    }
+    
+    // Older: show date
+    return msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
 
   // Load messages, theme, and session from storage on mount
@@ -228,6 +256,17 @@ const TradingBuddyWidget = () => {
     return () => {
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
+  }, [])
+
+  // Check if this is first launch
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      const result = await chrome.storage.local.get(['has_seen_welcome'])
+      if (!result.has_seen_welcome) {
+        setShowWelcomeModal(true)
+      }
+    }
+    checkFirstLaunch()
   }, [])
 
   // Timeout countdown timer
@@ -912,7 +951,50 @@ const TradingBuddyWidget = () => {
   }
 
   return (
-    <div
+    <>
+      {/* Welcome Modal */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
+          <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-slate-800 text-slate-100' : 'bg-white text-slate-900'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" />
+              <h2 className="text-2xl font-bold">Welcome to Snapchart!</h2>
+            </div>
+            <p className={`mb-4 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+              This extension captures screenshots when you click "Analyze Chart" and stores your chat history to help improve your trading psychology.
+            </p>
+            <p className={`mb-6 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+              By continuing, you agree to our Terms of Service and Privacy Policy.
+            </p>
+            <div className="flex gap-3 mb-4">
+              <button
+                onClick={() => window.open('https://www.snapchartapp.com/terms', '_blank')}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+              >
+                View Terms
+              </button>
+              <button
+                onClick={() => window.open('https://www.snapchartapp.com/privacy', '_blank')}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+              >
+                View Privacy
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                chrome.storage.local.set({ has_seen_welcome: true })
+                setShowWelcomeModal(false)
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+            >
+              Get Started
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Widget */}
+      <div
       style={{
         position: "fixed",
         left: `${position.x}px`,
@@ -949,7 +1031,7 @@ const TradingBuddyWidget = () => {
               <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
                 <button
                   onClick={() => {
-                    window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard`, '_blank')
+                    window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
@@ -1010,6 +1092,25 @@ const TradingBuddyWidget = () => {
                     Clear Chat
                   </button>
                 )}
+                <div className={`border-t my-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+                <button
+                  onClick={() => {
+                    window.open('https://www.snapchartapp.com/privacy', '_blank')
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  Privacy Policy
+                </button>
+                <button
+                  onClick={() => {
+                    window.open('https://www.snapchartapp.com/terms', '_blank')
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  Terms of Service
+                </button>
               </div>
             )}
             <button
@@ -1048,7 +1149,7 @@ const TradingBuddyWidget = () => {
             <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
               <div className="text-4xl mb-2">👋</div>
               <p className="mb-2">Hi! I'm your trading psychology coach.</p>
-              <p className="text-xs">Click "Analyze Chart" below to get started.</p>
+              <p className="text-xs">Ask a question or analyze a chart to begin.</p>
             </div>
           )}
 
@@ -1078,6 +1179,11 @@ const TradingBuddyWidget = () => {
                     }`}>
                       {msg.content}
                     </div>
+                    {msg.timestamp && (
+                      <div className="text-[10px] text-slate-400 mt-0.5 text-right px-1">
+                        {formatMessageTime(msg.timestamp)}
+                      </div>
+                    )}
                     {msg.chartImage && (
                       <img 
                         src={msg.chartImage} 
@@ -1138,6 +1244,7 @@ const TradingBuddyWidget = () => {
                   )}
                   
                   <div 
+
                     className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
@@ -1145,11 +1252,17 @@ const TradingBuddyWidget = () => {
                     }`}
                     dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
                   />
+                  {msg.timestamp && (
+                    <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
+                      {formatMessageTime(msg.timestamp)}
+                    </div>
+                  )}
                 </div>
               )}
               
               {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.verdict && (
-                <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%] text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
+                <div className="max-w-[85%]">
+                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
                   {/* Show chart with overlay if it exists */}
                   {msg.chartImage && msg.content.drawings && msg.content.drawings.length > 0 && (
                     <div className="mb-3">
@@ -1209,6 +1322,12 @@ const TradingBuddyWidget = () => {
                   {msg.content.behavioral_nudge && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900">
                       💡 {msg.content.behavioral_nudge}
+                    </div>
+                  )}
+                </div>
+                  {msg.timestamp && (
+                    <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
+                      {formatMessageTime(msg.timestamp)}
                     </div>
                   )}
                 </div>
@@ -1304,7 +1423,7 @@ const TradingBuddyWidget = () => {
                   }}
                   onKeyPress={(e) => e.stopPropagation()}
                   onKeyUp={(e) => e.stopPropagation()}
-                  placeholder="Ask me anything..."
+                  placeholder="What's on your mind?"
                   disabled={isSending}
                   maxLength={500}
                   className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
@@ -1316,7 +1435,7 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
                 >
                   {isSending ? "..." : "Send"}
                 </button>
@@ -1330,7 +1449,7 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
                 >
                   <span className="text-sm">📸</span>
                   Send with Chart
@@ -1339,7 +1458,7 @@ const TradingBuddyWidget = () => {
                 <button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 text-xs"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 text-xs"
                 >
                   <span className="text-sm">🔍</span>
                   {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
@@ -1350,7 +1469,7 @@ const TradingBuddyWidget = () => {
               {currentUsage && (
                 <button
                   onClick={() => setShowUsage(!showUsage)}
-                  className="text-xs text-slate-600 hover:text-slate-900 underline"
+                  className={`text-xs underline ${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {showUsage ? "Hide Usage" : "View Usage"}
                 </button>
@@ -1429,6 +1548,7 @@ const TradingBuddyWidget = () => {
         />
       )}
     </div>
+    </>
   )
 }
 
