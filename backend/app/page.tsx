@@ -92,7 +92,18 @@ export default function Home() {
             }
           })
 
-          if (error) throw error
+          if (error) {
+            // Check if email already exists
+            if (error.message.includes('already registered') || error.message.includes('already exists')) {
+              throw new Error('This email is already registered. Please sign in instead.')
+            }
+            throw error
+          }
+          
+          // Check if user already exists (Supabase returns user but no session for existing emails)
+          if (data.user && !data.session && data.user.identities?.length === 0) {
+            throw new Error('This email is already registered. Please sign in instead.')
+          }
           
           if (data.session) {
             // Signed up and logged in - save to localStorage and notify extension
