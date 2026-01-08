@@ -872,6 +872,20 @@ const TradingBuddyWidget = () => {
       if (!apiResponse.ok) {
         const errorData = await apiResponse.json().catch(() => ({}))
         console.error('[Content] Chat API error:', apiResponse.status, errorData)
+        
+        // Handle usage limit errors specially
+        if (apiResponse.status === 429 && errorData.message) {
+          const errorMsg = {
+            type: 'error',
+            content: errorData.message,
+            timestamp: new Date(),
+            requiresUpgrade: errorData.requiresUpgrade
+          }
+          setMessages(prev => [...prev, errorMsg])
+          setIsSending(false)
+          return
+        }
+        
         throw new Error(`API error: ${apiResponse.status}`)
       }
 
@@ -1241,8 +1255,16 @@ const TradingBuddyWidget = () => {
                 )}
                 
                 {msg.type === 'error' && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
-                    {msg.content}
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
+                    <div>{msg.content}</div>
+                    {msg.requiresUpgrade && (
+                      <button
+                        onClick={() => window.open('https://admin.snapchartapp.com/dashboard/account', '_blank')}
+                        className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        Upgrade to Pro - $49/mo
+                      </button>
+                    )}
                   </div>
                 )}
                 
