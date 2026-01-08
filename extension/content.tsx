@@ -93,6 +93,47 @@ const TradingBuddyWidget = () => {
   const isInitialLoadRef = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Function to load chat history from database
+  const loadChatHistoryFromDB = async () => {
+    const result = await chrome.storage.local.get('supabase_session')
+    if (!result.supabase_session) return
+    
+    try {
+      const historyResponse = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=20&offset=0`,
+        {
+          headers: {
+            "Authorization": `Bearer ${result.supabase_session.access_token}`
+          }
+        }
+      )
+
+      if (historyResponse.ok) {
+        const { messages: dbMessages } = await historyResponse.json()
+        
+        // If we got 20 messages, there might be more
+        setHasMoreMessages(dbMessages.length === 20)
+        setMessageOffset(20)
+        
+        // Convert DB format to UI format
+        const formattedMessages = dbMessages.map((msg: any) => ({
+          id: msg.id,
+          type: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          isFavorited: msg.is_favorited || false
+        }))
+        
+        setMessages(formattedMessages)
+        
+        // Update cache
+        chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
+      }
+    } catch (error) {
+      console.error('[Content] Error loading chat history:', error)
+    }
+  }
+
   // Handle scroll to show/hide scroll-to-bottom button
   const handleScroll = () => {
     if (!messagesContainerRef.current) return
@@ -195,42 +236,7 @@ const TradingBuddyWidget = () => {
         // Fetch full chat history from Supabase (initial load: 20 messages)
         setIsLoadingHistory(true)
         try {
-          const historyResponse = await fetch(
-            `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/history?limit=20&offset=0`,
-            {
-              headers: {
-                "Authorization": `Bearer ${result.supabase_session.access_token}`
-              }
-            }
-          )
-
-          if (historyResponse.ok) {
-            const { messages: dbMessages } = await historyResponse.json()
-
-            
-            // If we got 20 messages, there might be more
-            setHasMoreMessages(dbMessages.length === 20)
-            setMessageOffset(20)
-            
-            // Convert DB format to UI format
-            const formattedMessages = dbMessages.map((msg: any) => ({
-              id: msg.id,
-              type: msg.role === 'user' ? 'user' : 'assistant',
-              content: msg.content,
-              timestamp: new Date(msg.created_at),
-              isFavorited: msg.is_favorited || false
-            }))
-            
-            setMessages(formattedMessages)
-            
-            // Update cache
-            chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
-          } else {
-            console.error('[Content] Failed to load chat history:', historyResponse.status)
-          }
-        } catch (error) {
-          console.error('[Content] Error loading chat history:', error)
-          // Keep using cached messages if API fails
+          await loadChatHistoryFromDB()
         } finally {
           setIsLoadingHistory(false)
         }
@@ -243,6 +249,15 @@ const TradingBuddyWidget = () => {
       if (areaName === 'local' && changes.supabase_session) {
 
         setSession(changes.supabase_session.newValue)
+      }
+      
+      // Listen for chat sync events from other tabs
+      if (areaName === 'local' && changes.chat_sync) {
+        const syncEvent = changes.chat_sync.newValue
+        if (syncEvent?.action === 'message_sent') {
+          // Reload chat history from database
+          loadChatHistoryFromDB()
+        }
       }
     }
     chrome.storage.onChanged.addListener(handleStorageChange)
@@ -900,6 +915,14 @@ const TradingBuddyWidget = () => {
       if (chatResult.usage) {
         setCurrentUsage(chatResult.usage)
       }
+      
+      // Broadcast to other tabs that chat was updated
+      chrome.storage.local.set({
+        chat_sync: {
+          action: 'message_sent',
+          timestamp: Date.now()
+        }
+      })
       
       // Check for timeout action
       if (chatResult.action && chatResult.action.type === 'timeout') {
