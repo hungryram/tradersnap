@@ -1053,12 +1053,27 @@ const TradingBuddyWidget = () => {
       
     } catch (error) {
       console.error("[Content] Chat failed:", error)
-      const errorMsg = {
-        type: 'error',
-        content: 'Failed to send message. Please try again.',
-        timestamp: new Date()
+      
+      // Check if it's a 401 error (session expired)
+      if (error instanceof Error && error.message.includes('401')) {
+        // Clear stale session
+        await chrome.storage.local.remove('supabase_session')
+        setSession(null)
+        
+        const errorMsg = {
+          type: 'error',
+          content: 'Session expired. Please [sign in](https://admin.snapchartapp.com/) or use the extension popup to continue.',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+      } else {
+        const errorMsg = {
+          type: 'error',
+          content: `Failed to send message. ${error instanceof Error ? error.message : 'Please try again.'}`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
       }
-      setMessages(prev => [...prev, errorMsg])
     } finally {
       setIsSending(false)
       // Auto-focus input after AI responds
