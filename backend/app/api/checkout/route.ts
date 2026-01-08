@@ -62,9 +62,8 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
     }
 
-    // Get the base URL (strip any path from origin header)
-    const origin = request.headers.get("origin") || ""
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(origin).origin
+    // Use hardcoded base URL to avoid issues with auth redirects
+    const baseUrl = "https://admin.snapchartapp.com"
 
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
