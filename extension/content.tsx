@@ -842,6 +842,8 @@ const TradingBuddyWidget = () => {
       setMessages(prev => [...prev, errorMsg])
     } finally {
       setIsSending(false)
+      // Auto-focus input after AI responds
+      setTimeout(() => inputRef.current?.focus(), 100)
     }
   }
 

@@ -15,6 +15,7 @@ const openai = new OpenAI({
 // Request validation schema
 const analyzeRequestSchema = z.object({
   rulesetId: z.string().uuid(),
+  sessionId: z.string().uuid().optional(),
   context: z.object({
     symbol: z.string().optional(),
     timeframe: z.string().optional(),
@@ -301,10 +302,11 @@ REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
     const aiResponse = JSON.parse(completion.choices[0].message.content || "{}")
     const validatedResponse = analysisResponseSchema.parse(aiResponse)
 
-    // 7. Log analysis (optional)
+    // Save analysis to database (linked to session for deletion)
     await supabase.from("analyses").insert({
       user_id: user.id,
       ruleset_id: validatedRequest.rulesetId,
+      session_id: validatedRequest.sessionId || null,
       verdict: validatedResponse.verdict,
       payload: validatedResponse
     })

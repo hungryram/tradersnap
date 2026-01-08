@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user profile with usage data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, message_count, screenshot_count, usage_reset_date, first_name, last_name')
+      .select('plan, message_count, screenshot_count, usage_reset_date, first_name, last_name, total_tokens_used, total_input_tokens, total_output_tokens')
       .eq('id', user.id)
       .single()
 
@@ -289,6 +289,22 @@ Use for time-based coaching when they ask about the next candle or how long they
     })
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
+
+    // Track token usage (model-agnostic - check OpenAI dashboard for actual costs)
+    const usage = completion.usage
+    if (usage) {
+      console.log(`[OpenAI Usage] User: ${user.email} | Model: gpt-4.1 | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens})`)
+
+      // Update user's token usage in profile
+      await supabase
+        .from('profiles')
+        .update({
+          total_tokens_used: profile.total_tokens_used ? profile.total_tokens_used + usage.total_tokens : usage.total_tokens,
+          total_input_tokens: profile.total_input_tokens ? profile.total_input_tokens + usage.prompt_tokens : usage.prompt_tokens,
+          total_output_tokens: profile.total_output_tokens ? profile.total_output_tokens + usage.completion_tokens : usage.completion_tokens
+        })
+        .eq('id', user.id)
+    }
 
     // 5. Save messages to database for audit trail
     let userMessageId: string | null = null
