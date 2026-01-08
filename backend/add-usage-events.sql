@@ -107,3 +107,26 @@ BEGIN
   RETURN v_event_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Enable Row Level Security
+ALTER TABLE usage_events ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only insert their own events (via API with service role, but good practice)
+CREATE POLICY "Users can insert their own events"
+  ON usage_events
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users cannot read events directly (only via API or admin views)
+-- Service role bypasses RLS, so API can still access
+CREATE POLICY "No direct user access to events"
+  ON usage_events
+  FOR SELECT
+  TO authenticated
+  USING (false);
+
+-- Note: Views inherit RLS from base tables
+-- Since usage_events has RLS enabled and blocks SELECT for regular users,
+-- the views are automatically protected
+-- Only service role (backend API) can query these views
