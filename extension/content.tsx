@@ -834,7 +834,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session missing. Please [sign in](https://admin.snapchartapp.com/) using the extension popup (click the icon in your toolbar).',
+          content: 'Session missing. Please [sign in](https://admin.snapchartapp.com/) or use the extension popup (click the icon in your toolbar).',
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1405,7 +1405,7 @@ const TradingBuddyWidget = () => {
                 
                 {msg.type === 'error' && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
-                    <div>{msg.content}</div>
+                    <div dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content, false) }} />
                     {msg.requiresUpgrade && (
                       <button
                         onClick={() => window.open('https://admin.snapchartapp.com/dashboard/account', '_blank')}
