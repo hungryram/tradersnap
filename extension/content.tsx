@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
+import { analytics } from "~lib/analytics"
 
 import styleText from "data-text:~style.css"
 
@@ -418,6 +419,7 @@ const TradingBuddyWidget = () => {
     const messageListener = (message) => {
       if (message.type === "OPEN_WIDGET") {
         setIsOpen(true)
+        analytics.extensionOpened({ sessionId: session?.id })
         if (message.action === "analyze") {
           handleAnalyze()
         }
@@ -532,6 +534,7 @@ const TradingBuddyWidget = () => {
 
       const chartImage = screenshotResponse.dataUrl
       setLastChartImage(chartImage)
+      analytics.chartUploaded('screenshot', { sessionId: session?.id })
 
       // Add user message
       const userMessage = {
@@ -541,6 +544,7 @@ const TradingBuddyWidget = () => {
         chartImage: chartImage
       }
       setMessages(prev => [...prev, userMessage])
+      analytics.analysisStarted({ sessionId: session?.id })
 
       // Call analyze endpoint
       const analyzeResponse = await fetch(
@@ -569,6 +573,7 @@ const TradingBuddyWidget = () => {
       }
 
       const analysis = await analyzeResponse.json()
+      analytics.analysisFinished(analysis.verdict || 'unknown', { sessionId: session?.id })
 
       // Add analysis result as assistant message
       const assistantMessage = {
@@ -866,6 +871,7 @@ const TradingBuddyWidget = () => {
       }
 
       const chatResult = await apiResponse.json()
+      analytics.chatMessageSent(includeChart, { sessionId: session?.id })
       
       // Update usage tracking
       if (chatResult.usage) {
@@ -1181,6 +1187,7 @@ const TradingBuddyWidget = () => {
                           // Favorites remain in database for dashboard
                           setMessages([])
                           chrome.storage.local.remove('chat_messages')
+                          analytics.sessionCleared()
                           setShowMenu(false)
                         } catch (error) {
                           console.error('[Content] Error clearing chat:', error)
