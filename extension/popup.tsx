@@ -13,7 +13,7 @@ function IndexPopup() {
     
     const checkSession = async () => {
       try {
-        // Simply check chrome.storage - that's the single source of truth
+        // First check chrome.storage
         const result = await chrome.storage.local.get('supabase_session')
         console.log('[Popup] Chrome storage check:', result.supabase_session ? 'Session found' : 'No session')
         
@@ -44,17 +44,53 @@ function IndexPopup() {
             } catch (e) {
               console.error('[Popup] Failed to fetch user plan:', e)
             }
+            setIsLoading(false)
+            return
           } else {
             console.log('[Popup] Session expired, clearing')
             await chrome.storage.local.remove('supabase_session')
-            setIsLoggedIn(false)
-            setUser(null)
           }
-        } else {
-          console.log('[Popup] No session found')
-          setIsLoggedIn(false)
-          setUser(null)
         }
+        
+        // If no session in chrome.storage, try to fetch from dashboard tab
+        console.log('[Popup] No session in chrome.storage, checking dashboard tab...')
+        try {
+          const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
+          if (tabs.length > 0 && tabs[0].id) {
+            console.log('[Popup] Found dashboard tab, checking localStorage...')
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: tabs[0].id },
+              func: () => localStorage.getItem('trading_buddy_session')
+            })
+            
+            if (results?.[0]?.result) {
+              const webSession = JSON.parse(results[0].result)
+              console.log('[Popup] Found session in dashboard localStorage:', webSession.user?.email)
+              
+              // Verify not expired
+              if (webSession.expires_at && webSession.expires_at > Date.now() / 1000) {
+                console.log('[Popup] Session valid, saving to chrome.storage')
+                await chrome.storage.local.set({ supabase_session: webSession })
+                setIsLoggedIn(true)
+                setUser(webSession.user)
+                setIsLoading(false)
+                return
+              } else {
+                console.log('[Popup] Dashboard session expired')
+              }
+            } else {
+              console.log('[Popup] No session in dashboard localStorage')
+            }
+          } else {
+            console.log('[Popup] No dashboard tab found')
+          }
+        } catch (e) {
+          console.error('[Popup] Error fetching from dashboard:', e)
+        }
+        
+        console.log('[Popup] No valid session found')
+        setIsLoggedIn(false)
+        setUser(null)
       } catch (error) {
         console.error('[Popup] Error checking session:', error)
         setIsLoggedIn(false)

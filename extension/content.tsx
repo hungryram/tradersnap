@@ -18,6 +18,35 @@ const supabase = createBrowserClient(
   process.env.PLASMO_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// Add global debug function IMMEDIATELY (before anything else)
+if (typeof window !== 'undefined') {
+  (window as any).debugSnapchart = async () => {
+    console.log('=== Snapchart Debug Info ===')
+    
+    // Check chrome.storage
+    const chromeStorage = await chrome.storage.local.get('supabase_session')
+    console.log('Chrome Storage Session:', chromeStorage.supabase_session ? {
+      user: chromeStorage.supabase_session.user?.email,
+      expires_at: chromeStorage.supabase_session.expires_at,
+      expired: chromeStorage.supabase_session.expires_at < Date.now() / 1000
+    } : 'None')
+    
+    // Check localStorage (only works on admin domain)
+    try {
+      const localStorageSession = localStorage.getItem('trading_buddy_session')
+      console.log('LocalStorage Session:', localStorageSession ? JSON.parse(localStorageSession).user?.email : 'None')
+    } catch (e) {
+      console.log('LocalStorage Session: Not accessible (different domain)')
+    }
+    
+    console.log('Current URL:', window.location.href)
+    console.log('API URL:', process.env.PLASMO_PUBLIC_API_URL)
+    console.log('========================')
+  }
+  
+  console.log('[Snapchart] Debug function available. Run: debugSnapchart()')
+}
+
 export const config: PlasmoCSConfig = {
   matches: [
     // Trading platforms
@@ -1783,35 +1812,6 @@ const TradingBuddyWidget = () => {
     </div>
     </>
   )
-}
-
-// Add global debug function
-if (typeof window !== 'undefined') {
-  (window as any).debugSnapchart = async () => {
-    console.log('=== Snapchart Debug Info ===')
-    
-    // Check chrome.storage
-    const chromeStorage = await chrome.storage.local.get('supabase_session')
-    console.log('Chrome Storage Session:', chromeStorage.supabase_session ? {
-      user: chromeStorage.supabase_session.user?.email,
-      expires_at: chromeStorage.supabase_session.expires_at,
-      expired: chromeStorage.supabase_session.expires_at < Date.now() / 1000
-    } : 'None')
-    
-    // Check localStorage (only works on admin domain)
-    try {
-      const localStorageSession = localStorage.getItem('trading_buddy_session')
-      console.log('LocalStorage Session:', localStorageSession ? JSON.parse(localStorageSession).user?.email : 'None')
-    } catch (e) {
-      console.log('LocalStorage Session: Not accessible (different domain)')
-    }
-    
-    console.log('Current URL:', window.location.href)
-    console.log('API URL:', process.env.PLASMO_PUBLIC_API_URL)
-    console.log('========================')
-  }
-  
-  console.log('[Snapchart] Debug function available. Run: debugSnapchart()')
 }
 
 export default TradingBuddyWidget
