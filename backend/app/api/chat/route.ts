@@ -266,9 +266,10 @@ Use for time-based coaching when they ask about the next candle or how long they
     } else {
     }
 
-    // Add conversation history if provided (limit to last 20 messages for token control)
+    // Add conversation history if provided (limit based on plan to control token usage)
     if (validatedRequest.conversationHistory) {
-      const limitedHistory = validatedRequest.conversationHistory.slice(-20)
+      const historyLimit = profile.plan === 'pro' ? 20 : 10 // Free gets less history
+      const limitedHistory = validatedRequest.conversationHistory.slice(-historyLimit)
       messages.push(...limitedHistory)
     }
 
@@ -304,7 +305,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Free plan gets shorter responses but still functional
-    const maxTokens = profile.plan === 'pro' ? 1200 : 600
+    const maxTokens = profile.plan === 'pro' ? 1200 : 800
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
