@@ -309,8 +309,8 @@ Use for time-based coaching when they ask about the next candle or how long they
     // 4. Call OpenAI with plan-based model selection
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
-    // Free plan gets shorter responses but still functional
-    const maxTokens = profile.plan === 'pro' ? 1500 : 1000
+    // Both plans get full responses - differentiation is in message limits and model quality
+    const maxTokens = 1500
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {

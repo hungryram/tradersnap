@@ -348,6 +348,11 @@ const TradingBuddyWidget = () => {
           setSession(null)
         }
       } catch (e) {
+        // Extension context invalidated (extension reloaded) - silently ignore in production
+        if (e instanceof Error && e.message.includes('Extension context invalidated')) {
+          // User needs to reload the page after extension update
+          return
+        }
         console.error('[Content] Failed to parse localStorage session:', e)
       }
     }
@@ -474,6 +479,10 @@ const TradingBuddyWidget = () => {
     try {
       chrome.runtime.onMessage.addListener(messageListener)
     } catch (err) {
+      // Extension reloaded - silently return, user will reload page
+      if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+        return
+      }
       console.error('[Content] Extension context invalidated on mount. Page needs refresh.')
       return
     }
