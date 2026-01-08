@@ -34,7 +34,7 @@ const eventSchema = z.object({
     'session_cleared'
   ]),
   session_id: z.string().uuid().optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 })
 
 export async function POST(request: NextRequest) {
