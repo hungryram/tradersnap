@@ -337,6 +337,10 @@ const TradingBuddyWidget = () => {
             chrome.storage.local.remove('supabase_session')
             setSession(null)
           }
+        } else {
+          // No session in localStorage (signed out) - clear chrome.storage too
+          chrome.storage.local.remove('supabase_session')
+          setSession(null)
         }
       } catch (e) {
         console.error('[Content] Failed to parse localStorage session:', e)
