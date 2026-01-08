@@ -434,7 +434,7 @@ const TradingBuddyWidget = () => {
 
   useEffect(() => {
     // Listen for messages from background script
-    const messageListener = (message) => {
+    const messageListener = (message: any) => {
       if (message.type === "OPEN_WIDGET") {
         setIsOpen(true)
         analytics.extensionOpened({ sessionId: session?.id })
