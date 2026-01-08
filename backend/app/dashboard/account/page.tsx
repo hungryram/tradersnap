@@ -123,9 +123,17 @@ export default function AccountPage() {
         })
       })
 
-      if (!response.ok) throw new Error("Failed to create checkout session")
-
       const data = await response.json()
+
+      if (!response.ok) {
+        // If already subscribed, open billing portal instead
+        if (data.redirectToPortal) {
+          await openBillingPortal()
+          return
+        }
+        throw new Error(data.error || "Failed to create checkout session")
+      }
+
       window.location.href = data.url
       
     } catch (err) {

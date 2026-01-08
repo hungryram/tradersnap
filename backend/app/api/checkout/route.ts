@@ -39,9 +39,17 @@ export async function POST(request: NextRequest) {
     // Get user's profile to check for existing Stripe customer
     const { data: profile } = await supabase
       .from("profiles")
-      .select("stripe_customer_id, email")
+      .select("stripe_customer_id, email, plan, subscription_status")
       .eq("id", user.id)
       .single()
+
+    // Prevent duplicate subscriptions - redirect to billing portal if already subscribed
+    if (profile?.plan === "pro" && profile?.subscription_status === "active") {
+      return NextResponse.json(
+        { error: "Already subscribed", redirectToPortal: true },
+        { status: 400 }
+      )
+    }
 
     let customerId = profile?.stripe_customer_id
 
