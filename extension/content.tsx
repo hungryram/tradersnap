@@ -79,6 +79,7 @@ const TradingBuddyWidget = () => {
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messageOffset, setMessageOffset] = useState(0)
   const [currentUsage, setCurrentUsage] = useState<any>(null) // Track usage from chat responses
+  const [showUsage, setShowUsage] = useState(false) // Toggle for usage progress bars
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
@@ -131,6 +132,30 @@ const TradingBuddyWidget = () => {
       if (result.supabase_session) {
         console.log('[Content] Found session in storage, expires:', new Date(result.supabase_session.expires_at * 1000).toLocaleString())
         setSession(result.supabase_session)
+
+        // Fetch initial usage data
+        try {
+          const meResponse = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
+            headers: {
+              Authorization: `Bearer ${result.supabase_session.access_token}`
+            }
+          })
+          if (meResponse.ok) {
+            const meData = await meResponse.json()
+            if (meData.usage) {
+              setCurrentUsage({
+                messages: meData.usage.messages.used,
+                screenshots: meData.usage.screenshots.used,
+                limits: {
+                  maxMessages: meData.usage.messages.limit,
+                  maxScreenshots: meData.usage.screenshots.limit
+                }
+              })
+            }
+          }
+        } catch (error) {
+          console.error('[Content] Failed to fetch initial usage:', error)
+        }
 
         // Fetch full chat history from Supabase (initial load: 20 messages)
         setIsLoadingHistory(true)
@@ -1294,8 +1319,18 @@ const TradingBuddyWidget = () => {
                 </button>
               </div>
 
-              {/* Usage Progress Bars */}
+              {/* Usage Toggle Button */}
               {currentUsage && (
+                <button
+                  onClick={() => setShowUsage(!showUsage)}
+                  className="text-xs text-slate-600 hover:text-slate-900 underline"
+                >
+                  {showUsage ? "Hide Usage" : "View Usage"}
+                </button>
+              )}
+
+              {/* Usage Progress Bars */}
+              {currentUsage && showUsage && (
                 <div className="space-y-1.5 text-xs">
                   {/* Messages Progress */}
                   <div>
