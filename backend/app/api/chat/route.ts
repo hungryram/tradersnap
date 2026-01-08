@@ -226,7 +226,14 @@ RESPONSE
 Quick: MAX 2 sentences
 Charts: MAX 4 sentences
 Cut fluff.
-When listing options, put each on a new line, easy to read.
+
+FORMATTING
+When listing options/choices (A/B/C), format like:
+A) Option one
+B) Option two
+C) Option three
+
+NOT as a paragraph.
 
 Make them think, not follow.`
 
@@ -305,7 +312,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Free plan gets shorter responses but still functional
-    const maxTokens = profile.plan === 'pro' ? 1500 : 1000
+    const maxTokens = profile.plan === 'pro' ? 1500 : 1200
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
