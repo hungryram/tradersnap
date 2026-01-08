@@ -753,6 +753,42 @@ const TradingBuddyWidget = () => {
     
     // Capture chart if requested
     if (includeChart) {
+      // Check screenshot limit before capturing
+      try {
+        const result = await chrome.storage.local.get('supabase_session')
+        const { supabase_session } = result
+        
+        if (supabase_session?.access_token) {
+          const meResponse = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
+            headers: {
+              'Authorization': `Bearer ${supabase_session.access_token}`
+            }
+          })
+          
+          if (meResponse.ok) {
+            const userData = await meResponse.json()
+            const screenshotsUsed = userData.usage.screenshots.used
+            const screenshotsLimit = userData.usage.screenshots.limit
+            
+            if (screenshotsUsed >= screenshotsLimit) {
+              setIsSending(false)
+              const errorMsg = {
+                type: 'error',
+                content: userData.user.plan === 'free' 
+                  ? `You've used all 5 chart screenshots for today. Upgrade to Pro for 50 screenshots per day.`
+                  : `You've used all 50 chart screenshots for today. Limit resets at midnight UTC.`,
+                timestamp: new Date(),
+                requiresUpgrade: userData.user.plan === 'free'
+              }
+              setMessages(prev => [...prev, errorMsg])
+              return
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Content] Failed to check screenshot limit:', error)
+      }
+      
       // Hide widget before screenshot
       setIsOpen(false)
       await new Promise(resolve => setTimeout(resolve, 100))
