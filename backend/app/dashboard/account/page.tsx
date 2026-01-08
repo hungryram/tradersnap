@@ -13,9 +13,19 @@ interface UserData {
     created_at: string
   }
   usage: {
-    used: number
-    limit: number
-    period_start: string
+    messages: {
+      used: number
+      limit: number
+    }
+    screenshots: {
+      used: number
+      limit: number
+    }
+    favorites: {
+      used: number
+      limit: number
+    }
+    resetDate: string
   }
 }
 
@@ -152,7 +162,8 @@ export default function AccountPage() {
     )
   }
 
-  const usagePercent = userData ? (userData.usage.used / userData.usage.limit) * 100 : 0
+  const messagePercent = userData ? (userData.usage.messages.used / userData.usage.messages.limit) * 100 : 0
+  const screenshotPercent = userData ? (userData.usage.screenshots.used / userData.usage.screenshots.limit) * 100 : 0
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -207,39 +218,76 @@ export default function AccountPage() {
               <div>
                 <span className="text-sm text-slate-600">Plan</span>
                 <p className="font-medium text-slate-900 capitalize">
-                  {userData?.user.plan || "Free"}
-                </p>
-              </div>
-              <div>
-                <span className="text-sm text-slate-600">Status</span>
-                <p className="font-medium text-slate-900 capitalize">
-                  {userData?.user.subscription_status || "Inactive"}
+                  {userData?.user.plan === "pro" ? "Pro" : "Free"}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Usage */}
+          {/* Usage Today */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Usage This Month</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Chart Analyses</span>
-                <span className="font-medium text-slate-900">
-                  {userData?.usage.used} / {userData?.usage.limit}
-                </span>
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Usage Today</h2>
+            <div className="space-y-4">
+              {/* Messages */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-600">Messages</span>
+                  <span className="font-medium text-slate-900">
+                    {userData?.usage.messages.used} / {userData?.usage.messages.limit}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(messagePercent, 100)}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                />
+
+              {/* Screenshots */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-600">Chart Screenshots</span>
+                  <span className="font-medium text-slate-900">
+                    {userData?.usage.screenshots.used} / {userData?.usage.screenshots.limit}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(screenshotPercent, 100)}%` }}
+                  />
+                </div>
               </div>
-              {usagePercent >= 80 && (
+
+              {/* Reset info */}
+              <p className="text-xs text-slate-500 mt-3">
+                Usage resets daily at midnight UTC
+              </p>
+
+              {(messagePercent >= 80 || screenshotPercent >= 80) && userData?.user.plan === "free" && (
                 <p className="text-xs text-amber-600">
-                  ⚠️ You're running low on analyses. Consider upgrading your plan.
+                  ⚠️ You're running low on usage. Upgrade to Pro for 500 messages and 50 screenshots per day.
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Favorites */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Favorites</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">AI Context Limit</span>
+                <span className="font-medium text-slate-900">
+                  {userData?.usage.favorites.limit} favorites sent to AI
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                {userData?.user.plan === "free" 
+                  ? "Upgrade to Pro to send 20 favorites to the AI instead of 3"
+                  : "The AI sees your 20 most recent favorites for better context"}
+              </p>
             </div>
           </div>
 
@@ -250,7 +298,7 @@ export default function AccountPage() {
             {userData?.user.plan === "free" ? (
               <>
                 <p className="text-sm text-slate-600 mb-4">
-                  Upgrade to Pro for 20 rulesets and 300 chart analyses per month.
+                  Upgrade to Pro for 500 messages and 50 chart screenshots per day, plus 20 favorites in AI context.
                 </p>
                 <div className="flex gap-3">
                   <button

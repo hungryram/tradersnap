@@ -99,18 +99,12 @@ export async function GET(request: NextRequest) {
       .eq("is_primary", true)
       .single()
 
-    // Get current usage
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    
-    const { data: usage } = await supabase
-      .from("usage")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("period_start", periodStart)
-      .single()
-
-    const limit = profile.plan === "free" ? 10 : 300
+    // Get current usage from profile (new daily tracking system)
+    const limits = {
+      maxMessages: profile.plan === 'pro' ? 500 : 100,
+      maxScreenshots: profile.plan === 'pro' ? 50 : 2,
+      maxFavorites: profile.plan === 'pro' ? 20 : 3
+    }
 
     return NextResponse.json({
       user: {
@@ -128,9 +122,19 @@ export async function GET(request: NextRequest) {
         updated_at: ruleset.updated_at
       } : null,
       usage: {
-        used: usage?.used_count || 0,
-        limit: limit,
-        period_start: periodStart
+        messages: {
+          used: profile.message_count || 0,
+          limit: limits.maxMessages
+        },
+        screenshots: {
+          used: profile.screenshot_count || 0,
+          limit: limits.maxScreenshots
+        },
+        favorites: {
+          used: profile.favorite_limit || 0,
+          limit: limits.maxFavorites
+        },
+        resetDate: profile.usage_reset_date
       }
     }, {
       headers: getCorsHeaders(origin)
