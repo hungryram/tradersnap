@@ -104,49 +104,51 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 2. Check subscription status
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("subscription_status, plan")
-      .eq("id", user.id)
+    // 2. Fetch user profile with usage data
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, message_count, screenshot_count, usage_reset_date')
+      .eq('id', user.id)
       .single()
 
-    // Allow active, trialing, or free plan users
-    if (!profile) {
-      const response = NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      )
+    if (profileError || !profile) {
+      console.error('[Analyze API] Profile fetch error:', profileError)
+      const response = NextResponse.json({ error: "Profile not found" }, { status: 404 })
       return addCorsHeaders(response, origin)
     }
 
-    // 3. Check and increment usage quota
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    
-    const { data: usage, error: usageError } = await supabase
-      .from("usage")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("period_start", periodStart)
-      .single()
-
-    const limit = profile.plan === "free" ? 10 : 300
-    
-    if (usage && usage.used_count >= limit) {
-      const response = NextResponse.json(
-        { error: "Usage quota exceeded" },
-        { status: 429 }
-      )
-      return addCorsHeaders(response, origin)
+    // Check if usage needs to be reset
+    const today = new Date().toISOString().split('T')[0]
+    if (profile.usage_reset_date < today) {
+      await supabase
+        .from('profiles')
+        .update({ 
+          message_count: 0, 
+          screenshot_count: 0, 
+          usage_reset_date: today 
+        })
+        .eq('id', user.id)
+      profile.message_count = 0
+      profile.screenshot_count = 0
     }
 
-    // Atomic increment
-    await supabase.rpc("increment_usage", {
-      p_user_id: user.id,
-      p_period_start: periodStart,
-      p_limit: limit
-    })
+    // 3. Check daily screenshot limit
+    const limits = {
+      maxScreenshots: profile.plan === 'pro' ? 50 : 5
+    }
+
+    if (profile.screenshot_count >= limits.maxScreenshots) {
+      const response = NextResponse.json({
+        error: "Daily screenshot limit reached",
+        message: profile.plan === 'pro'
+          ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
+          : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
+        limit: limits.maxScreenshots,
+        current: profile.screenshot_count,
+        requiresUpgrade: profile.plan !== 'pro'
+      }, { status: 429 })
+      return addCorsHeaders(response, origin)
+    }
 
     // 4. Parse and validate request body
     const body = await request.json()
@@ -310,6 +312,14 @@ REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
       verdict: validatedResponse.verdict,
       payload: validatedResponse
     })
+
+    // Increment screenshot counter
+    await supabase
+      .from('profiles')
+      .update({
+        screenshot_count: profile.screenshot_count + 1
+      })
+      .eq('id', user.id)
 
     const response = NextResponse.json(validatedResponse)
     return addCorsHeaders(response, origin)
