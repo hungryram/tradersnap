@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase-client"
 interface UserData {
   user: {
     email: string
+    first_name: string | null
+    last_name: string | null
     plan: string
     subscription_status: string
     onboarded: boolean
@@ -35,6 +37,12 @@ export default function AccountPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoadingPortal, setIsLoadingPortal] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   useEffect(() => {
     loadAccountData()
@@ -67,6 +75,9 @@ export default function AccountPage() {
 
       const data = await response.json()
       setUserData(data)
+      setFirstName(data.user.first_name || "")
+      setLastName(data.user.last_name || "")
+      setEmail(data.user.email)
       setIsLoading(false)
     } catch (err) {
       console.error("Load error:", err)
@@ -106,6 +117,49 @@ export default function AccountPage() {
       console.error("Portal error:", err)
       setIsLoadingPortal(false)
       alert("Failed to open billing portal. Please try again.")
+    }
+  }
+
+  async function saveProfile() {
+    setIsSavingProfile(true)
+    setProfileMessage(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/")
+        return
+      }
+
+      const origin = window.location.origin
+      const response = await fetch(`${origin}/api/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          email: email !== userData?.user.email ? email : undefined
+        })
+      })
+
+      if (!response.ok) throw new Error("Failed to update profile")
+
+      const data = await response.json()
+      setProfileMessage({ type: 'success', text: data.message })
+      setIsEditingProfile(false)
+      
+      // Reload account data to refresh
+      await loadAccountData()
+      
+    } catch (err) {
+      console.error("Profile update error:", err)
+      setProfileMessage({ type: 'error', text: "Failed to update profile" })
+    } finally {
+      setIsSavingProfile(false)
     }
   }
 
@@ -213,21 +267,117 @@ export default function AccountPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="space-y-6">
-          {/* Account Info */}
+          {/* Profile Info */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Account</h2>
-            <div className="space-y-3">
-              <div>
-                <span className="text-sm text-slate-600">Email</span>
-                <p className="font-medium text-slate-900">{userData?.user.email}</p>
-              </div>
-              <div>
-                <span className="text-sm text-slate-600">Plan</span>
-                <p className="font-medium text-slate-900 capitalize">
-                  {userData?.user.plan === "pro" ? "Pro" : "Free"}
-                </p>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-slate-900">Profile</h2>
+              {!isEditingProfile && (
+                <button
+                  onClick={() => setIsEditingProfile(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+              )}
             </div>
+
+            {profileMessage && (
+              <div className={`mb-4 p-3 rounded-lg ${profileMessage.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                <p className="text-sm">{profileMessage.text}</p>
+              </div>
+            )}
+
+            {isEditingProfile ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-1">
+                      First Name
+                    </label>
+                    <input
+                      id="firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                      maxLength={50}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-1">
+                      Last Name
+                    </label>
+                    <input
+                      id="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      maxLength={50}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Changing your email requires verification</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={saveProfile}
+                    disabled={isSavingProfile}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-lg"
+                  >
+                    {isSavingProfile ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingProfile(false)
+                      setFirstName(userData?.user.first_name || "")
+                      setLastName(userData?.user.last_name || "")
+                      setEmail(userData?.user.email || "")
+                      setProfileMessage(null)
+                    }}
+                    disabled={isSavingProfile}
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-6 py-2 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm text-slate-600">Name</span>
+                  <p className="font-medium text-slate-900">
+                    {userData?.user.first_name || userData?.user.last_name 
+                      ? `${userData?.user.first_name || ''} ${userData?.user.last_name || ''}`.trim()
+                      : <span className="text-slate-400 italic">Not set</span>
+                    }
+                  </p>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-600">Email</span>
+                  <p className="font-medium text-slate-900">{userData?.user.email}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-600">Plan</span>
+                  <p className="font-medium text-slate-900 capitalize">
+                    {userData?.user.plan === "pro" ? "Pro" : "Free"}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Usage Today */}

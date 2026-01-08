@@ -109,6 +109,8 @@ export async function GET(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
+        first_name: profile.first_name || null,
+        last_name: profile.last_name || null,
         onboarded: profile.onboarded,
         plan: profile.plan,
         subscription_status: profile.subscription_status,
