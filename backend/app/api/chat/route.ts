@@ -427,9 +427,9 @@ Use for time-based coaching when they ask about the next candle or how long they
     console.error("Chat error:", error)
     
     if (error instanceof z.ZodError) {
-      console.error('[Chat API] Validation errors:', JSON.stringify(error.errors, null, 2))
+      console.error('[Chat API] Validation errors:', JSON.stringify(error.issues, null, 2))
       const response = NextResponse.json(
-        { error: "Invalid request", details: error.errors },
+        { error: "Invalid request", details: error.issues },
         { status: 400 }
       )
       return addCorsHeaders(response, origin)

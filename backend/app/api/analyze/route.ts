@@ -329,7 +329,7 @@ REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
     
     if (error instanceof z.ZodError) {
       const response = NextResponse.json(
-        { error: "Invalid request", details: error.errors },
+        { error: "Invalid request", details: error.issues },
         { status: 400 }
       )
       return addCorsHeaders(response, origin)
