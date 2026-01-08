@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user profile with usage data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, message_count, screenshot_count, usage_reset_date')
+      .select('plan, message_count, screenshot_count, usage_reset_date, first_name, last_name')
       .eq('id', user.id)
       .single()
 
@@ -152,13 +152,16 @@ export async function POST(request: NextRequest) {
 
     const userRules = ruleset?.rules_text || "No specific rules defined yet."
 
+    // Build user name context (use first name for natural conversation)
+    const firstName = profile.first_name?.trim()
+
     // 4. Build conversation with system prompt
-    const coachingPrompt = `Sharp trading coach. Enforce discipline on USER'S plan. NOT a signal service. Never act as permission-giver.
+    const coachingPrompt = `Sharp trading coach. Enforce discipline on ${firstName ? firstName + "'s" : "USER'S"} plan. NOT a signal service. Never act as permission-giver.
 
 VISION
 You can see charts (timeframes, indicators, levels, patterns). NEVER say "can't see chart." If unclear, state what's missing.
 
-USER'S RULES
+${firstName ? `TRADER: ${firstName}\n\n` : ''}USER'S RULES
 ${userRules}
 
 CHART ANALYSIS
