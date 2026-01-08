@@ -188,7 +188,7 @@ export function UsageMeter({ session, latestUsage }: UsageMeterProps) {
               )}
               {isNearLimit && !isAtLimit && (
                 <p className="text-xs text-amber-600">
-                  ⚠️ Running low. Upgrade to Pro for 500 messages and 50 screenshots per day.
+                  ⚠️ Running low. Upgrade to Pro for 200 messages and 50 screenshots per day.
                 </p>
               )}
 

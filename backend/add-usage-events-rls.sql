@@ -70,7 +70,6 @@ WITH user_stats AS (
 )
 SELECT 
   us.user_id,
-  p.email,
   us.days_active,
   us.charts_uploaded,
   us.no_trade_count,
@@ -83,18 +82,15 @@ SELECT
     ELSE 'active'
   END as user_type
 FROM user_stats us
-JOIN profiles p ON us.user_id = p.id
 ORDER BY us.last_active DESC;
 
 CREATE VIEW recent_activity WITH (security_barrier = true) AS
 SELECT 
   ue.id,
-  p.email,
   ue.event_type,
   ue.metadata,
   ue.created_at
 FROM usage_events ue
-JOIN profiles p ON ue.user_id = p.id
 ORDER BY ue.created_at DESC
 LIMIT 100;
 

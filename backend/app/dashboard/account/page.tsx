@@ -423,7 +423,7 @@ export default function AccountPage() {
 
               {(messagePercent >= 80 || screenshotPercent >= 80) && userData?.user.plan === "free" && (
                 <p className="text-xs text-amber-600">
-                  ⚠️ You're running low on usage. Upgrade to Pro for 500 messages and 50 screenshots per day.
+                  ⚠️ You're running low on usage. Upgrade to Pro for 200 messages and 50 screenshots per day.
                 </p>
               )}
             </div>
@@ -454,7 +454,7 @@ export default function AccountPage() {
             {userData?.user.plan === "free" ? (
               <>
                 <p className="text-sm text-slate-600 mb-4">
-                  Upgrade to Pro for 500 messages and 50 chart screenshots per day, plus 20 favorites in AI context.
+                  Upgrade to Pro for 200 messages and 50 chart screenshots per day, plus 20 favorites in AI context.
                 </p>
                 <div className="flex gap-3">
                   <button

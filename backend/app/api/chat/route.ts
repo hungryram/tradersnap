@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
 
     // 4. Define usage limits based on plan
     const limits = {
-      maxMessages: profile.plan === 'pro' ? 500 : 100,
-      maxScreenshots: profile.plan === 'pro' ? 50 : 2,
+      maxMessages: profile.plan === 'pro' ? 200 : 50,
+      maxScreenshots: profile.plan === 'pro' ? 50 : 5,
       maxFavoritesInContext: profile.plan === 'pro' ? 20 : 3
     }
 
@@ -108,8 +108,8 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({
         error: "Daily message limit reached",
         message: profile.plan === 'pro' 
-          ? "You've reached your daily limit of 500 messages. Your limit resets at midnight UTC."
-          : "You've used all 100 free messages today. Upgrade to Pro for 500 messages/day.",
+          ? "You've reached your daily limit of 200 messages. Your limit resets at midnight UTC."
+          : "You've used all 50 free messages today. Upgrade to Pro for 200 messages/day and 50 chart analyses.",
         limit: limits.maxMessages,
         current: profile.message_count,
         requiresUpgrade: profile.plan !== 'pro'
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         error: "Daily screenshot limit reached",
         message: profile.plan === 'pro'
           ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-          : "You've used both free chart analyses today. Upgrade to Pro for 50 charts/day.",
+          : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
         limit: limits.maxScreenshots,
         current: profile.screenshot_count,
         requiresUpgrade: profile.plan !== 'pro'
@@ -154,14 +154,18 @@ export async function POST(request: NextRequest) {
 
     // Build user name context (use first name for natural conversation)
     const firstName = profile.first_name?.trim()
+    const lastName = profile.last_name?.trim()
+    const fullName = [firstName, lastName].filter(Boolean).join(' ')
 
     // 4. Build conversation with system prompt
-    const coachingPrompt = `Sharp trading coach. Enforce discipline on ${firstName ? firstName + "'s" : "USER'S"} plan. NOT a signal service. Never act as permission-giver.
+    const coachingPrompt = `Sharp trading coach. Enforce discipline. NOT a signal service. Never act as permission-giver.
+
+${fullName ? `TRADER: ${fullName}\n` : ''}
 
 VISION
 You can see charts (timeframes, indicators, levels, patterns). NEVER say "can't see chart." If unclear, state what's missing.
 
-${firstName ? `TRADER: ${firstName}\n\n` : ''}USER'S RULES
+USER'S RULES
 ${userRules}
 
 CHART ANALYSIS
@@ -280,9 +284,10 @@ Use for time-based coaching when they ask about the next candle or how long they
       })
     }
 
-    // 4. Call OpenAI
+    // 4. Call OpenAI with plan-based model selection
+    const model = profile.plan === 'pro' ? 'gpt-4o' : 'gpt-4o-mini'
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
+      model,
       messages,
       max_tokens: 1200,
       temperature: 0.7
@@ -293,7 +298,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Track token usage (model-agnostic - check OpenAI dashboard for actual costs)
     const usage = completion.usage
     if (usage) {
-      console.log(`[OpenAI Usage] User: ${user.email} | Model: gpt-4.1 | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens})`)
+      console.log(`[OpenAI Usage] User: ${user.email} | Model: ${model} | Plan: ${profile.plan} | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens})`)
 
       // Update user's token usage in profile
       await supabase
