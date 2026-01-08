@@ -309,11 +309,13 @@ const TradingBuddyWidget = () => {
       return
     }
 
-
+    console.log('[Content] Session sync active on admin domain')
 
     const checkLocalStorage = () => {
       try {
         const stored = localStorage.getItem('trading_buddy_session')
+        console.log('[Content] Checking localStorage:', stored ? 'Session found' : 'No session')
+        
         if (stored) {
           const session = JSON.parse(stored)
           
@@ -323,7 +325,7 @@ const TradingBuddyWidget = () => {
           const fiveMinutes = 5 * 60
           
           if (expiresAt && expiresAt > now) {
-
+            console.log('[Content] Valid session found, syncing to chrome.storage')
             setSession(session)
             chrome.storage.local.set({ supabase_session: session })
             
@@ -332,13 +334,14 @@ const TradingBuddyWidget = () => {
               console.warn('[Content] Session expiring soon! Please refresh the page.')
             }
           } else {
-
+            console.log('[Content] Session expired, clearing')
             localStorage.removeItem('trading_buddy_session')
             chrome.storage.local.remove('supabase_session')
             setSession(null)
           }
         } else {
           // No session in localStorage (signed out) - clear chrome.storage too
+          console.log('[Content] No localStorage session, clearing chrome.storage')
           chrome.storage.local.remove('supabase_session')
           setSession(null)
         }
@@ -1780,6 +1783,35 @@ const TradingBuddyWidget = () => {
     </div>
     </>
   )
+}
+
+// Add global debug function
+if (typeof window !== 'undefined') {
+  (window as any).debugSnapchart = async () => {
+    console.log('=== Snapchart Debug Info ===')
+    
+    // Check chrome.storage
+    const chromeStorage = await chrome.storage.local.get('supabase_session')
+    console.log('Chrome Storage Session:', chromeStorage.supabase_session ? {
+      user: chromeStorage.supabase_session.user?.email,
+      expires_at: chromeStorage.supabase_session.expires_at,
+      expired: chromeStorage.supabase_session.expires_at < Date.now() / 1000
+    } : 'None')
+    
+    // Check localStorage (only works on admin domain)
+    try {
+      const localStorageSession = localStorage.getItem('trading_buddy_session')
+      console.log('LocalStorage Session:', localStorageSession ? JSON.parse(localStorageSession).user?.email : 'None')
+    } catch (e) {
+      console.log('LocalStorage Session: Not accessible (different domain)')
+    }
+    
+    console.log('Current URL:', window.location.href)
+    console.log('API URL:', process.env.PLASMO_PUBLIC_API_URL)
+    console.log('========================')
+  }
+  
+  console.log('[Snapchart] Debug function available. Run: debugSnapchart()')
 }
 
 export default TradingBuddyWidget
