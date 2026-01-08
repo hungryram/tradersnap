@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
-import { UsageMeter } from "~components/UsageMeter"
 
 import styleText from "data-text:~style.css"
 
@@ -123,13 +122,13 @@ const TradingBuddyWidget = () => {
         const reason = result.timeout_end.reason
         
         if (endTime > now) {
-          console.log('[Content] Active timeout found, ends in:', Math.floor((endTime - now) / 1000), 'seconds')
+
           setIsTimedOut(true)
           setTimeoutEndTime(endTime)
           setTimeoutReason(reason || 'Take a break to reset')
         } else {
           // Timeout expired, clear it
-          console.log('[Content] Timeout expired, clearing')
+
           chrome.storage.local.remove('timeout_end')
         }
       }
@@ -144,7 +143,7 @@ const TradingBuddyWidget = () => {
       }
       
       if (result.supabase_session) {
-        console.log('[Content] Found session in storage, expires:', new Date(result.supabase_session.expires_at * 1000).toLocaleString())
+
         setSession(result.supabase_session)
 
         // Fetch initial usage data
@@ -185,7 +184,7 @@ const TradingBuddyWidget = () => {
 
           if (historyResponse.ok) {
             const { messages: dbMessages } = await historyResponse.json()
-            console.log('[Content] Loaded chat history from Supabase:', dbMessages.length, 'messages')
+
             
             // If we got 20 messages, there might be more
             setHasMoreMessages(dbMessages.length === 20)
@@ -220,7 +219,7 @@ const TradingBuddyWidget = () => {
     // Listen for session updates from chrome.storage
     const handleStorageChange = (changes: any, areaName: string) => {
       if (areaName === 'local' && changes.supabase_session) {
-        console.log('[Content] Session changed in storage:', changes.supabase_session.newValue)
+
         setSession(changes.supabase_session.newValue)
       }
     }
@@ -239,7 +238,7 @@ const TradingBuddyWidget = () => {
       const now = Date.now()
       if (now >= timeoutEndTime) {
         // Timeout expired, unlock chat
-        console.log('[Content] Timeout expired, unlocking chat')
+
         setIsTimedOut(false)
         setTimeoutEndTime(null)
         setTimeoutReason('')
@@ -261,7 +260,7 @@ const TradingBuddyWidget = () => {
       return
     }
 
-    console.log('[Content] Setting up message listener for login events')
+
 
     const checkLocalStorage = () => {
       try {
@@ -275,7 +274,7 @@ const TradingBuddyWidget = () => {
           const fiveMinutes = 5 * 60
           
           if (expiresAt && expiresAt > now) {
-            console.log('[Content] Session valid, time until expiry:', Math.floor((expiresAt - now) / 60), 'minutes')
+
             setSession(session)
             chrome.storage.local.set({ supabase_session: session })
             
@@ -284,7 +283,7 @@ const TradingBuddyWidget = () => {
               console.warn('[Content] Session expiring soon! Please refresh the page.')
             }
           } else {
-            console.log('[Content] Session expired, clearing...')
+
             localStorage.removeItem('trading_buddy_session')
             chrome.storage.local.remove('supabase_session')
             setSession(null)
@@ -304,7 +303,7 @@ const TradingBuddyWidget = () => {
       if (event.origin !== window.location.origin) return
       
       if (event.data.type === 'TRADING_BUDDY_LOGIN' && event.data.session) {
-        console.log('[Content] Received login message from website')
+
         const session = event.data.session
         setSession(session)
         chrome.storage.local.set({ supabase_session: session })
@@ -314,7 +313,7 @@ const TradingBuddyWidget = () => {
     window.addEventListener('message', handleMessage)
     
     return () => {
-      console.log('[Content] Removing message listener')
+
       window.removeEventListener('message', handleMessage)
     }
   }, [])
@@ -394,7 +393,7 @@ const TradingBuddyWidget = () => {
       
       // Listen for session updates from popup
       if (message.type === "SESSION_UPDATED" && message.session) {
-        console.log('[Content] Received session update from popup')
+
         setSession(message.session)
       }
     }
@@ -457,7 +456,7 @@ const TradingBuddyWidget = () => {
 
       if (historyResponse.ok) {
         const { messages: dbMessages } = await historyResponse.json()
-        console.log('[Content] Loaded older messages:', dbMessages.length)
+
 
         // If we got fewer than 20, we've reached the end
         setHasMoreMessages(dbMessages.length === 20)
@@ -503,7 +502,7 @@ const TradingBuddyWidget = () => {
       const wasFavorited = currentlyFavorited === true
       const willBeFavorited = !wasFavorited
 
-      console.log('[Content] Toggling favorite:', { messageId, wasFavorited, willBeFavorited })
+
 
       const response = await fetch(
         `${process.env.PLASMO_PUBLIC_API_URL}/api/chat/favorite`,
@@ -521,7 +520,7 @@ const TradingBuddyWidget = () => {
       )
 
       if (response.ok) {
-        console.log('[Content] Favorite toggled successfully')
+
         // Update local state
         setMessages(prev => prev.map(msg => 
           msg.id === messageId 
@@ -606,7 +605,7 @@ const TradingBuddyWidget = () => {
         // Open popup to sign in
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }).catch(() => {
           // Fallback if background script not available
-          console.log('[Content] Could not open popup automatically')
+
         })
         
         const errorMsg = {
@@ -621,7 +620,7 @@ const TradingBuddyWidget = () => {
       
       // Check if token is expired or expiring soon
       if (supabase_session.expires_at && supabase_session.expires_at < currentTime) {
-        console.log('[Content] Token expired, clearing session')
+
         await chrome.storage.local.remove('supabase_session')
         
         const errorMsg = {
@@ -636,7 +635,7 @@ const TradingBuddyWidget = () => {
 
       // If token is expired, clear session and ask user to sign in again
       if (supabase_session.expires_at < Date.now() / 1000) {
-        console.log('[Content] Token expired, clearing session')
+
         await chrome.storage.local.remove('supabase_session')
         
         const errorMsg = {
@@ -671,7 +670,7 @@ const TradingBuddyWidget = () => {
         })
         .filter(msg => msg.content && msg.content.trim().length > 0) // Remove empty messages
 
-      console.log('[Content] Sending chat request')
+
 
       // Build request body
       const requestBody: any = {
@@ -733,7 +732,7 @@ const TradingBuddyWidget = () => {
       
       // Check for timeout action
       if (chatResult.action && chatResult.action.type === 'timeout') {
-        console.log('[Content] Timeout action received:', chatResult.action)
+
         const endTime = Date.now() + (chatResult.action.duration * 1000)
         
         // Store timeout in chrome.storage
@@ -971,7 +970,7 @@ const TradingBuddyWidget = () => {
                 {messages.length > 0 && (
                   <button
                     onClick={async () => {
-                      if (confirm('Clear all chat messages? This will reset the conversation but keep your trading rules.')) {
+                      if (confirm('Clear all chat messages? This will reset the conversation but keep your trading rules and favorites.')) {
                         try {
                           // Clear from Supabase
                           if (session?.access_token) {
@@ -988,29 +987,20 @@ const TradingBuddyWidget = () => {
                             if (!response.ok) {
                               console.error('[Content] Failed to clear chat from database')
                             } else {
-                              console.log('[Content] Chat cleared from database')
+
                             }
                           }
                           
-                          // Keep only favorited messages in local state and storage
-                          const favoritedMessages = messages.filter(msg => msg.isFavorited)
-                          setMessages(favoritedMessages)
-                          if (favoritedMessages.length > 0) {
-                            chrome.storage.local.set({ chat_messages: favoritedMessages })
-                          } else {
-                            chrome.storage.local.remove('chat_messages')
-                          }
+                          // Clear ALL messages from chatbox (including favorites locally)
+                          // Favorites remain in database for dashboard
+                          setMessages([])
+                          chrome.storage.local.remove('chat_messages')
                           setShowMenu(false)
                         } catch (error) {
                           console.error('[Content] Error clearing chat:', error)
-                          // Still clear locally even if API fails, but keep favorites
-                          const favoritedMessages = messages.filter(msg => msg.isFavorited)
-                          setMessages(favoritedMessages)
-                          if (favoritedMessages.length > 0) {
-                            chrome.storage.local.set({ chat_messages: favoritedMessages })
-                          } else {
-                            chrome.storage.local.remove('chat_messages')
-                          }
+                          // Still clear locally even if API fails
+                          setMessages([])
+                          chrome.storage.local.remove('chat_messages')
                           setShowMenu(false)
                         }
                       }

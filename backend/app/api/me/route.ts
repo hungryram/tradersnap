@@ -71,7 +71,6 @@ export async function GET(request: NextRequest) {
 
     // If profile doesn't exist, create it (new user)
     if (!profile) {
-      console.log('[API /me] Profile not found, creating new profile for user:', user.id)
       const { data: newProfile, error: createError } = await supabase
         .from("profiles")
         .insert({

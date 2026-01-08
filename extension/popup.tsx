@@ -14,7 +14,7 @@ function IndexPopup() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    console.log('[Popup] Component mounted, initializing auth...')
+
     
     const initializeAuth = async () => {
       try {
@@ -26,14 +26,14 @@ function IndexPopup() {
         }
         
         if (session) {
-          console.log('[Popup] Active Supabase session found')
+
           setIsLoggedIn(true)
           setUser(session.user)
           // Update chrome.storage with fresh session
           await chrome.storage.local.set({ supabase_session: session })
           
           // Broadcast to all tabs immediately
-          console.log('[Popup] Broadcasting session to all tabs...')
+
           const tabs = await chrome.tabs.query({})
           for (const tab of tabs) {
             if (tab.id) {
@@ -42,7 +42,7 @@ function IndexPopup() {
                   type: 'SESSION_UPDATED',
                   session: session
                 })
-                console.log('[Popup] Broadcasted to tab:', tab.id, tab.url?.substring(0, 50))
+
               } catch (err) {
                 // Tab might not have content script - ignore
               }
@@ -54,7 +54,7 @@ function IndexPopup() {
         }
         
         // Step 2: If no extension session, check if user logged in via website
-        console.log('[Popup] No extension session, checking website localStorage...')
+
         try {
           const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
           if (tabs.length > 0 && tabs[0].id) {
@@ -65,7 +65,7 @@ function IndexPopup() {
             
             if (results?.[0]?.result) {
               const webSession = JSON.parse(results[0].result)
-              console.log('[Popup] Found session in website localStorage, importing...')
+
               
               // Set session in extension's Supabase client
               const { error: setError } = await supabase.auth.setSession({
@@ -74,7 +74,7 @@ function IndexPopup() {
               })
               
               if (!setError) {
-                console.log('[Popup] Successfully imported session from website')
+
                 setIsLoggedIn(true)
                 setUser(webSession.user)
                 await chrome.storage.local.set({ supabase_session: webSession })
@@ -102,13 +102,13 @@ function IndexPopup() {
             }
           }
         } catch (e) {
-          console.log('[Popup] Could not check website localStorage:', e)
+
         }
         
         // Step 2: Check chrome.storage (might have session from content script)
         const result = await chrome.storage.local.get('supabase_session')
         if (result.supabase_session?.user) {
-          console.log('[Popup] Found cached session')
+
           // Verify it's not expired
           const expiresAt = result.supabase_session.expires_at
           if (expiresAt && expiresAt > Date.now() / 1000) {
@@ -117,13 +117,13 @@ function IndexPopup() {
             setIsLoading(false)
             return
           } else {
-            console.log('[Popup] Cached session expired, clearing...')
+
             await chrome.storage.local.remove('supabase_session')
           }
         }
         
         // No valid session found
-        console.log('[Popup] No valid session found')
+
         setIsLoggedIn(false)
         setUser(null)
         setIsLoading(false)
@@ -138,7 +138,7 @@ function IndexPopup() {
     // Listen for auth changes from Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[Popup] Auth state changed:', event, session ? 'logged in' : 'logged out')
+
         setIsLoggedIn(!!session)
         setUser(session?.user || null)
         
@@ -155,7 +155,7 @@ function IndexPopup() {
                   type: 'SESSION_UPDATED',
                   session: session
                 })
-                console.log('[Popup] Broadcasted session to tab:', tab.id)
+
               } catch (err) {
                 // Tab might not have content script - ignore
               }
@@ -201,7 +201,7 @@ function IndexPopup() {
       if (areaName === 'local' && changes.supabase_session) {
         const newSession = changes.supabase_session.newValue
         if (newSession?.user) {
-          console.log('[Popup] Session updated from storage')
+
           setIsLoggedIn(true)
           setUser(newSession.user)
         } else {
@@ -221,7 +221,7 @@ function IndexPopup() {
 
   const handleSignOut = async () => {
     try {
-      console.log('[Popup] Signing out...')
+
       await supabase.auth.signOut()
       await chrome.storage.local.remove('supabase_session')
       
@@ -235,10 +235,10 @@ function IndexPopup() {
           })
         }
       } catch (error) {
-        console.log('[Popup] Could not clear auth domain storage:', error)
+
       }
       
-      console.log('[Popup] Sign out complete')
+
       setIsLoggedIn(false)
       setUser(null)
     } catch (error) {

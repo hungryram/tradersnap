@@ -87,7 +87,6 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT from Authorization header
     const authHeader = request.headers.get("authorization")
-    console.log('[Analyze API] Auth header:', authHeader ? 'Present' : 'Missing')
     
     if (!authHeader?.startsWith("Bearer ")) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -95,11 +94,8 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
-    console.log('[Analyze API] Token length:', token.length)
     
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    console.log('[Analyze API] User lookup result:', user ? `Found: ${user.id}` : 'Not found', authError)
     
     if (authError || !user) {
       console.error('[Analyze API] Auth error:', authError)

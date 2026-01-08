@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Validate JWT
     const authHeader = request.headers.get("authorization")
-    console.log('[Chat API] Auth header:', authHeader ? 'Present' : 'Missing')
     
     if (!authHeader?.startsWith("Bearer ")) {
       const response = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -55,8 +54,6 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.substring(7)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    console.log('[Chat API] User:', user ? user.id : 'Not found')
     
     if (authError || !user) {
       const response = NextResponse.json({ error: "Invalid token" }, { status: 401 })
@@ -91,13 +88,8 @@ export async function POST(request: NextRequest) {
       profile.screenshot_count = 0
     }
 
-    console.log('[Chat API] Profile:', { plan: profile.plan, message_count: profile.message_count, screenshot_count: profile.screenshot_count })
-
     // 3. Parse request
     const body = await request.json()
-    console.log('[Chat API] Request body keys:', Object.keys(body))
-    console.log('[Chat API] Message length:', body.message?.length)
-    console.log('[Chat API] Include chart:', body.includeChart)
     
     const validatedRequest = chatRequestSchema.parse(body)
 
@@ -113,7 +105,6 @@ export async function POST(request: NextRequest) {
     
     // Check message limit
     if (profile.message_count >= limits.maxMessages) {
-      console.log('[Chat API] Message limit exceeded:', profile.message_count, '>=', limits.maxMessages)
       const response = NextResponse.json({
         error: "Daily message limit reached",
         message: profile.plan === 'pro' 
@@ -128,7 +119,6 @@ export async function POST(request: NextRequest) {
 
     // Check screenshot limit
     if (hasImage && profile.screenshot_count >= limits.maxScreenshots) {
-      console.log('[Chat API] Screenshot limit exceeded:', profile.screenshot_count, '>=', limits.maxScreenshots)
       const response = NextResponse.json({
         error: "Daily screenshot limit reached",
         message: profile.plan === 'pro'
@@ -161,8 +151,6 @@ export async function POST(request: NextRequest) {
     }
 
     const userRules = ruleset?.rules_text || "No specific rules defined yet."
-    console.log('[Chat API] User rules found:', !!ruleset)
-    console.log('[Chat API] User rules length:', userRules.length)
 
     // 4. Build conversation with system prompt
     const coachingPrompt = `Sharp trading coach. Enforce discipline on USER'S plan. NOT a signal service. Never act as permission-giver.
@@ -228,13 +216,6 @@ Make them think, not follow.`
       .order('created_at', { ascending: false }) // Most recent first
       .limit(limits.maxFavoritesInContext) // 3 for free, 20 for pro
 
-    console.log('[Chat API] Favorited messages:', {
-      count: favoritedMessages?.length || 0,
-      limit: limits.maxFavoritesInContext,
-      error: favoritesError,
-      userId: user.id
-    })
-
     const messages: any[] = [
       { role: "system", content: coachingPrompt }
     ]
@@ -255,20 +236,17 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Add favorited messages first (AI's persistent memory)
     if (favoritedMessages && favoritedMessages.length > 0) {
       const favoritedContext = `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
-      console.log('[Chat API] Adding favorited messages to context:', favoritedContext.substring(0, 200) + '...')
       messages.push({
         role: "system",
         content: favoritedContext
       })
     } else {
-      console.log('[Chat API] No favorited messages found for user')
     }
 
     // Add conversation history if provided (limit to last 20 messages for token control)
     if (validatedRequest.conversationHistory) {
       const limitedHistory = validatedRequest.conversationHistory.slice(-20)
       messages.push(...limitedHistory)
-      console.log('[Chat API] Conversation history:', validatedRequest.conversationHistory.length, 'total,', limitedHistory.length, 'sent')
     }
 
     // Add current message
@@ -337,12 +315,10 @@ Use for time-based coaching when they ask about the next candle or how long they
         console.error('[Chat API] Failed to save messages:', dbError)
         // Don't fail the request if DB save fails - user still gets response
       } else {
-        console.log('[Chat API] Messages saved to database:', savedMessages)
         // Extract message IDs
         if (savedMessages && savedMessages.length === 2) {
           userMessageId = savedMessages.find(m => m.role === 'user')?.id || null
           assistantMessageId = savedMessages.find(m => m.role === 'assistant')?.id || null
-          console.log('[Chat API] Extracted IDs:', { userMessageId, assistantMessageId })
         }
       }
     } catch (dbError) {
@@ -360,7 +336,6 @@ Use for time-based coaching when they ask about the next candle or how long they
         duration: minutes * 60, // Convert to seconds
         reason: 'Mandatory break to reset'
       }
-      console.log('[Chat API] Timeout action detected:', action)
     }
 
     // 7. Increment usage counters
@@ -372,13 +347,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       })
       .eq('id', user.id)
 
-    console.log('[Chat API] Usage incremented:', { 
-      messages: profile.message_count + 1, 
-      screenshots: hasImage ? profile.screenshot_count + 1 : profile.screenshot_count 
-    })
-
     // 8. Return response with message IDs and action
-    console.log('[Chat API] Returning response with IDs:', { userMessageId, assistantMessageId })
     const response = NextResponse.json({ 
       message: aiResponse,
       userMessageId,

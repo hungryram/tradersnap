@@ -40,8 +40,6 @@ export async function GET(req: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    console.log("[Favorites API] Fetching favorites for user:", user.id)
-
     // Use admin client to bypass RLS
     const adminClient = createAdminClient()
 
@@ -52,8 +50,6 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .eq("is_favorited", true)
       .order("created_at", { ascending: false })
-
-    console.log("[Favorites API] Found messages:", messages?.length || 0)
 
     if (error) {
       console.error("[Favorites API] Error fetching messages:", error)

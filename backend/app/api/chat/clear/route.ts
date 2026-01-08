@@ -59,8 +59,6 @@ export async function DELETE(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    console.log('[Chat Clear API] Cleared non-favorited messages for user:', user.id)
-
     // 3. Return success
     const response = NextResponse.json({ 
       success: true,
