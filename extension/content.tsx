@@ -88,6 +88,7 @@ const TradingBuddyWidget = () => {
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+  const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
@@ -254,8 +255,8 @@ const TradingBuddyWidget = () => {
       // Listen for chat sync events from other tabs
       if (areaName === 'local' && changes.chat_sync) {
         const syncEvent = changes.chat_sync.newValue
-        if (syncEvent?.action === 'message_sent') {
-          // Reload chat history from database
+        if (syncEvent?.action === 'message_sent' && syncEvent.tabId !== tabId) {
+          // Reload chat history from database (only if message came from another tab)
           loadChatHistoryFromDB()
         }
       }
@@ -920,7 +921,8 @@ const TradingBuddyWidget = () => {
       chrome.storage.local.set({
         chat_sync: {
           action: 'message_sent',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          tabId: tabId
         }
       })
       
