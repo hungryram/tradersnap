@@ -136,13 +136,6 @@ const TradingBuddyWidget = () => {
     const loadData = async () => {
       const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session', 'timeout_end'])
       
-      console.log('[Content] Loading from chrome.storage:', {
-        hasMessages: !!result.chat_messages,
-        hasTheme: !!result.theme,
-        hasSession: !!result.supabase_session,
-        sessionKeys: result.supabase_session ? Object.keys(result.supabase_session) : []
-      })
-      
       // Check for active timeout
       if (result.timeout_end) {
         const now = Date.now()
@@ -445,23 +438,28 @@ const TradingBuddyWidget = () => {
       return
     }
     
-    // Handle keyboard shortcuts - only when chat is open
+    // Document-level keyboard shortcuts - work anywhere when chat is open
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle shortcuts when chat is open
       if (!isOpen) return
       
-      // Ctrl+A / Cmd+A - Analyze chart
-      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
-        // Don't prevent default if user is selecting text
-        const selection = window.getSelection()
-        if (selection && selection.toString().length > 0) return
-        
+      // Ctrl+Alt+A - Analyze chart
+      if ((e.key === 'a' || e.key === 'A') && e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
         e.preventDefault()
-        setIsOpen(true)
         handleAnalyze()
+        return
+      }
+      
+      // Ctrl+Alt+Enter - Send with chart (only if input has text)
+      if (e.key === 'Enter' && e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
+        if (inputText.trim() && !isSending) {
+          e.preventDefault()
+          handleSendMessage(inputText, true)
+        }
+        return
       }
     }
     
+    chrome.runtime.onMessage.addListener(messageListener)
     document.addEventListener('keydown', handleKeyDown)
     
     return () => {
@@ -472,7 +470,7 @@ const TradingBuddyWidget = () => {
       }
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen])
+  }, [isOpen, inputText, isSending])
 
   const handleAnalyze = async () => {
     // Use the chat endpoint, which properly tracks screenshot usage
@@ -624,19 +622,6 @@ const TradingBuddyWidget = () => {
       let { supabase_session } = result
       
       const currentTime = Math.floor(Date.now() / 1000)
-      
-      console.log('[Content] Chat - checking session...', {
-        hasResult: !!result,
-        hasSession: !!supabase_session,
-        hasAccessToken: !!supabase_session?.access_token,
-        sessionKeys: supabase_session ? Object.keys(supabase_session) : [],
-        expiresAt: supabase_session?.expires_at,
-        expiresAtDate: supabase_session?.expires_at ? new Date(supabase_session.expires_at * 1000).toISOString() : null,
-        isExpired: supabase_session?.expires_at ? supabase_session.expires_at < currentTime : null,
-        currentTime,
-        currentTimeDate: new Date(currentTime * 1000).toISOString(),
-        timeUntilExpiry: supabase_session?.expires_at ? Math.floor((supabase_session.expires_at - currentTime) / 60) + ' minutes' : null
-      })
       
       if (!supabase_session?.access_token) {
         console.error('[Content] No valid session found!')
@@ -961,7 +946,7 @@ const TradingBuddyWidget = () => {
               <h2 className="text-2xl font-bold">Welcome to Snapchart!</h2>
             </div>
             <p className={`mb-4 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              This extension captures screenshots when you click "Analyze Chart" and stores your chat history to help improve your trading psychology.
+              This extension captures screenshots for chart analysis and stores your chat history (which you can clear anytime) to help improve your trading psychology.
             </p>
             <p className={`mb-6 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
               By continuing, you agree to our Terms of Service and Privacy Policy.
@@ -1001,7 +986,6 @@ const TradingBuddyWidget = () => {
         top: `${position.y}px`,
         zIndex: 2147483647
       }}
-      className="select-none"
       onKeyDown={(e) => e.stopPropagation()}
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
@@ -1009,7 +993,7 @@ const TradingBuddyWidget = () => {
       <div className={`${theme === 'dark' ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
         {/* Header - Draggable */}
         <div
-          className={`flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
+          className={`select-none flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-1.5">
@@ -1190,7 +1174,7 @@ const TradingBuddyWidget = () => {
                         alt="Chart" 
                         className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
                         style={{ maxHeight: '200px', cursor: 'pointer' }}
-                        onClick={() => window.open(msg.chartImage, '_blank')}
+                        onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: [], messageIndex: i })}
                         title="Click to view full size"
                       />
                     )}
@@ -1412,8 +1396,8 @@ const TradingBuddyWidget = () => {
                     e.stopPropagation()
                     if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending) {
                       e.preventDefault()
-                      if (e.ctrlKey || e.metaKey) {
-                        // Ctrl+Enter or Cmd+Enter: Send with chart
+                      if (e.ctrlKey && e.altKey) {
+                        // Ctrl+Alt+Enter: Send with chart
                         handleSendMessage(inputText, true)
                       } else {
                         // Regular Enter: Send without chart

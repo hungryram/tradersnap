@@ -12,6 +12,7 @@ function IndexPopup() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [userPlan, setUserPlan] = useState<string | null>(null)
 
   useEffect(() => {
 
@@ -31,6 +32,21 @@ function IndexPopup() {
           setUser(session.user)
           // Update chrome.storage with fresh session
           await chrome.storage.local.set({ supabase_session: session })
+          
+          // Fetch user plan
+          try {
+            const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            if (response.ok) {
+              const data = await response.json()
+              setUserPlan(data.user.plan)
+            }
+          } catch (e) {
+            console.error('[Popup] Failed to fetch user plan:', e)
+          }
           
           // Broadcast to all tabs immediately
 
@@ -275,12 +291,17 @@ function IndexPopup() {
           <div className="bg-slate-800 p-3 rounded">
             <p className="text-xs text-slate-400">Signed in as</p>
             <p className="text-sm font-medium truncate">{user?.email}</p>
+            {userPlan && (
+              <p className="text-xs text-slate-400 mt-1">
+                Plan: <span className="text-slate-200 capitalize">{userPlan === 'pro' ? 'Pro' : 'Free'}</span>
+              </p>
+            )}
           </div>
           
           <div className="text-xs text-slate-300 space-y-1">
-            <p>Keyboard shortcuts:</p>
-            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + A</span> - Analyze chart</p>
-            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Enter</span> - Send with chart</p>
+            <p>Keyboard shortcuts when chatbox is open:</p>
+            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Alt + A</span> - Analyze chart</p>
+            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Alt + Enter</span> - Send with chart</p>
           </div>
 
           <button 

@@ -38,15 +38,6 @@
       "scripting",
       "tabs"
     ],
-    "commands": {
-      "analyze-chart": {
-        "suggested_key": {
-          "default": "Ctrl+A",
-          "mac": "Command+A"
-        },
-        "description": "Analyze current chart"
-      }
-    },
     "web_accessible_resources": [
       {
         "resources": [

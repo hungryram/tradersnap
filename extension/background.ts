@@ -1,23 +1,5 @@
 export {}
 
-// Handle keyboard shortcut (if defined)
-if (chrome.commands) {
-  chrome.commands.onCommand.addListener((command) => {
-    if (command === "analyze-chart") {
-      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        const tab = tabs[0]
-        if (!tab?.id) return
-
-        // Send message to content script to open widget
-        chrome.tabs.sendMessage(tab.id, {
-          type: "OPEN_WIDGET",
-          action: "analyze"
-        })
-      })
-    }
-  })
-}
-
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Background] Received message:', message.type)
