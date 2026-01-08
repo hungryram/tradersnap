@@ -285,7 +285,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     }
 
     // 4. Call OpenAI with plan-based model selection
-    const model = profile.plan === 'pro' ? 'gpt-4o' : 'gpt-4o-mini'
+    const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     const completion = await openai.chat.completions.create({
       model,
       messages,
