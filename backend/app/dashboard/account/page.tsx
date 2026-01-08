@@ -170,7 +170,7 @@ export default function AccountPage() {
       <nav className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🤖</span>
+            <img src="/icon.png" alt="Snapchart" className="w-8 h-8" />
             <h1 className="text-xl font-bold text-slate-900">Snapchart</h1>
           </div>
           <div className="flex items-center gap-4">
@@ -184,7 +184,13 @@ export default function AccountPage() {
               href="/dashboard/saved-messages"
               className="text-sm text-slate-600 hover:text-slate-900"
             >
-              Saved Messages
+              Favorites
+            </a>
+            <a
+              href="/dashboard/account"
+              className="text-sm text-slate-600 hover:text-slate-900"
+            >
+              My Account
             </a>
             <button
               onClick={async () => {
