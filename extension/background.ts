@@ -30,10 +30,50 @@ async function captureScreenshot(tabId?: number) {
     const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
       format: "png"
     })
-    console.log('[Background] Screenshot captured, size:', dataUrl.length)
-    return { success: true, dataUrl }
+    
+    // Enhance image for better AI readability (sharpen text/numbers)
+    const enhancedDataUrl = await enhanceImageForAI(dataUrl)
+    
+    console.log('[Background] Screenshot captured and enhanced, size:', enhancedDataUrl.length)
+    return { success: true, dataUrl: enhancedDataUrl }
   } catch (error) {
     console.error("[Background] Screenshot capture failed:", error)
     return { success: false, error: (error as Error).message }
   }
+}
+
+async function enhanceImageForAI(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')!
+      
+      // Draw original image
+      ctx.drawImage(img, 0, 0)
+      
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data = imageData.data
+      
+      // Apply sharpening filter to enhance text/numbers
+      // Increase contrast slightly for better readability
+      for (let i = 0; i < data.length; i += 4) {
+        // Increase contrast (makes text sharper)
+        const factor = 1.2
+        data[i] = Math.min(255, (data[i] - 128) * factor + 128)     // R
+        data[i + 1] = Math.min(255, (data[i + 1] - 128) * factor + 128) // G
+        data[i + 2] = Math.min(255, (data[i + 2] - 128) * factor + 128) // B
+      }
+      
+      // Put enhanced image back
+      ctx.putImageData(imageData, 0, 0)
+      
+      // Convert to data URL
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.src = dataUrl
+  })
 }
