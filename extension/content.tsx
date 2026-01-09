@@ -96,6 +96,7 @@ const TradingBuddyWidget = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
+  const skipNextScrollRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Function to load chat history from database
@@ -466,6 +467,12 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     if (messages.length === 0) return
     
+    // Skip scroll if this was a favorite toggle
+    if (skipNextScrollRef.current) {
+      skipNextScrollRef.current = false
+      return
+    }
+    
     if (isInitialLoadRef.current) {
       // On initial load/reopen, wait for render then scroll instantly
       isInitialLoadRef.current = false
@@ -783,7 +790,7 @@ const TradingBuddyWidget = () => {
 
       if (response.ok) {
         // Prevent auto-scroll on favorite toggle
-        isInitialLoadRef.current = true
+        skipNextScrollRef.current = true
 
         // Update local state
         setMessages(prev => prev.map(msg => 
