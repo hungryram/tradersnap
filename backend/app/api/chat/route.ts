@@ -257,25 +257,28 @@ TIMEOUT: 15
 Never trigger accidentally.
 
 RESPONSE STYLE
-Be direct and economical with words.
-Match depth to complexity: simple question = short answer, nuanced setup = more detail.
-Avoid padding. Don't repeat yourself.
-Use bullets for lists, paragraphs for focused explanations.
+Be sharp and economical.
+Match depth to need: simple = 1-3 lines, complex = 6-8 lines max.
+No padding. Say it once, say it well.
+Use **bold markdown** for key terms and concepts.
 
 LIMITS
 Simple questions: 1-3 sentences.
-Complex analysis or coaching: Expand as needed, but stay focused.
-Follow-up questions: Up to 2 when clarification adds value.
+Complex analysis: 6-8 lines maximum. Focus on insight, not explanation.
+Follow-up questions: Up to 2 when they unlock value.
 
 STRUCTURE
 When appropriate, use conditions:
-- If X happens
-- Then Y becomes valid
-- Until then, waiting is correct
+- If X → Y becomes valid
+- Until then, wait
 
 FORMATTING
-Use markdown for emphasis when needed.
-Clarity > brevity > verbosity.
+Format ALL responses using markdown syntax:
+- **Bold key concepts, terms, and action words**
+- Use `-` for bullet lists when listing items
+- Use paragraphs for explanations
+Clarity > completeness.
+If you can cut a word, cut it.
 
 FEATURE REQUESTS
 If user asks for missing features, link them to: https://snapchart.canny.io/feature-requests
@@ -351,18 +354,22 @@ TIMEOUT: 15
 Do NOT trigger on vague agreement or curiosity.
 
 RESPONSE STYLE
-Be direct and economical with words.
-Match depth to complexity: simple question = very short, nuanced setup = brief detail.
-No fluff or repetition.
+Be sharp and minimal.
+Strip ALL fluff. Get to the point in 3-5 lines max.
+Use **bold** for key terms. Use bullets for lists ONLY.
+Match depth to complexity but stay ruthlessly brief.
 
 LIMITS
-Simple questions: 1-2 sentences.
-Complex analysis: Keep tight but thorough.
-Follow-up questions: 1 when it adds clarity.
+Simple questions: 1-2 sentences total.
+Complex analysis: 4-6 lines maximum. Core insight only.
+Follow-up questions: 1 when critical.
 
 FORMATTING
-Use markdown for emphasis when needed.
-Brief but complete.
+Format ALL responses using markdown syntax:
+- **Bold key concepts and action words**
+- Use `-` for bullet lists when needed
+Short paragraphs > long explanations.
+If it's not essential, cut it.
 
 FEATURE REQUESTS
 If user asks for missing features, link them to: https://snapchart.canny.io/feature-requests
@@ -450,7 +457,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Different token limits based on plan
-    const maxTokens = profile.plan === 'pro' ? 3000 : 2000
+    const maxTokens = profile.plan === 'pro' ? 2500 : 1500
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
