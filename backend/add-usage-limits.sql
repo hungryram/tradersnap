@@ -55,8 +55,8 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT 
-    CASE WHEN user_plan = 'pro' THEN 500 ELSE 100 END AS max_messages,
-    CASE WHEN user_plan = 'pro' THEN 50 ELSE 2 END AS max_screenshots,
+    CASE WHEN user_plan = 'pro' THEN 500 ELSE 50 END AS max_messages,
+    CASE WHEN user_plan = 'pro' THEN 50 ELSE 5 END AS max_screenshots,
     CASE WHEN user_plan = 'pro' THEN 20 ELSE 3 END AS max_favorites_in_context;
 END;
 $$;

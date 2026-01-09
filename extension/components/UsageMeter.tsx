@@ -188,7 +188,7 @@ export function UsageMeter({ session, latestUsage }: UsageMeterProps) {
               )}
               {isNearLimit && !isAtLimit && (
                 <p className="text-xs text-amber-600">
-                  ⚠️ Running low. Upgrade to Pro for 200 messages and 50 screenshots per day.
+                  ⚠️ Running low. <a href="https://admin.snapchartapp.com/dashboard/account" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-700">Upgrade to Pro</a> for 500 messages and 50 screenshots per day.
                 </p>
               )}
 

@@ -926,7 +926,7 @@ const TradingBuddyWidget = () => {
               const errorMsg = {
                 type: 'error',
                 content: userData.user.plan === 'free' 
-                  ? `You've used all 5 chart screenshots for today. Upgrade to Pro for 50 screenshots per day.`
+                  ? `You've used all 5 chart screenshots for today. [Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account) for 50 screenshots per day.`
                   : `You've used all 50 chart screenshots for today. Limit resets at midnight UTC.`,
                 timestamp: new Date(),
                 requiresUpgrade: userData.user.plan === 'free'
@@ -1566,14 +1566,29 @@ const TradingBuddyWidget = () => {
                       </div>
                     )}
                     {msg.chartImage && (
-                      <img 
-                        src={msg.chartImage} 
-                        alt="Chart" 
-                        className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
-                        style={{ maxHeight: '200px', cursor: 'pointer' }}
-                        onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: [], messageIndex: i })}
-                        title="Click to view full size"
-                      />
+                      <div>
+                        <img 
+                          src={msg.chartImage} 
+                          alt="Chart" 
+                          className="mt-2 rounded-lg border border-blue-400 max-w-full h-auto"
+                          style={{ maxHeight: '200px', cursor: 'pointer' }}
+                          onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: [], messageIndex: i })}
+                          title="Click to view full size"
+                        />
+                        {currentUsage?.limits && currentUsage.limits.maxScreenshots === 5 && (
+                          <p className="text-[10px] text-blue-200 mt-1 italic">
+                            Lower resolution on Free plan may affect analysis accuracy.{' '}
+                            <a 
+                              href="https://admin.snapchartapp.com/dashboard/account" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="underline hover:text-white"
+                            >
+                              Upgrade to Pro
+                            </a>
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
