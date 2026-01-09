@@ -257,14 +257,14 @@ TIMEOUT: 15
 Never trigger accidentally.
 
 RESPONSE STYLE
-Short lines.
-One idea per line.
-Never dense paragraphs.
-Line breaks do NOT count as extra sentences.
+Speak naturally and conversationally.
+Use paragraphs when explaining concepts or reasoning.
+Use bullets only when listing multiple distinct points or options.
+Be concise but clear - quality over rigid formatting.
 
 LIMITS
-Quick replies (no chart): MAX 3 sentences.
-Chart replies: MAX 5 sentences.
+Quick replies (no chart): Keep brief and conversational.
+Chart replies: Be thorough but focused on key observations.
 Ask up to THREE follow-up questions.
 
 STRUCTURE
@@ -274,9 +274,8 @@ When appropriate, use conditions:
 - Until then, waiting is correct
 
 FORMATTING
-Use markdown formatting.
-Put list items on separate lines.
-Never merge options into a single paragraph.
+Use markdown for emphasis when needed.
+Let the content dictate the format - natural flow over forced structure.
 
 FEATURE REQUESTS
 If user asks for missing features, link them to: https://snapchart.canny.io/feature-requests
@@ -352,20 +351,19 @@ TIMEOUT: 15
 Do NOT trigger on vague agreement or curiosity.
 
 RESPONSE STYLE
-Short lines.
-One idea per line.
-Never dense paragraphs.
-Line breaks do NOT count as extra sentences.
+Speak naturally and conversationally.
+Use paragraphs when explaining concepts or reasoning.
+Use bullets only when listing multiple distinct points or options.
+Be concise - free tier gets shorter responses than Pro.
 
 LIMITS
-Quick replies (no chart): MAX 2 sentences.
-Chart replies: MAX 4 sentences.
+Quick replies (no chart): Keep very brief.
+Chart replies: Focus on 2-3 key observations.
 Ask at most ONE follow-up question.
 
 FORMATTING
-Use markdown formatting.
-Put list items on separate lines.
-Never merge options into a single paragraph.
+Use markdown for emphasis when needed.
+Let the content dictate the format - natural flow over forced structure.
 
 FEATURE REQUESTS
 If user asks for missing features, link them to: https://snapchart.canny.io/feature-requests
@@ -452,8 +450,8 @@ Use for time-based coaching when they ask about the next candle or how long they
     // 4. Call OpenAI with plan-based model selection
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
-    // Both plans get full responses - differentiation is in message limits and model quality
-    const maxTokens = 1500
+    // Different token limits based on plan
+    const maxTokens = profile.plan === 'pro' ? 3000 : 2000
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
@@ -469,7 +467,20 @@ Use for time-based coaching when they ask about the next candle or how long they
     
     const completion = await openai.chat.completions.create(completionParams)
 
-    const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
+    // Check finish reason for better error messages
+    const finishReason = completion.choices[0]?.finish_reason
+    let aiResponse = completion.choices[0]?.message?.content
+    
+    if (!aiResponse) {
+      // Provide helpful message based on why response failed
+      if (finishReason === 'length') {
+        aiResponse = profile.plan === 'pro'
+          ? "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? I'm here to help!"
+          : "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? (Pro users get longer responses for more detailed analysis)"
+      } else {
+        aiResponse = "I'm sorry, I couldn't generate a response. Please try again."
+      }
+    }
     
     // Check if AI couldn't read the chart properly (for screenshot tracking)
     const cantReadIndicators = [

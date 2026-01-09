@@ -43,37 +43,65 @@ async function captureScreenshot(tabId?: number) {
 }
 
 async function enhanceImageForAI(dataUrl: string): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')!
+  return new Promise((resolve, reject) => {
+    try {
+      const img = new Image()
       
-      // Draw original image
-      ctx.drawImage(img, 0, 0)
-      
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const data = imageData.data
-      
-      // Apply sharpening filter to enhance text/numbers
-      // Increase contrast slightly for better readability
-      for (let i = 0; i < data.length; i += 4) {
-        // Increase contrast (makes text sharper)
-        const factor = 1.2
-        data[i] = Math.min(255, (data[i] - 128) * factor + 128)     // R
-        data[i + 1] = Math.min(255, (data[i + 1] - 128) * factor + 128) // G
-        data[i + 2] = Math.min(255, (data[i + 2] - 128) * factor + 128) // B
+      img.onerror = (error) => {
+        console.error('[Background] Image enhancement failed:', error)
+        // Return original image if enhancement fails
+        resolve(dataUrl)
       }
       
-      // Put enhanced image back
-      ctx.putImageData(imageData, 0, 0)
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+          
+          if (!ctx) {
+            console.error('[Background] Failed to get canvas context')
+            resolve(dataUrl)
+            return
+          }
+          
+          // Draw original image
+          ctx.drawImage(img, 0, 0)
+          
+          // Get image data
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const data = imageData.data
+          
+          // Apply sharpening filter to enhance text/numbers
+          // Increase contrast slightly for better readability
+          for (let i = 0; i < data.length; i += 4) {
+            // Increase contrast (makes text sharper)
+            const factor = 1.2
+            data[i] = Math.min(255, (data[i] - 128) * factor + 128)     // R
+            data[i + 1] = Math.min(255, (data[i + 1] - 128) * factor + 128) // G
+            data[i + 2] = Math.min(255, (data[i + 2] - 128) * factor + 128) // B
+          }
+          
+          // Put enhanced image back
+          ctx.putImageData(imageData, 0, 0)
+          
+          // Convert to data URL
+          const enhancedDataUrl = canvas.toDataURL('image/png')
+          console.log('[Background] Image enhanced successfully')
+          resolve(enhancedDataUrl)
+        } catch (error) {
+          console.error('[Background] Error during image processing:', error)
+          // Return original image if processing fails
+          resolve(dataUrl)
+        }
+      }
       
-      // Convert to data URL
-      resolve(canvas.toDataURL('image/png'))
+      img.src = dataUrl
+    } catch (error) {
+      console.error('[Background] Error setting up image enhancement:', error)
+      // Return original image if setup fails
+      resolve(dataUrl)
     }
-    img.src = dataUrl
   })
 }
