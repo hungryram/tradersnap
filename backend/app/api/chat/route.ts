@@ -592,8 +592,10 @@ Use for time-based coaching when they ask about the next candle or how long they
     }
 
     // 6. Check if AI recommended a timeout (only valid values: 5, 10, 15)
+    console.log('[Chat API] Checking for timeout in response:', aiResponse.substring(0, 200))
     let action = null
     const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(5|10|15)/i)
+    console.log('[Chat API] Timeout match result:', timeoutMatch)
     if (timeoutMatch) {
       const minutes = parseInt(timeoutMatch[1])
       console.log('[Chat API] Timeout detected:', minutes, 'minutes')
@@ -602,6 +604,7 @@ Use for time-based coaching when they ask about the next candle or how long they
         duration: minutes * 60, // Convert to seconds
         reason: 'Mandatory break to reset'
       }
+      console.log('[Chat API] Action object created:', action)
     }
 
     // 7. Increment usage counters (don't count screenshot if chart was unreadable)

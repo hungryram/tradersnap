@@ -1171,9 +1171,12 @@ const TradingBuddyWidget = () => {
       })
       
       // Check for timeout action
+      console.log('[Content] Chat result received:', chatResult)
+      console.log('[Content] Action in result:', chatResult.action)
       if (chatResult.action && chatResult.action.type === 'timeout') {
-
+        console.log('[Content] Timeout action detected! Duration:', chatResult.action.duration)
         const endTime = Date.now() + (chatResult.action.duration * 1000)
+        console.log('[Content] Setting timeout until:', new Date(endTime))
         
         // Store timeout in chrome.storage
         chrome.storage.local.set({
@@ -1187,6 +1190,9 @@ const TradingBuddyWidget = () => {
         setIsTimedOut(true)
         setTimeoutEndTime(endTime)
         setTimeoutReason(chatResult.action.reason)
+        console.log('[Content] Timeout state set')
+      } else {
+        console.log('[Content] No timeout action in response')
       }
       
       // Update user message with database ID
@@ -1249,7 +1255,7 @@ const TradingBuddyWidget = () => {
             idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
           ))
         }
-      }, 30) // 30ms per character = slower, more readable
+      }, 25) // 25ms per character
       
     } catch (error) {
       console.error("[Content] Chat failed:", error)
