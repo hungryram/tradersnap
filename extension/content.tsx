@@ -508,10 +508,12 @@ const TradingBuddyWidget = () => {
   // Simple markdown-to-HTML converter for chat messages
   const renderMarkdown = (text: string): string => {
     const rawHtml = marked.parse(text, { breaks: true, gfm: true }) as string
-    return DOMPurify.sanitize(rawHtml, {
+    const sanitized = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3'],
       ALLOWED_ATTR: ['href', 'target', 'rel']
     })
+    // Add target="_blank" and rel="noopener noreferrer" to all links
+    return sanitized.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href=')
   }
 
   useEffect(() => {
@@ -1198,6 +1200,9 @@ const TradingBuddyWidget = () => {
         isFavorited: false
       }
       setMessages(prev => [...prev, assistantMessage])
+      
+      // Scroll to show the thinking bubble
+      setTimeout(() => scrollToBottom(), 100)
       
       // Animate typing effect
       let charIndex = 0

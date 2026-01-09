@@ -459,7 +459,8 @@ LIMITS:
       ...validatedResponse,
       ruleset_name: ruleset.name,
       userMessageId: userMsg.id,
-      assistantMessageId: assistantMsg.id
+      assistantMessageId: assistantMsg.id,
+      chartUnreadable: chartUnreadable || undefined
     }
 
     const response = NextResponse.json(responseWithRuleset)
