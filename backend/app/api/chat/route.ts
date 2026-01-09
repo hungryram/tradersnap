@@ -629,7 +629,6 @@ Use for time-based coaching when they ask about the next candle or how long they
         duration: minutes * 60, // Convert to seconds
         reason: 'Mandatory break to reset'
       }
-      console.log('[Chat API] Timeout action detected:', action)
     }
 
     // 7. Increment usage counters (don't count screenshot if chart was unreadable)
