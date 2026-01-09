@@ -722,6 +722,14 @@ const TradingBuddyWidget = () => {
       // Refresh usage to update progress bar
       await refreshUsage()
 
+      // Notify user if chart wasn't counted due to quality
+      if (analysis.chartUnreadable) {
+        setToastMessage({
+          type: 'info',
+          message: 'Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.'
+        })
+      }
+
       // Scroll to bottom
       setTimeout(() => scrollToBottom(), 100)
 
@@ -880,9 +888,17 @@ const TradingBuddyWidget = () => {
         }
       } else if (response.status === 429) {
         const errorData = await response.json()
+        // Add upgrade link to the error message if it mentions upgrading
+        let errorMessage = errorData.error || 'You have reached your favorites limit.'
+        if (errorMessage.includes('Upgrade to Pro')) {
+          errorMessage = errorMessage.replace(
+            'Upgrade to Pro',
+            '[Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account)'
+          )
+        }
         setMessages(prev => [...prev, {
           type: 'error',
-          content: errorData.error || 'You have reached your favorites limit.',
+          content: errorMessage,
           timestamp: new Date()
         }])
       } else {
@@ -1102,6 +1118,14 @@ const TradingBuddyWidget = () => {
       // Update usage tracking
       if (chatResult.usage) {
         setCurrentUsage(chatResult.usage)
+      }
+      
+      // Notify user if chart wasn't counted due to quality
+      if (chatResult.chartUnreadable) {
+        setToastMessage({
+          type: 'info',
+          message: 'Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.'
+        })
       }
       
       // Broadcast to other tabs that chat was updated

@@ -471,6 +471,35 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
     
+    // Check if AI couldn't read the chart properly (for screenshot tracking)
+    const cantReadIndicators = [
+      'unable to read',
+      'cannot read',
+      'can\'t see',
+      'cannot see',
+      'too blurry',
+      'zoom in',
+      'unclear image',
+      'image quality',
+      'clean up chart',
+      'remove indicators',
+      'hard to read',
+      'difficult to read',
+      'unclear chart',
+      'lacks visible',
+      'not visible',
+      'not displayed',
+      'is absent',
+      'are absent',
+      'no visible',
+      'information is absent',
+      'lacks candlestick',
+      'lacks price action'
+    ]
+    
+    const responseText = aiResponse.toLowerCase()
+    const chartUnreadable = isNewScreenshot && cantReadIndicators.some(indicator => responseText.includes(indicator))
+    
     // Log if response is empty
     if (!completion.choices[0]?.message?.content) {
       console.error('[Chat API] Empty response from OpenAI:', {
@@ -549,17 +578,23 @@ Use for time-based coaching when they ask about the next candle or how long they
       }
     }
 
-    // 7. Increment usage counters
+    // 7. Increment usage counters (don't count screenshot if chart was unreadable)
+    const shouldCountScreenshot = isNewScreenshot && !chartUnreadable
+    
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         message_count: profile.message_count + 1,
-        screenshot_count: isNewScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
+        screenshot_count: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
       })
       .eq('id', user.id)
 
     if (updateError) {
       console.error('[Chat API] Failed to update usage counters:', updateError)
+    }
+
+    if (chartUnreadable) {
+      console.log('[Chat API] Chart unreadable - not counting towards usage')
     }
 
     // 8. Return response with message IDs and action
@@ -568,9 +603,10 @@ Use for time-based coaching when they ask about the next candle or how long they
       userMessageId,
       assistantMessageId,
       action,
+      chartUnreadable: chartUnreadable || undefined,
       usage: {
         messages: profile.message_count + 1,
-        screenshots: isNewScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count,
+        screenshots: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count,
         limits: limits
       }
     })
