@@ -1,9 +1,9 @@
 {
   "name": "trading-buddy-extension",
   "displayName": "Snapchart",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "AI Trading Psychology Overlay",
-  "author": "Your Name",
+  "author": "Snapchart",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
