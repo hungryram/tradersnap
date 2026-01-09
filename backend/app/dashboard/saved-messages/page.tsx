@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import DashboardNav from "../components/DashboardNav"
+import { marked } from "marked"
+import DOMPurify from "dompurify"
 
 interface FavoritedMessage {
   id: string
@@ -118,6 +120,14 @@ export default function SavedMessagesPage() {
     msg.content.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const renderMarkdown = (text: string): string => {
+    const rawHtml = marked.parse(text, { breaks: true, gfm: true }) as string
+    return DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3'],
+      ALLOWED_ATTR: ['href', 'target', 'rel']
+    })
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <DashboardNav />
@@ -215,22 +225,10 @@ export default function SavedMessagesPage() {
                     ⭐
                   </button>
                 </div>
-                <div className="text-slate-900 prose prose-sm max-w-none">
-                  {msg.content.split('\n').map((line, i) => {
-                    // Parse markdown-style bold
-                    const parts = line.split(/(\*\*.*?\*\*)/g)
-                    return (
-                      <p key={i} className="mb-2 last:mb-0">
-                        {parts.map((part, j) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={j}>{part.slice(2, -2)}</strong>
-                          }
-                          return <span key={j}>{part}</span>
-                        })}
-                      </p>
-                    )
-                  })}
-                </div>
+                <div 
+                  className="text-slate-900 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                />
               </div>
             )
             })}

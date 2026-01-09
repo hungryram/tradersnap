@@ -808,7 +808,7 @@ const TradingBuddyWidget = () => {
         const errorData = await response.json()
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'Free plan limited to 3 saved messages. [Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account) for unlimited saved messages.',
+          content: errorData.error || 'You have reached your favorites limit.',
           timestamp: new Date()
         }])
       } else {
