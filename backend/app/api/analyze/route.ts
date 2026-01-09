@@ -328,7 +328,7 @@ LIMITS:
     const imageDetail = profile.plan === 'pro' ? 'high' : 'auto'
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.1",
       messages: [
         { role: "system", content: coachingPrompt },
         {
