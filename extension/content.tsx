@@ -688,11 +688,20 @@ const TradingBuddyWidget = () => {
       const analysis = await analyzeResponse.json()
       analytics.analysisFinished(analysis.setup_status || 'unknown', { sessionId: session?.id })
 
-      // Add analysis result as assistant message
+      // Update user message with database ID
+      if (analysis.userMessageId) {
+        setMessages(prev => prev.map(msg => 
+          msg === userMessage ? { ...msg, id: analysis.userMessageId, isFavorited: false } : msg
+        ))
+      }
+
+      // Add analysis result as assistant message with database ID
       const assistantMessage = {
         type: 'assistant',
         content: analysis,
-        timestamp: new Date()
+        timestamp: new Date(),
+        id: analysis.assistantMessageId,
+        isFavorited: false
       }
       setMessages(prev => [...prev, assistantMessage])
 

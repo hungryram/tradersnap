@@ -189,7 +189,6 @@ Symbol: ${validatedRequest.context?.symbol ?? '(not provided)'}
 Timeframe: ${validatedRequest.context?.timeframe ?? '(not provided)'}
 Notes: ${validatedRequest.context?.notes ?? '(none)'}
 
---------------------
 BOUNDARIES (STRICT)
 
 DO NOT:
@@ -204,7 +203,6 @@ DO:
 - Say "wait" when rules aren't met
 - Challenge emotional reasoning
 
---------------------
 TASK
 
 1) Read the chart structurally
@@ -226,7 +224,6 @@ TASK
 
 Never hallucinate.
 
---------------------
 TIME DISCIPLINE
 
 Use time to slow decisions:
@@ -234,20 +231,6 @@ Use time to slow decisions:
 "Next 5m close."
 "If nothing changes, nothing changes."
 
---------------------
-TIMEOUT (STRICT)
-
-Trigger ONLY if:
-- User explicitly asks ("timeout", "5 min", etc.)
-- User immediately agrees after you suggest a break
-- Repeated severe emotional tilt
-
-Format exactly:
-TIMEOUT: 5
-TIMEOUT: 10
-TIMEOUT: 15
-
---------------------
 VALIDITY ESTIMATE
 
 Provide an estimate of how likely this setup is VALID per the user's rules and what is visible on the chart.
@@ -260,7 +243,6 @@ Rules:
 - Tighten the range only when confirmations are clearly visible
 - Always explain what would increase/decrease the estimate
 
---------------------
 OUTPUT (JSON ONLY)
 
 Return ONLY valid JSON. No markdown. No extra text.
@@ -304,7 +286,6 @@ violated → rules are clearly broken`
     const tierModifier = profile.plan === 'pro'
       ? `
 
---------------------
 TIER: PRO
 VISION: HIGH-RESOLUTION
 
@@ -324,7 +305,6 @@ LIMITS:
   "If X happens → Y becomes valid"`
       : `
 
---------------------
 TIER: FREE
 VISION: LOW-RESOLUTION (512x512)
 
@@ -377,6 +357,41 @@ LIMITS:
       : validatedResponse.setup_status === 'incomplete' ? 'warn'
       : 'fail'
 
+    // Save user message to chat_messages
+    const { data: userMsg, error: userMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        user_id: user.id,
+        role: 'user',
+        content: '📸 Analyze this chart',
+        image_url: validatedRequest.image
+      })
+      .select('id')
+      .single()
+
+    if (userMsgError) {
+      console.error('[Analyze API] Failed to save user message:', userMsgError)
+      const response = NextResponse.json({ error: "Failed to save message" }, { status: 500 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // Save assistant message (structured analysis) to chat_messages
+    const { data: assistantMsg, error: assistantMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        user_id: user.id,
+        role: 'assistant',
+        content: JSON.stringify(validatedResponse)
+      })
+      .select('id')
+      .single()
+
+    if (assistantMsgError) {
+      console.error('[Analyze API] Failed to save assistant message:', assistantMsgError)
+      const response = NextResponse.json({ error: "Failed to save message" }, { status: 500 })
+      return addCorsHeaders(response, origin)
+    }
+
     // Save analysis to database (linked to session for deletion)
     const { error: insertError } = await supabase.from("analyses").insert({
       user_id: user.id,
@@ -405,10 +420,12 @@ LIMITS:
       // Don't fail the request - analysis already succeeded
     }
 
-    // Include ruleset name in response for user context
+    // Include ruleset name and message IDs in response
     const responseWithRuleset = {
       ...validatedResponse,
-      ruleset_name: ruleset.name
+      ruleset_name: ruleset.name,
+      userMessageId: userMsg.id,
+      assistantMessageId: assistantMsg.id
     }
 
     const response = NextResponse.json(responseWithRuleset)
