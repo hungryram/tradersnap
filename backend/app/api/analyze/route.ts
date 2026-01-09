@@ -368,7 +368,7 @@ LIMITS:
       : 'fail'
 
     // Save analysis to database (linked to session for deletion)
-    await supabase.from("analyses").insert({
+    const { error: insertError } = await supabase.from("analyses").insert({
       user_id: user.id,
       ruleset_id: validatedRequest.rulesetId,
       session_id: validatedRequest.sessionId || null,
@@ -376,13 +376,24 @@ LIMITS:
       payload: validatedResponse
     })
 
-    // Increment screenshot counter
-    await supabase
+    if (insertError) {
+      console.error('[Analyze API] Failed to save analysis:', insertError)
+      const response = NextResponse.json({ error: "Failed to save analysis" }, { status: 500 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // Only increment counter if everything succeeded
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({
         screenshot_count: profile.screenshot_count + 1
       })
       .eq('id', user.id)
+
+    if (updateError) {
+      console.error('[Analyze API] Failed to increment counter:', updateError)
+      // Don't fail the request - analysis already succeeded
+    }
 
     const response = NextResponse.json(validatedResponse)
     return addCorsHeaders(response, origin)

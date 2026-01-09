@@ -682,7 +682,7 @@ const TradingBuddyWidget = () => {
       }
 
       const analysis = await analyzeResponse.json()
-      analytics.analysisFinished(analysis.verdict || 'unknown', { sessionId: session?.id })
+      analytics.analysisFinished(analysis.setup_status || 'unknown', { sessionId: session?.id })
 
       // Add analysis result as assistant message
       const assistantMessage = {
@@ -1228,10 +1228,13 @@ const TradingBuddyWidget = () => {
     )
   }
 
-  const getVerdictColor = (verdict: string) => {
-    switch (verdict) {
+  const getVerdictColor = (status: string) => {
+    switch (status) {
+      case "aligned":
       case "pass": return "text-green-600"
+      case "incomplete":
       case "warn": return "text-yellow-600"
+      case "violated":
       case "fail": return "text-red-600"
       default: return "text-slate-600"
     }
@@ -1556,7 +1559,7 @@ const TradingBuddyWidget = () => {
                 </div>
               )}
               
-              {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.verdict && (
+              {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.setup_status && (
                 <div className="max-w-[85%]">
                   <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
                   {/* Show chart with overlay if it exists */}
@@ -1589,8 +1592,8 @@ const TradingBuddyWidget = () => {
                     </div>
                   )}
                   
-                  <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.verdict)}`}>
-                    {msg.content.verdict}
+                  <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.setup_status)}`}>
+                    {msg.content.setup_status}
                   </div>
                   
                   <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
