@@ -1576,13 +1576,13 @@ const TradingBuddyWidget = () => {
                           title="Click to view full size"
                         />
                         {currentUsage?.limits && currentUsage.limits.maxScreenshots === 5 && (
-                          <p className="text-[10px] text-blue-200 mt-1 italic">
+                          <p className={`text-[10px] mt-1 italic ${theme === 'dark' ? 'text-blue-200' : 'text-slate-700'}`}>
                             Lower resolution on Free plan may affect analysis accuracy.{' '}
                             <a 
                               href="https://admin.snapchartapp.com/dashboard/account" 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="underline hover:text-white"
+                              className={`underline font-medium ${theme === 'dark' ? 'text-blue-300 hover:text-white' : 'text-blue-800 hover:text-blue-950'}`}
                             >
                               Upgrade to Pro
                             </a>
@@ -1705,12 +1705,8 @@ const TradingBuddyWidget = () => {
                         <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>
                           Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
                         </span>
-                        <span className={`text-[10px] uppercase font-medium ${
-                          msg.content.validity_estimate.confidence === 'high' ? 'text-green-600' :
-                          msg.content.validity_estimate.confidence === 'medium' ? 'text-yellow-600' :
-                          'text-orange-600'
-                        }`}>
-                          {msg.content.validity_estimate.confidence}
+                        <span className="text-[10px] text-slate-400">
+                          {msg.content.validity_estimate.confidence} confidence
                         </span>
                       </div>
                       {msg.content.validity_estimate.reason && (

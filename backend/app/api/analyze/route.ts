@@ -352,6 +352,35 @@ LIMITS:
     const aiResponse = JSON.parse(completion.choices[0].message.content || "{}")
     const validatedResponse = analysisResponseSchema.parse(aiResponse)
 
+    // Check if AI couldn't read the chart properly
+    const cantReadIndicators = [
+      'unable to read',
+      'cannot read',
+      'can\'t see',
+      'cannot see',
+      'too blurry',
+      'zoom in',
+      'unclear image',
+      'image quality',
+      'clean up chart',
+      'remove indicators',
+      'hard to read',
+      'difficult to read',
+      'unclear chart',
+      'lacks visible',
+      'not visible',
+      'not displayed',
+      'is absent',
+      'are absent',
+      'no visible',
+      'information is absent',
+      'lacks candlestick',
+      'lacks price action'
+    ]
+    
+    const responseText = `${validatedResponse.summary} ${validatedResponse.bullets.join(' ')}`.toLowerCase()
+    const chartUnreadable = cantReadIndicators.some(indicator => responseText.includes(indicator))
+
     // Map setup_status to verdict for backward compatibility
     const verdict = validatedResponse.setup_status === 'aligned' ? 'pass'
       : validatedResponse.setup_status === 'incomplete' ? 'warn'
@@ -408,17 +437,21 @@ LIMITS:
       return addCorsHeaders(response, origin)
     }
 
-    // Only increment counter if everything succeeded
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        screenshot_count: profile.screenshot_count + 1
-      })
-      .eq('id', user.id)
+    // Only increment counter if everything succeeded AND chart was readable
+    if (!chartUnreadable) {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          screenshot_count: profile.screenshot_count + 1
+        })
+        .eq('id', user.id)
 
-    if (updateError) {
-      console.error('[Analyze API] Failed to increment counter:', updateError)
-      // Don't fail the request - analysis already succeeded
+      if (updateError) {
+        console.error('[Analyze API] Failed to increment counter:', updateError)
+        // Don't fail the request - analysis already succeeded
+      }
+    } else {
+      console.log('[Analyze API] Chart unreadable - not counting towards usage')
     }
 
     // Include ruleset name and message IDs in response
