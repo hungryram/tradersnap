@@ -331,7 +331,14 @@ const TradingBuddyWidget = () => {
           if (expiresAt && expiresAt > now) {
             console.log('[Content] Valid session found, syncing to chrome.storage')
             setSession(session)
-            chrome.storage.local.set({ supabase_session: session })
+            try {
+              chrome.storage.local.set({ supabase_session: session })
+            } catch (err) {
+              if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+                return
+              }
+              throw err
+            }
             
             // If expiring soon, log a warning
             if (expiresAt - now < fiveMinutes) {
@@ -340,13 +347,27 @@ const TradingBuddyWidget = () => {
           } else {
             console.log('[Content] Session expired, clearing')
             localStorage.removeItem('trading_buddy_session')
-            chrome.storage.local.remove('supabase_session')
+            try {
+              chrome.storage.local.remove('supabase_session')
+            } catch (err) {
+              if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+                return
+              }
+              throw err
+            }
             setSession(null)
           }
         } else {
           // No session in localStorage (signed out) - clear chrome.storage too
           console.log('[Content] No localStorage session, clearing chrome.storage')
-          chrome.storage.local.remove('supabase_session')
+          try {
+            chrome.storage.local.remove('supabase_session')
+          } catch (err) {
+            if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+              return
+            }
+            throw err
+          }
           setSession(null)
         }
       } catch (e) {
