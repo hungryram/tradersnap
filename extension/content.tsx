@@ -73,6 +73,7 @@ const TradingBuddyWidget = () => {
   const [isResizing, setIsResizing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
@@ -196,7 +197,7 @@ const TradingBuddyWidget = () => {
   // Load messages, theme, and session from storage on mount
   useEffect(() => {
     const loadData = async () => {
-      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'supabase_session', 'timeout_end'])
+      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'textSize', 'supabase_session', 'timeout_end'])
       
       // Check for active timeout
       if (result.timeout_end) {
@@ -223,6 +224,10 @@ const TradingBuddyWidget = () => {
       
       if (result.theme) {
         setTheme(result.theme)
+      }
+      
+      if (result.textSize) {
+        setTextSize(result.textSize)
       }
       
       if (result.supabase_session) {
@@ -516,6 +521,24 @@ const TradingBuddyWidget = () => {
     return sanitized.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href=')
   }
 
+  // Get text size classes based on current size setting
+  const getTextSizeClass = () => {
+    switch (textSize) {
+      case 'small': return 'text-xs'
+      case 'large': return 'text-base'
+      default: return 'text-sm' // medium
+    }
+  }
+
+  // Get half-sized text class for secondary elements
+  const getHalfTextSizeClass = () => {
+    switch (textSize) {
+      case 'small': return 'text-[10px]'
+      case 'large': return 'text-sm'
+      default: return 'text-xs' // medium
+    }
+  }
+
   useEffect(() => {
     // Listen for messages from background script
     const messageListener = (message: any) => {
@@ -585,6 +608,9 @@ const TradingBuddyWidget = () => {
 
     setIsAnalyzing(true)
     setIsSending(true)
+    
+    // Scroll to show loading bubble
+    setTimeout(() => scrollToBottom(), 100)
 
     try {
       // Get fresh session
@@ -728,7 +754,7 @@ const TradingBuddyWidget = () => {
       if (analysis.chartUnreadable) {
         setMessages(prev => [...prev, {
           type: 'info',
-          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.',
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer.',
           timestamp: new Date()
         }])
       }
@@ -918,6 +944,9 @@ const TradingBuddyWidget = () => {
     if (!text.trim() || isSending) return
     
     setIsSending(true)
+    
+    // Scroll to show loading bubble
+    setTimeout(() => scrollToBottom(), 100)
     
     let chartImage = null
     
@@ -1127,7 +1156,7 @@ const TradingBuddyWidget = () => {
       if (chatResult.chartUnreadable) {
         setMessages(prev => [...prev, {
           type: 'info',
-          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.',
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer.',
           timestamp: new Date()
         }])
       }
@@ -1451,6 +1480,50 @@ const TradingBuddyWidget = () => {
                 >
                   {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
                 </button>
+                <div className={`px-4 py-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <div className="text-xs font-medium mb-1">Text Size</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setTextSize('small')
+                        chrome.storage.local.set({ textSize: 'small' })
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs ${
+                        textSize === 'small'
+                          ? theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                          : theme === 'dark' ? 'bg-dark-elevated text-slate-300 hover:bg-dark-border' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Small
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTextSize('medium')
+                        chrome.storage.local.set({ textSize: 'medium' })
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs ${
+                        textSize === 'medium'
+                          ? theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                          : theme === 'dark' ? 'bg-dark-elevated text-slate-300 hover:bg-dark-border' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Medium
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTextSize('large')
+                        chrome.storage.local.set({ textSize: 'large' })
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs ${
+                        textSize === 'large'
+                          ? theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                          : theme === 'dark' ? 'bg-dark-elevated text-slate-300 hover:bg-dark-border' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Large
+                    </button>
+                  </div>
+                </div>
                 {messages.length > 0 && (
                   <button
                     onClick={async () => {
@@ -1584,7 +1657,7 @@ const TradingBuddyWidget = () => {
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.type === 'user' && (
                   <div className="max-w-[80%]">
-                    <div className={`bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm text-sm transition-all ${
+                    <div className={`bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm ${getTextSizeClass()} transition-all ${
                       msg.isFavorited ? 'border-l-4 border-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1625,7 +1698,7 @@ const TradingBuddyWidget = () => {
                 )}
                 
                 {msg.type === 'error' && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
+                  <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()}`}>
                     <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                     {msg.requiresUpgrade && (
                       <button
@@ -1639,7 +1712,7 @@ const TradingBuddyWidget = () => {
                 )}
                 
                 {msg.type === 'info' && (
-                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm ${
+                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()} ${
                     theme === 'dark' 
                       ? 'bg-blue-950/50 border border-blue-800/50 text-blue-200' 
                       : 'bg-blue-50 border border-blue-200 text-blue-700'
@@ -1682,7 +1755,7 @@ const TradingBuddyWidget = () => {
                   
                   <div 
 
-                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
+                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1699,7 +1772,7 @@ const TradingBuddyWidget = () => {
               
               {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.setup_status && (
                 <div className="max-w-[85%]">
-                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border' : 'bg-white border border-slate-200'}`}>
+                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border' : 'bg-white border border-slate-200'}`}>
                   {/* Show chart with overlay if it exists */}
                   {msg.chartImage && msg.content.drawings && msg.content.drawings.length > 0 && (
                     <div className="mb-3">
@@ -1761,7 +1834,7 @@ const TradingBuddyWidget = () => {
                   <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
                   
                   {msg.content.bullets && msg.content.bullets.length > 0 && (
-                    <ul className={`text-xs space-y-1 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <ul className={`space-y-1 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       {msg.content.bullets.map((bullet: string, idx: number) => (
                         <li key={idx}>• {bullet}</li>
                       ))}
@@ -1801,7 +1874,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.behavioral_nudge && (
-                    <div className={`rounded-lg p-2 text-xs border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                    <div className={`rounded-lg p-2 border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
                       💡 {msg.content.behavioral_nudge}
                     </div>
                   )}
@@ -1844,11 +1917,11 @@ const TradingBuddyWidget = () => {
           
           {(isAnalyzing || isSending) && (
             <div className="flex justify-start">
-              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border' : 'bg-white border border-slate-200'}`}>
-                <div className={`flex gap-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                  <span className="animate-bounce">●</span>
-                  <span className="animate-bounce delay-100">●</span>
-                  <span className="animate-bounce delay-200">●</span>
+              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-300' : 'bg-white border border-slate-200 text-slate-400'}`}>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_infinite]"></span>
+                  <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]"></span>
+                  <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.4s_infinite]"></span>
                 </div>
               </div>
             </div>
@@ -1912,7 +1985,7 @@ const TradingBuddyWidget = () => {
                   placeholder="What's on your mind?"
                   disabled={isSending}
                   maxLength={500}
-                  className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-dark-surface border-dark-border text-white placeholder-slate-400 disabled:bg-dark-elevated' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
+                  className={`flex-1 px-3 py-1.5 border rounded-lg ${getTextSizeClass()} focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-dark-surface border-dark-border text-white placeholder-slate-400 disabled:bg-dark-elevated' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
                 />
                 <button
                   onClick={() => {
@@ -1921,13 +1994,13 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
+                  className={`bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg ${getTextSizeClass()} font-medium`}
                 >
                   {isSending ? "..." : "Send"}
                 </button>
               </div>
               {inputText.length > 0 && (
-                <div className={`text-xs ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className={`${getHalfTextSizeClass()} ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                   {inputText.length}/500 characters{inputText.length >= 500 && ' (limit reached)'}
                 </div>
               )}
@@ -1941,7 +2014,7 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+                  className={`flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-2 py-1.5 rounded-lg ${getTextSizeClass()} font-medium flex items-center justify-center gap-1.5`}
                 >
                   <span className="text-sm">📸</span>
                   Send with Chart
@@ -1950,7 +2023,7 @@ const TradingBuddyWidget = () => {
                 <button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 text-xs"
+                  className={`flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 ${getTextSizeClass()}`}
                 >
                   <span className="text-sm">🔍</span>
                   {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
@@ -1961,7 +2034,7 @@ const TradingBuddyWidget = () => {
               {currentUsage && (
                 <button
                   onClick={() => setShowUsage(!showUsage)}
-                  className={`text-xs underline ${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                  className={`${getHalfTextSizeClass()} underline ${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {showUsage ? "Hide Usage" : "View Usage"}
                 </button>
