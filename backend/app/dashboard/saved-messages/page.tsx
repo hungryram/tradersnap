@@ -19,11 +19,38 @@ export default function SavedMessagesPage() {
   const [messages, setMessages] = useState<FavoritedMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [userPlan, setUserPlan] = useState<'free' | 'pro'>('free')
+  const [favoritesLimit, setFavoritesLimit] = useState(3)
 
   useEffect(() => {
     checkAuth()
+    loadUserProfile()
     loadFavoritedMessages()
   }, [])
+
+  async function loadUserProfile() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const response = await fetch(
+        `${window.location.origin}/api/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setUserPlan(data.user.plan)
+        setFavoritesLimit(data.usage.favorites.limit)
+      }
+    } catch (error) {
+      console.error("Error loading user profile:", error)
+    }
+  }
 
   async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -104,6 +131,14 @@ export default function SavedMessagesPage() {
               Messages you've favorited for the AI to remember
             </p>
           </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-slate-900">
+              {messages.length}/{favoritesLimit}
+            </div>
+            <div className="text-xs text-slate-500">
+              {userPlan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+            </div>
+          </div>
         </div>
 
         {/* Search */}
@@ -135,10 +170,18 @@ export default function SavedMessagesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredMessages.map((msg) => (
+            {filteredMessages.map((msg, index) => {
+              // Only the most recent N messages (based on limit) are sent to AI
+              const isActiveInAI = index < favoritesLimit
+              
+              return (
               <div
                 key={msg.id}
-                className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow"
+                className={`bg-white rounded-lg border p-6 shadow-sm transition-all ${
+                  isActiveInAI 
+                    ? 'border-slate-200 hover:shadow-md' 
+                    : 'border-slate-100 opacity-50'
+                }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -158,6 +201,11 @@ export default function SavedMessagesPage() {
                         minute: '2-digit'
                       })}
                     </span>
+                    {!isActiveInAI && (
+                      <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600">
+                        Not sent to AI
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={() => unfavoriteMessage(msg.id)}
@@ -184,7 +232,8 @@ export default function SavedMessagesPage() {
                   })}
                 </div>
               </div>
-            ))}
+            )
+            })}
           </div>
         )}
       </div>
