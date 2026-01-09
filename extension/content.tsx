@@ -1300,7 +1300,7 @@ const TradingBuddyWidget = () => {
       {/* Welcome Modal */}
       {showWelcomeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
-          <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-slate-800 text-slate-100' : 'bg-white text-slate-900'}`}>
+          <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-dark-surface text-slate-100' : 'bg-white text-slate-900'}`}>
             <div className="flex items-center gap-3 mb-4">
               <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" />
               <h2 className="text-2xl font-bold">Welcome to Snapchart!</h2>
@@ -1314,13 +1314,13 @@ const TradingBuddyWidget = () => {
             <div className="flex gap-3 mb-4">
               <button
                 onClick={() => window.open('https://www.snapchartapp.com/terms', '_blank')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-dark-border text-slate-300 hover:bg-dark-elevated' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
               >
                 View Terms
               </button>
               <button
                 onClick={() => window.open('https://www.snapchartapp.com/privacy', '_blank')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-dark-border text-slate-300 hover:bg-dark-elevated' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
               >
                 View Privacy
               </button>
@@ -1350,10 +1350,10 @@ const TradingBuddyWidget = () => {
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
-      <div className={`${theme === 'dark' ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
+      <div className={`${theme === 'dark' ? 'bg-dark-bg text-white border-dark-border' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
         {/* Header - Draggable */}
         <div
-          className={`select-none flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
+          className={`select-none flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-dark-border bg-gradient-to-r from-dark-surface to-dark-elevated' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-1.5">
@@ -1372,13 +1372,13 @@ const TradingBuddyWidget = () => {
               ⋮
             </button>
             {showMenu && (
-              <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-dark-surface border-dark-border' : 'bg-white border-slate-200'}`}>
                 <button
                   onClick={() => {
                     window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   Dashboard
                 </button>
@@ -1389,7 +1389,7 @@ const TradingBuddyWidget = () => {
                     chrome.storage.local.set({ theme: newTheme })
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
                 </button>
@@ -1432,18 +1432,18 @@ const TradingBuddyWidget = () => {
                         }
                       }
                     }}
-                    className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                    className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                   >
                     Clear Chat
                   </button>
                 )}
-                <div className={`border-t my-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+                <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                 <button
                   onClick={() => {
                     window.open('https://snapchart.canny.io/', '_blank')
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   Feature Requests
                 </button>
@@ -1452,7 +1452,7 @@ const TradingBuddyWidget = () => {
                     window.open('https://www.snapchartapp.com/privacy', '_blank')
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   Privacy Policy
                 </button>
@@ -1461,7 +1461,7 @@ const TradingBuddyWidget = () => {
                     window.open('https://www.snapchartapp.com/terms', '_blank')
                     setShowMenu(false)
                   }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   Terms of Service
                 </button>
@@ -1480,7 +1480,7 @@ const TradingBuddyWidget = () => {
         <div 
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className={`flex-1 overflow-y-auto p-4 space-y-4 relative ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}
+          className={`flex-1 overflow-y-auto p-4 space-y-4 relative ${theme === 'dark' ? 'bg-dark-surface' : 'bg-slate-50'}`}
         >
           {/* Load Older Messages Button */}
           {hasMoreMessages && messages.length > 0 && (
@@ -1490,7 +1490,7 @@ const TradingBuddyWidget = () => {
                 disabled={isLoadingMore}
                 className={`text-xs px-4 py-2 rounded-full ${
                   theme === 'dark' 
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                    ? 'bg-dark-elevated text-slate-300 hover:bg-dark-elevated' 
                     : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                 } disabled:opacity-50 transition-colors`}
               >
@@ -1514,7 +1514,7 @@ const TradingBuddyWidget = () => {
                 <button
                   onClick={() => toggleFavorite(msg.id, msg.isFavorited)}
                   className={`absolute ${msg.type === 'user' ? 'right-0' : 'left-0'} top-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
-                    theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-200'
+                    theme === 'dark' ? 'hover:bg-dark-elevated' : 'hover:bg-slate-200'
                   }`}
                   title={msg.isFavorited ? 'Unfavorite' : 'Favorite'}
                 >
@@ -1599,7 +1599,7 @@ const TradingBuddyWidget = () => {
                   
                   <div 
 
-                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
+                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1616,7 +1616,7 @@ const TradingBuddyWidget = () => {
               
               {msg.type === 'assistant' && typeof msg.content === 'object' && msg.content.setup_status && (
                 <div className="max-w-[85%]">
-                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
+                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border' : 'bg-white border border-slate-200'}`}>
                   {/* Show chart with overlay if it exists */}
                   {msg.chartImage && msg.content.drawings && msg.content.drawings.length > 0 && (
                     <div className="mb-3">
@@ -1658,7 +1658,7 @@ const TradingBuddyWidget = () => {
                   </div>
 
                   {msg.content.validity_estimate && (
-                    <div className={`text-xs mb-2 px-2 py-1.5 rounded ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-100'}`}>
+                    <div className={`text-xs mb-2 px-2 py-1.5 rounded ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-100'}`}>
                       <div className="flex items-center justify-between">
                         <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>
                           Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
@@ -1728,7 +1728,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {/* Disclaimer for analyze results */}
-                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-200'}`}>
+                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-slate-400 border-dark-border' : 'text-slate-500 border-slate-200'}`}>
                     AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
                   </div>
                 </div>
@@ -1754,7 +1754,7 @@ const TradingBuddyWidget = () => {
               onClick={scrollToBottom}
               className={`sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto w-8 h-8 flex items-center justify-center rounded-full shadow-md transition-all hover:scale-110 hover:opacity-100 z-50 opacity-70 ${
                 theme === 'dark' 
-                  ? 'bg-slate-800 text-white border border-slate-600' 
+                  ? 'bg-dark-surface text-white border border-dark-border' 
                   : 'bg-white text-slate-700 border border-slate-300'
               }`}
               title="Scroll to bottom"
@@ -1765,7 +1765,7 @@ const TradingBuddyWidget = () => {
           
           {(isAnalyzing || isSending) && (
             <div className="flex justify-start">
-              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm ${theme === 'dark' ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
+              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border' : 'bg-white border border-slate-200'}`}>
                 <div className={`flex gap-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                   <span className="animate-bounce">●</span>
                   <span className="animate-bounce delay-100">●</span>
@@ -1777,10 +1777,10 @@ const TradingBuddyWidget = () => {
         </div>
 
         {/* Actions */}
-        <div className={`p-3 space-y-1.5 ${theme === 'dark' ? 'border-t border-slate-700 bg-slate-900' : 'border-t border-slate-200 bg-white'}`}>
+        <div className={`p-3 space-y-1.5 ${theme === 'dark' ? 'border-t border-dark-border bg-dark-bg' : 'border-t border-slate-200 bg-white'}`}>
           {/* Timeout Timer (replaces input when active) */}
           {isTimedOut && timeoutEndTime ? (
-            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-amber-50 border border-amber-200'}`}>
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-amber-50 border border-amber-200'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="text-2xl">⏸️</div>
@@ -1833,7 +1833,7 @@ const TradingBuddyWidget = () => {
                   placeholder="What's on your mind?"
                   disabled={isSending}
                   maxLength={500}
-                  className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400 disabled:bg-slate-700' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
+                  className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-dark-surface border-dark-border text-white placeholder-slate-400 disabled:bg-dark-elevated' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
                 />
                 <button
                   onClick={() => {
