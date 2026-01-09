@@ -188,11 +188,9 @@ export default function RulesPage() {
     setError(null)
     setSuccess(null)
 
-    // Prompt for new name
-    const newName = prompt("Enter a name for the new ruleset:", `${rulesetName} - Copy`)
-    
-    if (!newName || newName.trim() === "") {
-      setError("Ruleset name is required")
+    // Check if they changed the name
+    if (rulesetName.trim() === "" || rulesetName.trim() === currentRuleset?.name) {
+      setError("Please enter a new name for the ruleset before saving as new")
       return
     }
 
@@ -214,7 +212,7 @@ export default function RulesPage() {
           Authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          name: newName.trim(),
+          name: rulesetName.trim(),
           rules_text: rulesText,
           is_primary: false
         })
@@ -294,6 +292,9 @@ export default function RulesPage() {
                   <span className="text-red-600">✗ Weak rule:</span> "Be patient"
                 </p>
                 <p>Keep it simple. 3-5 clear rules beat 20 vague ones. You can always refine them as you learn what works.</p>
+                <p className="pt-2 border-t border-slate-200 mt-3">
+                  💡 <strong>Multiple Rulesets:</strong> Create different rulesets for different strategies or market conditions. Select one as your <strong>primary ruleset</strong> for your AI Coach to follow.
+                </p>
               </div>
               {userPlan && (
                 <p className="text-sm text-slate-500 mt-2">
