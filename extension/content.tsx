@@ -1682,7 +1682,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {/* Disclaimer for analyze results */}
-                  <div className={`text-[9px] mt-3 pt-2 border-t ${theme === 'dark' ? 'text-slate-500 border-slate-600' : 'text-slate-400 border-slate-200'}`}>
+                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-200'}`}>
                     Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
                   </div>
                 </div>
