@@ -4,6 +4,8 @@ import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import { analytics } from "~lib/analytics"
+import { marked } from "marked"
+import DOMPurify from "dompurify"
 
 import styleText from "data-text:~style.css"
 
@@ -360,30 +362,61 @@ const TradingBuddyWidget = () => {
     // Check once on mount
     checkLocalStorage()
     
-    // Periodically check localStorage every 2 seconds (only on admin domain)
-    // This ensures session syncs even if postMessage is missed during sign-in
-    const intervalId = setInterval(() => {
+    // Limited fallback polling (5 checks over 10 seconds, then stop)
+    // This ensures session syncs during login since storage events don't fire in same tab
+    let checksRemaining = 5
+    const fallbackIntervalId = setInterval(() => {
+      checksRemaining--
       checkLocalStorage()
+      if (checksRemaining === 0) {
+        clearInterval(fallbackIntervalId)
+      }
     }, 2000)
     
-    // Listen for login messages from the website (no polling!)
-    const handleMessage = (event: MessageEvent) => {
-      // Only accept messages from same origin for security
-      if (event.origin !== window.location.origin) return
-      
-      if (event.data.type === 'TRADING_BUDDY_LOGIN' && event.data.session) {
-
-        const session = event.data.session
-        setSession(session)
-        chrome.storage.local.set({ supabase_session: session })
+    // Listen for storage events (cross-tab session sync)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'trading_buddy_session' && e.newValue) {
+        try {
+          const session = JSON.parse(e.newValue)
+          setSession(session)
+          try {
+            chrome.storage.local.set({ supabase_session: session })
+          } catch (err) {
+            if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+              return
+            }
+            throw err
+          }
+        } catch (err) {
+          console.error('[Content] Failed to parse storage session:', err)
+        }
       }
     }
     
+    // Listen for login messages from the website
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      
+      if (event.data.type === 'TRADING_BUDDY_LOGIN' && event.data.session) {
+        const session = event.data.session
+        setSession(session)
+        try {
+          chrome.storage.local.set({ supabase_session: session })
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('Extension context invalidated')) {
+            return
+          }
+          throw err
+        }
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
     window.addEventListener('message', handleMessage)
     
     return () => {
-
-      clearInterval(intervalId)
+      clearInterval(fallbackIntervalId)
+      window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('message', handleMessage)
     }
   }, [])
@@ -433,28 +466,12 @@ const TradingBuddyWidget = () => {
   }, [messages])
 
   // Simple markdown-to-HTML converter for chat messages
-  const formatMarkdown = (text: string, isDark: boolean = false) => {
-    return text
-      // Headers
-      .replace(/^### (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
-      .replace(/^## (.+)$/gm, '<div class="font-bold text-base mt-2 mb-1">$1</div>')
-      .replace(/^# (.+)$/gm, '<div class="font-bold text-lg mt-2 mb-1">$1</div>')
-      // Blockquotes - theme-aware styling
-      .replace(/^> (.+)$/gm, `<blockquote class="border-l-4 ${isDark ? 'border-slate-500 text-slate-300' : 'border-gray-300 text-gray-700'} pl-3 py-1 my-1 italic">$1</blockquote>`)
-      // Markdown links - [text](url)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
-      // Plain URLs (http/https)
-      .replace(/(?<!href="|">)(https?:\/\/[^\s<]+[^<.,\s])/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline">$1</a>')
-      // Bold
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Unordered lists (-, *, +)
-      .replace(/^[\-\*\+] (.+)$/gm, '<div class="ml-4 my-0.5">• $1</div>')
-      // Numbered lists (1., 2., etc.)
-      .replace(/^(\d+)\. (.+)$/gm, '<div class="ml-4 my-0.5">$1. $2</div>')
-      // Line breaks (but preserve breaks between list items)
-      .replace(/\n/g, '<br/>')
+  const renderMarkdown = (text: string): string => {
+    const rawHtml = marked.parse(text, { breaks: true, gfm: true }) as string
+    return DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3'],
+      ALLOWED_ATTR: ['href', 'target', 'rel']
+    })
   }
 
   useEffect(() => {
@@ -1456,7 +1473,7 @@ const TradingBuddyWidget = () => {
                 
                 {msg.type === 'error' && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm">
-                    <div dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content, false) }} />
+                    <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                     {msg.requiresUpgrade && (
                       <button
                         onClick={() => window.open('https://admin.snapchartapp.com/dashboard/account', '_blank')}
@@ -1502,12 +1519,12 @@ const TradingBuddyWidget = () => {
                   
                   <div 
 
-                    className={`px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
+                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm text-sm shadow-sm transition-all ${theme === 'dark' ? 'bg-slate-700 border border-slate-600 text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
                     }`}
-                    dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content, theme === 'dark') }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
                   {msg.timestamp && (
                     <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
