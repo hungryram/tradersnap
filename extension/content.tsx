@@ -1592,6 +1592,12 @@ const TradingBuddyWidget = () => {
                     </div>
                   )}
                   
+                  {msg.content.ruleset_name && (
+                    <div className={`text-[10px] uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Analyzed with: {msg.content.ruleset_name}
+                    </div>
+                  )}
+                  
                   <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.setup_status)}`}>
                     {msg.content.setup_status}
                   </div>
@@ -1630,12 +1636,15 @@ const TradingBuddyWidget = () => {
 
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
                     <div className="bg-blue-50 rounded-lg p-2 mb-2">
-                      <div className="font-medium text-xs mb-1 text-slate-900">� Levels to Watch</div>
+                      <div className="font-medium text-xs mb-1 text-slate-900">Levels to Watch</div>
                       {msg.content.levels_to_watch.map((level: any, idx: number) => (
                         <div key={idx} className="text-xs text-slate-700 mb-1.5 last:mb-0">
                           <div className="font-bold text-slate-900">
                             {level.type === 'resistance' ? '🔴' : level.type === 'support' ? '🟢' : '🔵'} {level.label}
                           </div>
+                          {level.when_observed && (
+                            <div className="text-[10px] text-slate-500 ml-4 mb-0.5">⏱️ {level.when_observed}</div>
+                          )}
                           <div className="text-[11px] text-slate-600 ml-4">{level.why_it_matters}</div>
                         </div>
                       ))}
@@ -1647,6 +1656,11 @@ const TradingBuddyWidget = () => {
                       💡 {msg.content.behavioral_nudge}
                     </div>
                   )}
+
+                  {/* Disclaimer for analyze results */}
+                  <div className={`text-[9px] mt-3 pt-2 border-t ${theme === 'dark' ? 'text-slate-500 border-slate-600' : 'text-slate-400 border-slate-200'}`}>
+                    Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
+                  </div>
                 </div>
                   {msg.timestamp && (
                     <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">

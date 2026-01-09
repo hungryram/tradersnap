@@ -38,6 +38,7 @@ const analysisResponseSchema = z.object({
     label: z.string(),
     type: z.enum(["support", "resistance", "structure", "invalidation"]),
     relative_location: z.string(),
+    when_observed: z.string(),
     why_it_matters: z.string(),
     confidence: z.enum(["low", "medium", "high"])
   })),
@@ -277,6 +278,7 @@ Return ONLY valid JSON. No markdown. No extra text.
     "label": "Include PRICE if visible (e.g., 'Resistance at 25,730-25,740' OR 'Support zone around 25,600')",
     "type": "support | resistance",
     "relative_location": "above | below | current price",
+    "when_observed": "When/where on chart (e.g., 'tested twice in last hour', 'formed at 10:30 AM', 'recent rejection', 'earlier low')",
     "why_it_matters": "Brief reason",
     "confidence": "low | medium | high"
   }],
@@ -290,6 +292,7 @@ LEVELS TO WATCH:
 - ALWAYS include price/zone in label when visible
 - Use ranges for zones: "25,730-25,740"
 - Use approximate if unclear: "around 25,600"
+- Include WHEN it formed: "tested twice today", "rejected at 2:45 PM", "recent high", "earlier consolidation"
 - Only use generic labels if price unreadable
 
 SETUP STATUS MEANING:
@@ -401,7 +404,13 @@ LIMITS:
       // Don't fail the request - analysis already succeeded
     }
 
-    const response = NextResponse.json(validatedResponse)
+    // Include ruleset name in response for user context
+    const responseWithRuleset = {
+      ...validatedResponse,
+      ruleset_name: ruleset.name
+    }
+
+    const response = NextResponse.json(responseWithRuleset)
     return addCorsHeaders(response, origin)
 
   } catch (error) {
