@@ -313,12 +313,9 @@ const TradingBuddyWidget = () => {
       return
     }
 
-    console.log('[Content] Session sync active on admin domain')
-
     const checkLocalStorage = () => {
       try {
         const stored = localStorage.getItem('trading_buddy_session')
-        console.log('[Content] Checking localStorage:', stored ? 'Session found' : 'No session')
         
         if (stored) {
           const session = JSON.parse(stored)
@@ -329,7 +326,6 @@ const TradingBuddyWidget = () => {
           const fiveMinutes = 5 * 60
           
           if (expiresAt && expiresAt > now) {
-            console.log('[Content] Valid session found, syncing to chrome.storage')
             setSession(session)
             try {
               chrome.storage.local.set({ supabase_session: session })
@@ -345,7 +341,6 @@ const TradingBuddyWidget = () => {
               console.warn('[Content] Session expiring soon! Please refresh the page.')
             }
           } else {
-            console.log('[Content] Session expired, clearing')
             localStorage.removeItem('trading_buddy_session')
             try {
               chrome.storage.local.remove('supabase_session')
@@ -359,7 +354,6 @@ const TradingBuddyWidget = () => {
           }
         } else {
           // No session in localStorage (signed out) - clear chrome.storage too
-          console.log('[Content] No localStorage session, clearing chrome.storage')
           try {
             chrome.storage.local.remove('supabase_session')
           } catch (err) {

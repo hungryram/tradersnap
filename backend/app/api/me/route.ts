@@ -133,6 +133,13 @@ export async function GET(request: NextRequest) {
       maxFavorites: profile.plan === 'pro' ? 20 : 3
     }
 
+    // Count actual favorited messages
+    const { count: favoritesCount } = await supabase
+      .from('chat_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_favorited', true)
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -160,7 +167,7 @@ export async function GET(request: NextRequest) {
           limit: limits.maxScreenshots
         },
         favorites: {
-          used: profile.favorite_limit || 0,
+          used: favoritesCount || 0,
           limit: limits.maxFavorites
         },
         resetDate: profile.usage_reset_date

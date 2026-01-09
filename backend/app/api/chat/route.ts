@@ -547,13 +547,17 @@ Use for time-based coaching when they ask about the next candle or how long they
     }
 
     // 7. Increment usage counters
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({
         message_count: profile.message_count + 1,
         screenshot_count: isNewScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
       })
       .eq('id', user.id)
+
+    if (updateError) {
+      console.error('[Chat API] Failed to update usage counters:', updateError)
+    }
 
     // 8. Return response with message IDs and action
     const response = NextResponse.json({ 
