@@ -51,10 +51,7 @@ export const config: PlasmoCSConfig = {
     "*://*.binance.com/*",
     "*://*.coinbase.com/*",
     "*://*.kraken.com/*",
-    "*://*.bybit.com/*",
-    // Your backend for login (add your domain here)
-    "*://localhost/*",
-    "*://localhost:*/*"
+    "*://*.bybit.com/*"
   ],
   all_frames: false
 }
