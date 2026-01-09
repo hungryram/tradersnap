@@ -346,7 +346,7 @@ LIMITS:
         }
       ],
       response_format: { type: "json_object" },
-      max_tokens: 1500
+      max_completion_tokens: 1500
     })
 
     const aiResponse = JSON.parse(completion.choices[0].message.content || "{}")
