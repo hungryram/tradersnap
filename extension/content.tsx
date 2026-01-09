@@ -722,6 +722,9 @@ const TradingBuddyWidget = () => {
       }
       setMessages(prev => [...prev, assistantMessage])
 
+      // Refresh usage to update progress bar
+      await refreshUsage()
+
       // Scroll to bottom
       setTimeout(() => scrollToBottom(), 100)
 
@@ -736,6 +739,33 @@ const TradingBuddyWidget = () => {
       setIsAnalyzing(false)
       setIsSending(false)
       setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }
+
+  const refreshUsage = async () => {
+    if (!session) return
+    
+    try {
+      const meResponse = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        if (meData.usage) {
+          setCurrentUsage({
+            messages: meData.usage.messages.used,
+            screenshots: meData.usage.screenshots.used,
+            limits: {
+              maxMessages: meData.usage.messages.limit,
+              maxScreenshots: meData.usage.screenshots.limit
+            }
+          })
+        }
+      }
+    } catch (error) {
+      console.error('[Content] Failed to refresh usage:', error)
     }
   }
 
