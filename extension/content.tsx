@@ -1595,6 +1595,28 @@ const TradingBuddyWidget = () => {
                   <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.setup_status)}`}>
                     {msg.content.setup_status}
                   </div>
+
+                  {msg.content.validity_estimate && (
+                    <div className={`text-xs mb-2 px-2 py-1.5 rounded ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-100'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>
+                          Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
+                        </span>
+                        <span className={`text-[10px] uppercase font-medium ${
+                          msg.content.validity_estimate.confidence === 'high' ? 'text-green-600' :
+                          msg.content.validity_estimate.confidence === 'medium' ? 'text-yellow-600' :
+                          'text-orange-600'
+                        }`}>
+                          {msg.content.validity_estimate.confidence}
+                        </span>
+                      </div>
+                      {msg.content.validity_estimate.reason && (
+                        <div className={`text-[11px] mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {msg.content.validity_estimate.reason}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   
                   <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
                   
@@ -1608,11 +1630,13 @@ const TradingBuddyWidget = () => {
 
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
                     <div className="bg-blue-50 rounded-lg p-2 mb-2">
-                      <div className="font-medium text-xs mb-1 text-slate-900">📍 Levels to Watch</div>
+                      <div className="font-medium text-xs mb-1 text-slate-900">� Levels to Watch</div>
                       {msg.content.levels_to_watch.map((level: any, idx: number) => (
-                        <div key={idx} className="text-xs text-slate-700 mb-1">
-                          <div className="font-medium">{level.label}</div>
-                          <div className="text-slate-600">{level.why_it_matters}</div>
+                        <div key={idx} className="text-xs text-slate-700 mb-1.5 last:mb-0">
+                          <div className="font-bold text-slate-900">
+                            {level.type === 'resistance' ? '🔴' : level.type === 'support' ? '🟢' : '🔵'} {level.label}
+                          </div>
+                          <div className="text-[11px] text-slate-600 ml-4">{level.why_it_matters}</div>
                         </div>
                       ))}
                     </div>

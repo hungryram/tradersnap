@@ -274,7 +274,7 @@ Return ONLY valid JSON. No markdown. No extra text.
   "summary": "One punchy sentence describing what's happening",
   "bullets": ["One clear observation per line"],
   "levels_to_watch": [{
-    "label": "Short description",
+    "label": "Include PRICE if visible (e.g., 'Resistance at 25,730-25,740' OR 'Support zone around 25,600')",
     "type": "support | resistance",
     "relative_location": "above | below | current price",
     "why_it_matters": "Brief reason",
@@ -285,6 +285,12 @@ Return ONLY valid JSON. No markdown. No extra text.
   "behavioral_nudge": "One sharp coaching sentence",
   "follow_up_questions": []
 }
+
+LEVELS TO WATCH:
+- ALWAYS include price/zone in label when visible
+- Use ranges for zones: "25,730-25,740"
+- Use approximate if unclear: "around 25,600"
+- Only use generic labels if price unreadable
 
 SETUP STATUS MEANING:
 aligned    → chart behavior matches their rules (not permission)
