@@ -140,9 +140,22 @@ export default function SavedMessagesPage() {
     }
   }
 
-  const filteredMessages = messages.filter(msg =>
-    msg.content.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMessages = messages.filter(msg => {
+    const searchLower = searchTerm.toLowerCase()
+    if (typeof msg.content === 'string') {
+      return msg.content.toLowerCase().includes(searchLower)
+    } else if (typeof msg.content === 'object') {
+      // Search in analysis object fields
+      const analysisText = [
+        msg.content.summary,
+        msg.content.setup_status,
+        ...(msg.content.bullets || []),
+        msg.content.behavioral_nudge
+      ].filter(Boolean).join(' ').toLowerCase()
+      return analysisText.includes(searchLower)
+    }
+    return false
+  })
 
   const renderMarkdown = (text: string): string => {
     const rawHtml = marked.parse(text, { breaks: true, gfm: true }) as string
