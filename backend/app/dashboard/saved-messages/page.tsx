@@ -10,7 +10,7 @@ import DOMPurify from "dompurify"
 interface FavoritedMessage {
   id: string
   role: string
-  content: string
+  content: string | any
   created_at: string
   is_favorited: boolean
 }
@@ -78,7 +78,31 @@ export default function SavedMessagesPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setMessages(data.messages || [])
+        
+        // Parse JSON content for analysis messages
+        const parsedMessages = (data.messages || []).map((msg: FavoritedMessage) => {
+          let content = msg.content
+          
+          // Parse JSON content for analysis messages
+          if (msg.role === 'assistant' && typeof content === 'string') {
+            try {
+              const parsed = JSON.parse(content)
+              // Check if it's an analysis response (has setup_status field)
+              if (parsed.setup_status) {
+                content = parsed
+              }
+            } catch (e) {
+              // Not JSON or parsing failed - keep as string
+            }
+          }
+          
+          return {
+            ...msg,
+            content: content
+          }
+        })
+        
+        setMessages(parsedMessages)
       }
     } catch (error) {
       console.error("Error loading favorited messages:", error)
@@ -126,6 +150,79 @@ export default function SavedMessagesPage() {
       ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3'],
       ALLOWED_ATTR: ['href', 'target', 'rel']
     })
+  }
+
+  const renderAnalysis = (analysis: any) => {
+    return (
+      <div className="space-y-4">
+        {/* Setup Status */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Setup Status:</span>
+          <span className={`px-2 py-1 rounded text-sm font-medium ${
+            analysis.setup_status === 'valid' ? 'bg-green-100 text-green-700' :
+            analysis.setup_status === 'potentially_valid' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {analysis.setup_status}
+          </span>
+        </div>
+
+        {/* Validity Estimate */}
+        {analysis.validity_estimate && (
+          <div>
+            <p className="text-sm font-medium mb-1">Validity Estimate:</p>
+            <p className="text-sm text-slate-700">
+              {analysis.validity_estimate.percent_range?.[0]}-{analysis.validity_estimate.percent_range?.[1]}% 
+              ({analysis.validity_estimate.confidence} confidence)
+            </p>
+            <p className="text-sm text-slate-600 mt-1">{analysis.validity_estimate.reason}</p>
+          </div>
+        )}
+
+        {/* Summary */}
+        {analysis.summary && (
+          <div>
+            <p className="text-sm font-medium mb-1">Summary:</p>
+            <p className="text-sm text-slate-700">{analysis.summary}</p>
+          </div>
+        )}
+
+        {/* Bullets */}
+        {analysis.bullets && analysis.bullets.length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-2">Key Points:</p>
+            <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+              {analysis.bullets.map((bullet: string, i: number) => (
+                <li key={i}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Levels to Watch */}
+        {analysis.levels_to_watch && analysis.levels_to_watch.length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-2">Levels to Watch:</p>
+            <div className="space-y-2">
+              {analysis.levels_to_watch.map((level: any, i: number) => (
+                <div key={i} className="text-sm border-l-2 border-slate-300 pl-3">
+                  <p className="font-medium">{level.label} ({level.type})</p>
+                  <p className="text-slate-600 text-xs">{level.why_it_matters}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Behavioral Nudge */}
+        {analysis.behavioral_nudge && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <p className="text-sm font-medium text-blue-900 mb-1">💡 Trading Tip:</p>
+            <p className="text-sm text-blue-800">{analysis.behavioral_nudge}</p>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -225,10 +322,24 @@ export default function SavedMessagesPage() {
                     ⭐
                   </button>
                 </div>
-                <div 
-                  className="text-slate-900 prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                />
+                <div className="text-slate-900">
+                  {typeof msg.content === 'string' ? (
+                    <div 
+                      className="text-sm leading-relaxed"
+                      style={{
+                        overflowWrap: 'break-word',
+                        wordWrap: 'break-word'
+                      }}
+                    >
+                      <div 
+                        className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                      />
+                    </div>
+                  ) : (
+                    renderAnalysis(msg.content)
+                  )}
+                </div>
               </div>
             )
             })}
