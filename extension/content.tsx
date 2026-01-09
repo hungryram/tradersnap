@@ -1,5 +1,5 @@
 import type { PlasmoCSConfig } from "plasmo"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
@@ -460,6 +460,10 @@ const TradingBuddyWidget = () => {
       setTimeout(() => {
         inputRef.current?.focus()
       }, 100)
+      // Force scroll to bottom after a delay to ensure DOM is ready
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
+      }, 200)
     }
   }, [isOpen])
 
@@ -1178,23 +1182,28 @@ const TradingBuddyWidget = () => {
   }, [isDragging])
 
   // Resize handlers
+  const startSizeRef = useRef({ width: 0, height: 0 })
+  const startPosRef = useRef({ x: 0, y: 0 })
+
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsResizing(true)
+    startSizeRef.current = { width: size.width, height: size.height }
+    startPosRef.current = { x: e.clientX, y: e.clientY }
   }
 
-  const handleResizeMouseMove = (e: MouseEvent) => {
-    if (isResizing) {
-      const newWidth = Math.max(300, Math.min(800, size.width + e.movementX))
-      const newHeight = Math.max(400, Math.min(900, size.height + e.movementY))
-      setSize({ width: newWidth, height: newHeight })
-    }
-  }
+  const handleResizeMouseMove = useCallback((e: MouseEvent) => {
+    const deltaX = e.clientX - startPosRef.current.x
+    const deltaY = e.clientY - startPosRef.current.y
+    const newWidth = Math.max(300, Math.min(800, startSizeRef.current.width + deltaX))
+    const newHeight = Math.max(400, Math.min(900, startSizeRef.current.height + deltaY))
+    setSize({ width: newWidth, height: newHeight })
+  }, [])
 
-  const handleResizeMouseUp = () => {
+  const handleResizeMouseUp = useCallback(() => {
     setIsResizing(false)
-  }
+  }, [])
 
   useEffect(() => {
     if (isResizing) {
@@ -1205,7 +1214,7 @@ const TradingBuddyWidget = () => {
         document.removeEventListener("mouseup", handleResizeMouseUp)
       }
     }
-  }, [isResizing, size])
+  }, [isResizing, handleResizeMouseMove, handleResizeMouseUp])
 
   if (!isOpen) {
     return (
@@ -1637,17 +1646,32 @@ const TradingBuddyWidget = () => {
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
                     <div className="bg-blue-50 rounded-lg p-2 mb-2">
                       <div className="font-medium text-xs mb-1 text-slate-900">Levels to Watch</div>
-                      {msg.content.levels_to_watch.map((level: any, idx: number) => (
-                        <div key={idx} className="text-xs text-slate-700 mb-1.5 last:mb-0">
-                          <div className="font-bold text-slate-900">
-                            {level.type === 'resistance' ? '🔴' : level.type === 'support' ? '🟢' : '🔵'} {level.label}
+                      {msg.content.levels_to_watch.map((level: any, idx: number) => {
+                        const getTypeIcon = (type: string) => {
+                          switch(type) {
+                            case 'resistance': return '🔴'
+                            case 'support': return '🟢'
+                            case 'structure': return '🔵'
+                            case 'invalidation': return '❌'
+                            case 'trendline': return '📈'
+                            case 'breakout_level': return '⚡'
+                            case 'consolidation': return '🔶'
+                            default: return '📍'
+                          }
+                        }
+                        
+                        return (
+                          <div key={idx} className="text-xs text-slate-700 mb-1.5 last:mb-0">
+                            <div className="font-bold text-slate-900">
+                              {getTypeIcon(level.type)} {level.label}
+                            </div>
+                            {level.when_observed && (
+                              <div className="text-[10px] text-slate-500 ml-4 mb-0.5">⏱️ {level.when_observed}</div>
+                            )}
+                            <div className="text-[11px] text-slate-600 ml-4">{level.why_it_matters}</div>
                           </div>
-                          {level.when_observed && (
-                            <div className="text-[10px] text-slate-500 ml-4 mb-0.5">⏱️ {level.when_observed}</div>
-                          )}
-                          <div className="text-[11px] text-slate-600 ml-4">{level.why_it_matters}</div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 

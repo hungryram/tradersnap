@@ -36,7 +36,7 @@ const analysisResponseSchema = z.object({
   bullets: z.array(z.string()),
   levels_to_watch: z.array(z.object({
     label: z.string(),
-    type: z.enum(["support", "resistance", "structure", "invalidation"]),
+    type: z.enum(["support", "resistance", "structure", "invalidation", "trendline", "breakout_level", "consolidation"]),
     relative_location: z.string(),
     when_observed: z.string(),
     why_it_matters: z.string(),
@@ -275,10 +275,10 @@ Return ONLY valid JSON. No markdown. No extra text.
   "summary": "One punchy sentence describing what's happening",
   "bullets": ["One clear observation per line"],
   "levels_to_watch": [{
-    "label": "Include PRICE if visible (e.g., 'Resistance at 25,730-25,740' OR 'Support zone around 25,600')",
-    "type": "support | resistance",
+    "label": "Include PRICE if visible",
+    "type": "support | resistance | structure | invalidation | trendline | breakout_level | consolidation",
     "relative_location": "above | below | current price",
-    "when_observed": "When/where on chart (e.g., 'tested twice in last hour', 'formed at 10:30 AM', 'recent rejection', 'earlier low')",
+    "when_observed": "Read TIMESTAMP from X-axis if visible (e.g., '10:30 AM', '2:45 PM', 'around 3:00'). If unreadable, describe timing (e.g., 'twice today', 'recent low')",
     "why_it_matters": "Brief reason",
     "confidence": "low | medium | high"
   }],
@@ -292,13 +292,14 @@ LEVELS TO WATCH:
 - ALWAYS include price/zone in label when visible
 - Use ranges for zones: "25,730-25,740"
 - Use approximate if unclear: "around 25,600"
-- Include WHEN it formed: "tested twice today", "rejected at 2:45 PM", "recent high", "earlier consolidation"
+- PRIORITIZE reading timestamp from X-axis: "10:30 AM", "2:45 PM", "around 3:15"
+- If timestamp unreadable, describe timing. Example:"twice today", "recent rejection"
 - Only use generic labels if price unreadable
 
 SETUP STATUS MEANING:
-aligned    → chart behavior matches their rules (not permission)
+aligned → chart behavior matches their rules (not permission)
 incomplete → something required is missing
-violated   → rules are clearly broken`
+violated → rules are clearly broken`
 
     const tierModifier = profile.plan === 'pro'
       ? `
