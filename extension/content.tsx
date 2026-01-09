@@ -1282,13 +1282,16 @@ const TradingBuddyWidget = () => {
 
   const getVerdictColor = (status: string) => {
     switch (status) {
+      case "valid":
       case "aligned":
-      case "pass": return "text-green-600"
+      case "pass": return "bg-green-100 text-green-700 border border-green-200"
+      case "potentially_valid":
       case "incomplete":
-      case "warn": return "text-yellow-600"
+      case "warn": return "bg-yellow-100 text-yellow-700 border border-yellow-200"
+      case "invalid":
       case "violated":
-      case "fail": return "text-red-600"
-      default: return "text-slate-600"
+      case "fail": return "bg-red-100 text-red-700 border border-red-200"
+      default: return "bg-slate-100 text-slate-700 border border-slate-200"
     }
   }
 
@@ -1650,8 +1653,8 @@ const TradingBuddyWidget = () => {
                     </div>
                   )}
                   
-                  <div className={`text-xs font-bold uppercase mb-2 ${getVerdictColor(msg.content.setup_status)}`}>
-                    {msg.content.setup_status}
+                  <div className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase mb-3 ${getVerdictColor(msg.content.setup_status)}`}>
+                    {msg.content.setup_status.replace(/_/g, ' ')}
                   </div>
 
                   {msg.content.validity_estimate && (
@@ -1726,7 +1729,7 @@ const TradingBuddyWidget = () => {
 
                   {/* Disclaimer for analyze results */}
                   <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-200'}`}>
-                    Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
+                    AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
                   </div>
                 </div>
                   {msg.timestamp && (
