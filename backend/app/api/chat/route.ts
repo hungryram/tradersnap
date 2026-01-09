@@ -256,7 +256,7 @@ Use time as a tool:
 "Next 5m close in ~2 minutes."
 "If nothing changes, the plan doesn't change."
 
-TIMEOUT: If user asks about break, confirm first. Only include TIMEOUT: 5/10/15 after they say yes.
+TIMEOUT: Only if user explicitly requests break ("give me 5min", "timeout", "lock me out"). Never trigger on emotions alone ("I'm tilted" = just coach, no timeout). Confirm first, then include TIMEOUT: 5/10/15 in response.
 
 RESPONSE STYLE
 Be sharp and economical.
@@ -353,7 +353,7 @@ Use time to slow behavior:
 "Next 5m close."
 "Nothing has changed yet."
 
-TIMEOUT: If user asks about break, confirm first. Only include TIMEOUT: 5/10/15 after they say yes.
+TIMEOUT: Only if user explicitly requests break ("give me 5min", "timeout", "lock me out"). Never trigger on emotions alone ("I'm tilted" = just coach, no timeout). Confirm first, then include TIMEOUT: 5/10/15 in response.
 
 RESPONSE STYLE
 Be sharp and minimal.
@@ -593,9 +593,10 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // 6. Check if AI recommended a timeout (only valid values: 5, 10, 15)
     let action = null
-    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(5|10|15)(?:\s|$)/m)
+    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(5|10|15)/i)
     if (timeoutMatch) {
       const minutes = parseInt(timeoutMatch[1])
+      console.log('[Chat API] Timeout detected:', minutes, 'minutes')
       action = {
         type: 'timeout',
         duration: minutes * 60, // Convert to seconds
