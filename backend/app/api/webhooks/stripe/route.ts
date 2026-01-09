@@ -34,12 +34,20 @@ export async function POST(request: NextRequest) {
     case "customer.subscription.updated": {
       const subscription = event.data.object as Stripe.Subscription
       
+      // Keep pro plan active even if cancel_at_period_end is true
+      // Only downgrade when subscription.deleted fires at period end
+      const updates: any = {
+        subscription_status: subscription.status
+      }
+      
+      // Only update plan if subscription is active (not canceled)
+      if (subscription.status === "active" || subscription.status === "trialing") {
+        updates.plan = subscription.items.data[0].price.lookup_key || "pro"
+      }
+      
       await supabase
         .from("profiles")
-        .update({
-          subscription_status: subscription.status,
-          plan: subscription.items.data[0].price.lookup_key || "pro"
-        })
+        .update(updates)
         .eq("stripe_customer_id", subscription.customer)
       
       break
@@ -48,6 +56,7 @@ export async function POST(request: NextRequest) {
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription
       
+      // Only now (at period end) do we downgrade to free
       await supabase
         .from("profiles")
         .update({
