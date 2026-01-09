@@ -256,9 +256,7 @@ Use time as a tool:
 "Next 5m close in ~2 minutes."
 "If nothing changes, the plan doesn't change."
 
-TIMEOUT
-If user wants timeout or breaks: confirm first, then respond with options for 5/10/15 breaks.
-Don't trigger without confirmation.
+TIMEOUT: If user asks about break, confirm first. Only include TIMEOUT: 5/10/15 after they say yes.
 
 RESPONSE STYLE
 Be sharp and economical.
@@ -355,9 +353,7 @@ Use time to slow behavior:
 "Next 5m close."
 "Nothing has changed yet."
 
-TIMEOUT
-If user wants timeout or breaks: confirm first, then respond with options for 5/10/15 breaks.
-Don't trigger without confirmation.
+TIMEOUT: If user asks about break, confirm first. Only include TIMEOUT: 5/10/15 after they say yes.
 
 RESPONSE STYLE
 Be sharp and minimal.
@@ -595,9 +591,9 @@ Use for time-based coaching when they ask about the next candle or how long they
       // Continue anyway - chat works even if audit trail fails
     }
 
-    // 6. Check if AI recommended a timeout
+    // 6. Check if AI recommended a timeout (only valid values: 5, 10, 15)
     let action = null
-    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(\d+)/)
+    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(5|10|15)(?:\s|$)/m)
     if (timeoutMatch) {
       const minutes = parseInt(timeoutMatch[1])
       action = {
