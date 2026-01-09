@@ -80,7 +80,7 @@ const TradingBuddyWidget = () => {
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messageOffset, setMessageOffset] = useState(0)
   const [currentUsage, setCurrentUsage] = useState<any>(null) // Track usage from chat responses
-  const [showUsage, setShowUsage] = useState(false) // Toggle for usage progress bars
+  const [showUsage, setShowUsage] = useState(true) // Toggle for usage progress bars - open by default
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isTimedOut, setIsTimedOut] = useState(false)
@@ -724,14 +724,15 @@ const TradingBuddyWidget = () => {
 
       // Notify user if chart wasn't counted due to quality
       if (analysis.chartUnreadable) {
-        setToastMessage({
+        setMessages(prev => [...prev, {
           type: 'info',
-          message: 'Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.'
-        })
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.',
+          timestamp: new Date()
+        }])
       }
 
-      // Scroll to bottom
-      setTimeout(() => scrollToBottom(), 100)
+      // Scroll to bottom with extra delay for screenshot rendering
+      setTimeout(() => scrollToBottom(), 300)
 
     } catch (error) {
       console.error('[Content] Analysis error:', error)
@@ -1122,10 +1123,11 @@ const TradingBuddyWidget = () => {
       
       // Notify user if chart wasn't counted due to quality
       if (chatResult.chartUnreadable) {
-        setToastMessage({
+        setMessages(prev => [...prev, {
           type: 'info',
-          message: 'Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.'
-        })
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or removing indicators.',
+          timestamp: new Date()
+        }])
       }
       
       // Broadcast to other tabs that chat was updated
@@ -1631,6 +1633,16 @@ const TradingBuddyWidget = () => {
                   </div>
                 )}
                 
+                {msg.type === 'info' && (
+                  <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] text-sm ${
+                    theme === 'dark' 
+                      ? 'bg-blue-950/50 border border-blue-800/50 text-blue-200' 
+                      : 'bg-blue-50 border border-blue-200 text-blue-700'
+                  }`}>
+                    {msg.content}
+                  </div>
+                )}
+                
                 {msg.type === 'assistant' && typeof msg.content === 'string' && (
                 <div className="max-w-[85%]">
                   {/* Show chart with overlay if drawings exist */}
@@ -1959,7 +1971,7 @@ const TradingBuddyWidget = () => {
                       <span>Messages</span>
                       <span>{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
+                    <div className="w-full bg-slate-200 rounded-full h-0.5 overflow-hidden">
                       <div
                         className={`h-full transition-all ${
                           currentUsage.messages >= currentUsage.limits.maxMessages
@@ -1979,7 +1991,7 @@ const TradingBuddyWidget = () => {
                       <span>Screenshots</span>
                       <span>{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
+                    <div className="w-full bg-slate-200 rounded-full h-0.5 overflow-hidden">
                       <div
                         className={`h-full transition-all ${
                           currentUsage.screenshots >= currentUsage.limits.maxScreenshots
