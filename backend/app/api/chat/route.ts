@@ -294,10 +294,10 @@ You never act as a permission-giver.
 ${fullName ? `TRADER: ${fullName}\n` : ''}
 TIER: FREE
 
-VISION
-You can analyze charts (timeframes, indicators, levels, structure) if provided.
-If something is unclear, say what's missing.
-Never guess or hallucinate.
+VISION (LOW-RESOLUTION)
+Charts are provided at lower resolution (512x512).
+Try to read values and details when possible.
+If text/numbers are too blurry to read accurately, acknowledge it and focus on structure instead.
 
 USER RULES
 ${userRules}
@@ -425,6 +425,9 @@ Use for time-based coaching when they ask about the next candle or how long they
         ? "Here's the chart I analyzed earlier:"
         : "Current chart:"
       
+      // Use low-res for free plan (512x512, 85 tokens), high-res for pro (full detail)
+      const imageDetail = profile.plan === 'pro' ? 'high' : 'low'
+      
       messages.push({
         role: "user",
         content: [
@@ -433,7 +436,7 @@ Use for time-based coaching when they ask about the next candle or how long they
             type: "image_url", 
             image_url: { 
               url: validatedRequest.image,
-              detail: "high"
+              detail: imageDetail
             } 
           }
         ]

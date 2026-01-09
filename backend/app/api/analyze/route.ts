@@ -26,7 +26,12 @@ const analyzeRequestSchema = z.object({
 
 // Response schema
 const analysisResponseSchema = z.object({
-  verdict: z.enum(["pass", "warn", "fail"]),
+  setup_status: z.enum(["aligned", "incomplete", "violated"]),
+  validity_estimate: z.object({
+    percent_range: z.tuple([z.number(), z.number()]),
+    confidence: z.enum(["low", "medium", "high"]),
+    reason: z.string()
+  }).nullable(),
   summary: z.string(),
   bullets: z.array(z.string()),
   levels_to_watch: z.array(z.object({
@@ -39,7 +44,7 @@ const analysisResponseSchema = z.object({
   rule_violations: z.array(z.string()),
   missing_confirmations: z.array(z.string()),
   behavioral_nudge: z.string(),
-  follow_up_question: z.string().optional(),
+  follow_up_questions: z.array(z.string()).optional(),
   drawings: z.array(z.union([
     z.object({
       type: z.literal("trendline"),
@@ -167,119 +172,171 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 6. Call OpenAI Vision API
-    const coachingPrompt = `You are a sharp, experienced trading coach analyzing charts.
-You call it like you see it—no corporate speak, no hand-holding.
+    // 6. Call OpenAI Vision API with base + tier modifier prompt
+    const basePrompt = `You are a sharp, experienced trading coach.
+You enforce discipline.
+You are NOT a signal service.
+You never give permission to trade.
 
-USER'S TRADING RULES:
+Direct. No corporate speak.
+
+RULES:
 ${ruleset.rules_text}
 
 CONTEXT:
-Symbol: ${validatedRequest.context?.symbol || "Unknown"}
-Timeframe: ${validatedRequest.context?.timeframe || "Unknown"}  
-Notes: ${validatedRequest.context?.notes || "None"}
+Symbol: ${validatedRequest.context?.symbol ?? '(not provided)'}
+Timeframe: ${validatedRequest.context?.timeframe ?? '(not provided)'}
+Notes: ${validatedRequest.context?.notes ?? '(none)'}
 
----
-YOUR JOB:
+--------------------
+BOUNDARIES (STRICT)
 
-1. **Identify the setup**: Read the chart—asset, timeframe, what's happening structurally
-2. **Check their rules**: Do their confirmations exist or not? Be honest.
-3. **Give your read**: Is this clean, messy, valid, or forced?
-4. **Challenge them**: Ask the question that makes them think twice
-5. **Be curious when uncertain**: Ask rather than guess
+DO NOT:
+- Give buy/sell instructions
+- Give entries, exits, stops, or targets
+- Predict outcomes or probabilities
+- Invent indicator meanings or values
 
----
-CONFIDENCE-GATED APPROACH:
+DO:
+- Speak in observations only
+- Reference structure, levels, and rules
+- Say "wait" when rules aren't met
+- Challenge emotional reasoning
 
-**Answer confidently** when details are clear:
-- "Sharp drop to 25,340, then recovery - uptrend rebuilding"
-- "Resistance at 25,730-25,740 held twice - that's a level"
+--------------------
+TASK
 
-**Answer + ask** when structure visible but details unclear:
-- "Support looks like it's holding around 25,600. That said, can't tell what the blue line tracking price is - VWAP or custom MA? A zoomed shot of the last 20-30 candles would help me give sharper feedback."
+1) Read the chart structurally
+   - Trend, range, rejection, breakout, chop
 
-**Refuse to guess** when too unclear:
-- "Don't want to guess here - can't clearly see the timeframe or what those indicators are. Tell me the timeframe and what the lines represent?"
+2) Check rules
+   - Are they aligned, incomplete, or violated?
 
-**Guidelines:**
-- Prefer precision over confidence
-- Ask 1-2 high-leverage questions max in follow_up_question field
-- Explain WHY you need clarification
-- Never hallucinate indicator meanings
+3) Classify setup state
+   - aligned / incomplete / violated
 
----
-HOW TO DESCRIBE WHAT YOU SEE:
+4) Coach behavior
+   - Call out FOMO, impatience, fear, forcing
 
-✓ "Sharp drop to 25,340, then recovered—higher lows forming, uptrend rebuilding"
-✓ "Resistance at 25,730-25,740 held twice—that's a level to watch"
-✓ "Choppy consolidation, no clear structure—I'd stay out"
-✓ "Clean breakout above prior swing high at 25,650"
+5) Handle uncertainty correctly
+   - Explain what's unclear
+   - Ask for clarification
+   - Refuse to guess if needed
 
-Use trader language:
-- Support/resistance held or broke
-- Clean rejection vs weak bounce
-- Trending hard vs choppy/ranging
-- Structure intact vs invalidated
+Never hallucinate.
 
----
-BEHAVIORAL COACHING:
+--------------------
+TIME DISCIPLINE
 
-Don't ask boring questions like "Are you in a position or considering a setup?"
+Use time to slow decisions:
+"One candle."
+"Next 5m close."
+"If nothing changes, nothing changes."
 
-Instead:
-- "Why this chart right now? FOMO or does it match your plan?"
-- "If you lose on this, will you be pissed at the market or at yourself for forcing it?"
-- "Your rules say X, but this chart shows Y. So what's the move?"
-- "This looks clean per your rules. What's stopping you—fear or discipline?"
+--------------------
+TIMEOUT (STRICT)
 
-Call out emotional trading:
-- If it's FOMO: "You're chasing. Walk away."
-- If it's revenge: "Trying to make it back? That's how you blow up."
-- If they're hesitating on a good setup: "Your plan says go. Trust it or change it."
+Trigger ONLY if:
+- User explicitly asks ("timeout", "5 min", etc.)
+- User immediately agrees after you suggest a break
+- Repeated severe emotional tilt
 
----
-RESPONSE FORMAT (JSON):
+Format exactly:
+TIMEOUT: 5
+TIMEOUT: 10
+TIMEOUT: 15
+
+--------------------
+VALIDITY ESTIMATE
+
+Provide an estimate of how likely this setup is VALID per the user's rules and what is visible on the chart.
+This is NOT a prediction of profit and NOT a market forecast.
+
+Rules:
+- Output a RANGE, not a single percent. Example: [60, 75]
+- Include confidence: low/medium/high
+- If key details are missing or unreadable, set validity_estimate to null and ask clarifying questions
+- Tighten the range only when confirmations are clearly visible
+- Always explain what would increase/decrease the estimate
+
+--------------------
+OUTPUT (JSON ONLY)
+
+Return ONLY valid JSON. No markdown. No extra text.
 
 {
-  "verdict": "pass" | "warn" | "fail",
-  "summary": "One punchy sentence describing what happened (NOT a question)",
-  "bullets": [
-    "Sharp drop to 25,340, then gradual recovery",
-    "Resistance holding at 25,730-25,740 zone", 
-    "Higher lows forming—uptrend structure rebuilding"
-  ],
+  "setup_status": "aligned" | "incomplete" | "violated",
+  "validity_estimate": {
+    "percent_range": [min, max],
+    "confidence": "low | medium | high",
+    "reason": "Short reason tied to rules + clarity"
+  },
+  "summary": "One punchy sentence describing what's happening",
+  "bullets": ["One clear observation per line"],
   "levels_to_watch": [{
-    "label": "Resistance at 25,730-25,740",
-    "type": "resistance",
-    "relative_location": "above current price",
-    "why_it_matters": "Price rejected here twice—key level",
-    "confidence": "high"
+    "label": "Short description",
+    "type": "support | resistance",
+    "relative_location": "above | below | current price",
+    "why_it_matters": "Brief reason",
+    "confidence": "low | medium | high"
   }],
-  "rule_violations": ["Missing X confirmation per your rules"],
-  "missing_confirmations": ["No volume spike", "No confirmation candle yet"],
-  "behavioral_nudge": "One sharp coaching sentence that challenges or validates them",
-  "follow_up_question": "One direct question that makes them think (not generic)"
+  "rule_violations": [],
+  "missing_confirmations": [],
+  "behavioral_nudge": "One sharp coaching sentence",
+  "follow_up_questions": []
 }
 
-verdict meanings:
-- **pass**: Their rules are clearly met—setup looks valid
-- **warn**: Iffy—some confirmations missing or structure unclear
-- **fail**: Violates their rules or structure is broken
+SETUP STATUS MEANING:
+aligned    → chart behavior matches their rules (not permission)
+incomplete → something required is missing
+violated   → rules are clearly broken`
 
----
-EXAMPLES OF GOOD BEHAVIORAL NUDGES:
+    const tierModifier = profile.plan === 'pro'
+      ? `
 
-✓ "You said you don't trade ranges—this IS a range. Why are you looking?"
-✓ "Your rules check out. Now execute or admit you don't trust your system."
-✓ "If you're forcing this trade, you already know the answer."
-✓ "Clean setup per your plan—stop overthinking and follow your rules."
+--------------------
+TIER: PRO
+VISION: HIGH-RESOLUTION
 
-✗ "Consider your risk tolerance and plan carefully" (too generic)
-✗ "What are your thoughts on this setup?" (boring, passive)
+VALIDITY ESTIMATE:
+- Use tight ranges when confirmations are clear
+- High confidence requires all critical confirmations visible
+- Always pair estimate with what would raise/lower it
 
----
-REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
+ADDITIONAL CONTEXT:
+- You may reference saved messages
+- You may call out repeated behavioral patterns
+- You may use the trader's own words
 
+LIMITS:
+- Ask up to TWO follow-up questions
+- Use conditional framing when helpful:
+  "If X happens → Y becomes valid"`
+      : `
+
+--------------------
+TIER: FREE
+VISION: LOW-RESOLUTION (512x512)
+
+VISION RULES:
+- Do NOT invent numbers you cannot read
+- Use zones instead of exact prices
+- Focus on structure over precision
+
+VALIDITY ESTIMATE:
+- Use wider ranges if details are unclear
+- Focus on structural alignment with rules
+- Set to null if key confirmations can't be verified
+
+LIMITS:
+- Ask at most ONE follow-up question
+- Keep bullets concise`
+
+    const coachingPrompt = basePrompt + tierModifier
+
+    // Use low-res for free plan (512x512, 85 tokens), high-res for pro (full detail)
+    const imageDetail = profile.plan === 'pro' ? 'high' : 'low'
+    
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -290,7 +347,8 @@ REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
             {
               type: "image_url",
               image_url: {
-                url: validatedRequest.image
+                url: validatedRequest.image,
+                detail: imageDetail
               }
             },
             { type: "text", text: "Analyze this chart." }
@@ -304,12 +362,17 @@ REMEMBER: Be direct, be real, make them think. No corporate compliance speak.`
     const aiResponse = JSON.parse(completion.choices[0].message.content || "{}")
     const validatedResponse = analysisResponseSchema.parse(aiResponse)
 
+    // Map setup_status to verdict for backward compatibility
+    const verdict = validatedResponse.setup_status === 'aligned' ? 'pass'
+      : validatedResponse.setup_status === 'incomplete' ? 'warn'
+      : 'fail'
+
     // Save analysis to database (linked to session for deletion)
     await supabase.from("analyses").insert({
       user_id: user.id,
       ruleset_id: validatedRequest.rulesetId,
       session_id: validatedRequest.sessionId || null,
-      verdict: validatedResponse.verdict,
+      verdict: verdict,
       payload: validatedResponse
     })
 
