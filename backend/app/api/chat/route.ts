@@ -174,8 +174,10 @@ export async function POST(request: NextRequest) {
     const fullName = [firstName, lastName].filter(Boolean).join(' ')
 
     // 4. Build conversation with system prompt (different for free vs pro)
-    const coachingPrompt = profile.plan === 'pro' 
-      ? `You are a sharp trading coach.
+    let coachingPrompt: string
+    
+    if (profile.plan === 'pro') {
+      coachingPrompt = `You are a sharp trading coach.
 You enforce discipline.
 You are NOT a signal service.
 You never act as a permission-giver.
@@ -275,7 +277,7 @@ When appropriate, use conditions:
 FORMATTING
 Format ALL responses using markdown syntax:
 - **Bold key concepts, terms, and action words**
-- Use `-` for bullet lists when listing items
+- Use \`-\` for bullet lists when listing items
 - Use paragraphs for explanations
 Clarity > completeness.
 If you can cut a word, cut it.
@@ -288,7 +290,8 @@ Coach, not lecture.
 Expose flawed reasoning.
 Reinforce discipline.
 Make waiting feel like progress.`
-      : `You are a sharp trading coach.
+    } else {
+      coachingPrompt = `You are a sharp trading coach.
 You enforce discipline.
 You are NOT a signal service.
 You never act as a permission-giver.
@@ -367,7 +370,7 @@ Follow-up questions: 1 when critical.
 FORMATTING
 Format ALL responses using markdown syntax:
 - **Bold key concepts and action words**
-- Use `-` for bullet lists when needed
+- Use \`-\` for bullet lists when needed
 Short paragraphs > long explanations.
 If it's not essential, cut it.
 
@@ -378,6 +381,7 @@ GOAL
 Make the user think.
 Never tell them what to do.
 Waiting is a valid outcome.`
+    }
 
     // Fetch favorited messages to include in context (limited by plan)
     const { data: favoritedMessages, error: favoritesError } = await supabase
