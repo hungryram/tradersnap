@@ -122,13 +122,30 @@ const TradingBuddyWidget = () => {
         setMessageOffset(20)
         
         // Convert DB format to UI format
-        const formattedMessages = dbMessages.map((msg: any) => ({
-          id: msg.id,
-          type: msg.role === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          isFavorited: msg.is_favorited || false
-        }))
+        const formattedMessages = dbMessages.map((msg: any) => {
+          let content = msg.content
+          
+          // Parse JSON content for analysis messages
+          if (msg.role === 'assistant' && typeof content === 'string') {
+            try {
+              const parsed = JSON.parse(content)
+              // Check if it's an analysis response (has setup_status field)
+              if (parsed.setup_status) {
+                content = parsed
+              }
+            } catch (e) {
+              // Not JSON or parsing failed - keep as string
+            }
+          }
+          
+          return {
+            id: msg.id,
+            type: msg.role === 'user' ? 'user' : 'assistant',
+            content: content,
+            timestamp: new Date(msg.created_at),
+            isFavorited: msg.is_favorited || false
+          }
+        })
         
         setMessages(formattedMessages)
         
@@ -745,13 +762,30 @@ const TradingBuddyWidget = () => {
         setMessageOffset(prev => prev + dbMessages.length)
 
         // Convert DB format to UI format
-        const formattedMessages = dbMessages.map((msg: any) => ({
-          id: msg.id,
-          type: msg.role === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          isFavorited: msg.is_favorited || false
-        }))
+        const formattedMessages = dbMessages.map((msg: any) => {
+          let content = msg.content
+          
+          // Parse JSON content for analysis messages
+          if (msg.role === 'assistant' && typeof content === 'string') {
+            try {
+              const parsed = JSON.parse(content)
+              // Check if it's an analysis response (has setup_status field)
+              if (parsed.setup_status) {
+                content = parsed
+              }
+            } catch (e) {
+              // Not JSON or parsing failed - keep as string
+            }
+          }
+          
+          return {
+            id: msg.id,
+            type: msg.role === 'user' ? 'user' : 'assistant',
+            content: content,
+            timestamp: new Date(msg.created_at),
+            isFavorited: msg.is_favorited || false
+          }
+        })
 
         // Prepend older messages to the beginning
         setMessages(prev => [...formattedMessages, ...prev])
