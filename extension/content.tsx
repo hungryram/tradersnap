@@ -1236,7 +1236,7 @@ const TradingBuddyWidget = () => {
       // Animate typing effect
       let charIndex = 0
       const typingInterval = setInterval(() => {
-        charIndex += 2 // Type 2 characters at a time for faster animation
+        charIndex += 1 // Type 1 character at a time
         if (charIndex >= fullResponse.length) {
           charIndex = fullResponse.length
           clearInterval(typingInterval)
@@ -1249,7 +1249,7 @@ const TradingBuddyWidget = () => {
             idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
           ))
         }
-      }, 20) // 20ms per iteration = fast but visible typing
+      }, 30) // 30ms per character = slower, more readable
       
     } catch (error) {
       console.error("[Content] Chat failed:", error)
