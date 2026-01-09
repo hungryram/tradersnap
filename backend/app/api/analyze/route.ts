@@ -357,38 +357,39 @@ LIMITS:
       : validatedResponse.setup_status === 'incomplete' ? 'warn'
       : 'fail'
 
-    // Save user message to chat_messages
-    const { data: userMsg, error: userMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
+    // Save both messages to chat_messages table
+    const messagesToSave = [
+      {
         user_id: user.id,
         role: 'user',
         content: '📸 Analyze this chart',
-        image_url: validatedRequest.image
-      })
-      .select('id')
-      .single()
-
-    if (userMsgError) {
-      console.error('[Analyze API] Failed to save user message:', userMsgError)
-      const response = NextResponse.json({ error: "Failed to save message" }, { status: 500 })
-      return addCorsHeaders(response, origin)
-    }
-
-    // Save assistant message (structured analysis) to chat_messages
-    const { data: assistantMsg, error: assistantMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
+        screenshot_url: null // Chart images stored in extension chrome.storage
+      },
+      {
         user_id: user.id,
         role: 'assistant',
         content: JSON.stringify(validatedResponse)
-      })
-      .select('id')
-      .single()
+      }
+    ]
 
-    if (assistantMsgError) {
-      console.error('[Analyze API] Failed to save assistant message:', assistantMsgError)
-      const response = NextResponse.json({ error: "Failed to save message" }, { status: 500 })
+    const { data: savedMessages, error: messagesError } = await supabase
+      .from('chat_messages')
+      .insert(messagesToSave)
+      .select('id, role')
+
+    if (messagesError) {
+      console.error('[Analyze API] Failed to save messages:', messagesError)
+      const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
+      return addCorsHeaders(response, origin)
+    }
+
+    // Extract message IDs
+    const userMsg = savedMessages?.find(m => m.role === 'user')
+    const assistantMsg = savedMessages?.find(m => m.role === 'assistant')
+
+    if (!userMsg || !assistantMsg) {
+      console.error('[Analyze API] Failed to retrieve message IDs')
+      const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
       return addCorsHeaders(response, origin)
     }
 
