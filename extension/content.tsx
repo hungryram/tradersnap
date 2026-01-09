@@ -1814,7 +1814,7 @@ const TradingBuddyWidget = () => {
                   </div>
 
                   {msg.content.validity_estimate && (
-                    <div className={`text-xs mb-2 px-2 py-1.5 rounded ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-100'}`}>
+                    <div className={`text-xs mb-2 px-3 py-2.5 rounded ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-100'}`}>
                       <div className="flex items-center justify-between">
                         <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>
                           Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
@@ -1834,7 +1834,7 @@ const TradingBuddyWidget = () => {
                   <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
                   
                   {msg.content.bullets && msg.content.bullets.length > 0 && (
-                    <ul className={`space-y-1 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <ul className={`space-y-2 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       {msg.content.bullets.map((bullet: string, idx: number) => (
                         <li key={idx}>• {bullet}</li>
                       ))}
@@ -1842,7 +1842,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
-                    <div className={`rounded-lg p-2 mb-2 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
+                    <div className={`rounded-lg p-3 mb-2 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
                       <div className={`font-medium text-xs mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>Levels to Watch</div>
                       {msg.content.levels_to_watch.map((level: any, idx: number) => {
                         const getTypeIcon = (type: string) => {
@@ -1874,7 +1874,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.behavioral_nudge && (
-                    <div className={`rounded-lg p-2 border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                    <div className={`rounded-lg p-3 border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
                       💡 {msg.content.behavioral_nudge}
                     </div>
                   )}
