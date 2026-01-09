@@ -1690,8 +1690,8 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
-                    <div className="bg-blue-50 rounded-lg p-2 mb-2">
-                      <div className="font-medium text-xs mb-1 text-slate-900">Levels to Watch</div>
+                    <div className={`rounded-lg p-2 mb-2 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
+                      <div className={`font-medium text-xs mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>Levels to Watch</div>
                       {msg.content.levels_to_watch.map((level: any, idx: number) => {
                         const getTypeIcon = (type: string) => {
                           switch(type) {
@@ -1707,13 +1707,13 @@ const TradingBuddyWidget = () => {
                         }
                         
                         return (
-                          <div key={idx} className="text-xs text-slate-700 mb-1.5 last:mb-0">
-                            <div className="font-bold text-slate-900">
+                          <div key={idx} className={`text-xs mb-1.5 last:mb-0 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <div className={`font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
                               {getTypeIcon(level.type)} {level.label}
                             </div>
-                            <div className="text-[11px] text-slate-600 ml-4">
+                            <div className={`text-[11px] ml-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                               {level.why_it_matters}
-                              {level.when_observed && <span className="text-[10px] text-slate-500"> ({level.when_observed})</span>}
+                              {level.when_observed && <span className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}> ({level.when_observed})</span>}
                             </div>
                           </div>
                         )
@@ -1722,7 +1722,7 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.behavioral_nudge && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900">
+                    <div className={`rounded-lg p-2 text-xs border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
                       💡 {msg.content.behavioral_nudge}
                     </div>
                   )}

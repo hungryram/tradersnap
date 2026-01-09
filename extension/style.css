@@ -101,17 +101,20 @@
 }
 
 /* Dark mode overrides */
-.markdown-content.bg-slate-700 code {
+.markdown-content.bg-slate-700 code,
+.markdown-content.bg-dark-elevated code {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.markdown-content.bg-slate-700 pre {
+.markdown-content.bg-slate-700 pre,
+.markdown-content.bg-dark-elevated pre {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.markdown-content.bg-slate-700 blockquote {
-  border-left-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.8);
+.markdown-content.bg-slate-700 blockquote,
+.markdown-content.bg-dark-elevated blockquote {
+  border-left-color: rgba(148, 163, 184, 0.5);
+  color: rgba(203, 213, 225, 0.9);
 }
 
 /* Error message specific styles */
