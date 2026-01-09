@@ -1665,10 +1665,10 @@ const TradingBuddyWidget = () => {
                             <div className="font-bold text-slate-900">
                               {getTypeIcon(level.type)} {level.label}
                             </div>
-                            {level.when_observed && (
-                              <div className="text-[10px] text-slate-500 ml-4 mb-0.5">⏱️ {level.when_observed}</div>
-                            )}
-                            <div className="text-[11px] text-slate-600 ml-4">{level.why_it_matters}</div>
+                            <div className="text-[11px] text-slate-600 ml-4">
+                              {level.why_it_matters}
+                              {level.when_observed && <span className="text-[10px] text-slate-500"> ({level.when_observed})</span>}
+                            </div>
                           </div>
                         )
                       })}
