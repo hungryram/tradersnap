@@ -121,8 +121,8 @@ function IndexPopup() {
     try {
       console.log('[Popup] Signing out...')
       
-      // Clear chrome.storage first
-      await chrome.storage.local.remove('supabase_session')
+      // Clear chrome.storage first (session and timeout)
+      await chrome.storage.local.remove(['supabase_session', 'timeout_end'])
       
       // Force sign out by navigating to admin domain with logout query
       try {
@@ -156,7 +156,7 @@ function IndexPopup() {
     } catch (error) {
       console.error('[Popup] Sign out error:', error)
       // Force clear local state even if script fails
-      await chrome.storage.local.remove('supabase_session')
+      await chrome.storage.local.remove(['supabase_session', 'timeout_end'])
       setIsLoggedIn(false)
       setUser(null)
     }
