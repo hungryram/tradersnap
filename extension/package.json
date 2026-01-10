@@ -77,7 +77,29 @@
         "matches": [
           "https://www.tradingview.com/*",
           "https://tradingview.com/*",
-          "https://*.tradingview.com/*"
+          "https://*.tradingview.com/*",
+          "https://trader.tradovate.com/*",
+          "https://*.tradovate.com/*",
+          "https://*.tdameritrade.com/*",
+          "https://*.ninjatrader.com/*",
+          "https://*.tradestation.com/*",
+          "https://www.binance.com/*",
+          "https://*.binance.com/*",
+          "https://www.coinbase.com/*",
+          "https://*.coinbase.com/*",
+          "https://www.kraken.com/*",
+          "https://*.kraken.com/*",
+          "https://*.bybit.com/*",
+          "https://trade.tastytrade.com/*",
+          "https://*.tastytrade.com/*",
+          "https://*.tastyworks.com/*",
+          "https://app.webull.com/*",
+          "https://*.webull.com/*",
+          "https://*.interactivebrokers.com/*",
+          "https://*.schwab.com/*",
+          "https://*.etrade.com/*",
+          "https://*.fidelity.com/*",
+          "https://*.robinhood.com/*"
         ]
       }
     ]
