@@ -1,8 +1,8 @@
 {
   "name": "trading-buddy-extension",
-  "displayName": "Snapchart",
-  "version": "1.0.0",
-  "description": "AI Trading Psychology Overlay",
+  "displayName": "Snapchart - Trading Psychology AI Coach",
+  "version": "1.0.1",
+  "description": "AI trading psychology coach. Analyze charts against your rules and build disciplined trading habits with real-time feedback.",
   "author": "Snapchart",
   "scripts": {
     "dev": "plasmo dev",
@@ -33,31 +33,7 @@
   },
   "manifest": {
     "host_permissions": [
-      "https://www.tradingview.com/*",
-      "https://tradingview.com/*",
-      "https://*.tradingview.com/*",
-      "https://trader.tradovate.com/*",
-      "https://*.tradovate.com/*",
-      "https://*.tdameritrade.com/*",
-      "https://*.ninjatrader.com/*",
-      "https://*.tradestation.com/*",
-      "https://www.binance.com/*",
-      "https://*.binance.com/*",
-      "https://www.coinbase.com/*",
-      "https://*.coinbase.com/*",
-      "https://www.kraken.com/*",
-      "https://*.kraken.com/*",
-      "https://*.bybit.com/*",
-      "https://trade.tastytrade.com/*",
-      "https://*.tastytrade.com/*",
-      "https://*.tastyworks.com/*",
-      "https://app.webull.com/*",
-      "https://*.webull.com/*",
-      "https://*.interactivebrokers.com/*",
-      "https://*.schwab.com/*",
-      "https://*.etrade.com/*",
-      "https://*.fidelity.com/*",
-      "https://*.robinhood.com/*"
+      "<all_urls>"
     ],
     "permissions": [
       "activeTab",
@@ -99,7 +75,16 @@
           "https://*.schwab.com/*",
           "https://*.etrade.com/*",
           "https://*.fidelity.com/*",
-          "https://*.robinhood.com/*"
+          "https://*.robinhood.com/*",
+          "https://*.topstepx.com/*",
+          "https://*.rithmic.com/*",
+          "https://*.thinkorswim.com/*",
+          "https://*.metatrader4.com/*",
+          "https://*.metatrader5.com/*",
+          "https://*.ctrader.com/*",
+          "https://*.tradier.com/*",
+          "https://*.lightspeed.com/*",
+          "https://*.speedtrader.com/*"
         ]
       }
     ]
