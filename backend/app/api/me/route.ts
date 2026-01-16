@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     // Get current usage from profile (new daily tracking system)
     const limits = {
-      maxMessages: profile.plan === 'pro' ? 200 : 50,
+      maxMessages: profile.plan === 'pro' ? 500 : 15,
       maxScreenshots: profile.plan === 'pro' ? 50 : 5,
       maxFavorites: profile.plan === 'pro' ? 20 : 3
     }

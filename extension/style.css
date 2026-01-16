@@ -26,6 +26,10 @@
   font-weight: 600;
 }
 
+.markdown-content.dark strong {
+  color: white !important;
+}
+
 .markdown-content em {
   font-style: italic;
 }
@@ -122,7 +126,7 @@
 .markdown-content.bg-slate-700 blockquote,
 .markdown-content.bg-dark-elevated blockquote {
   border-left-color: rgba(148, 163, 184, 0.5);
-  color: rgba(203, 213, 225, 0.9);
+  color: #ffffff
 }
 
 /* Error message specific styles */

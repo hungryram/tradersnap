@@ -140,10 +140,9 @@ function IndexPopup() {
           })
         } else {
           console.log('[Popup] No admin tab, opening one to trigger sign out...')
-          // Create a tab that will trigger sign out
+          // Create a visible tab to sign out (Chrome reviewers prefer visible navigation)
           await chrome.tabs.create({ 
-            url: `${process.env.PLASMO_PUBLIC_API_URL}/?signout=true`,
-            active: false 
+            url: `${process.env.PLASMO_PUBLIC_API_URL}/?signout=true`
           })
         }
       } catch (error) {

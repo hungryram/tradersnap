@@ -8,10 +8,16 @@ module.exports = {
     extend: {
       colors: {
         dark: {
-          bg: '#121212',
-          surface: '#1e1e1e',
-          elevated: '#2d2d2d',
-          border: '#3d3d3d',
+          bg: '#171b1f',
+          surface: '#0d1117',
+          elevated: 'lab(5.25641% -.716366 -2.91725)',
+          border: '#2d3439',
+          text: 'lab(59.4% 0 0)',
+          placeholder: 'lab(94.2% 0 0)',
+        },
+        blue: {
+          600: 'rgb(0, 145, 255)',
+          700: 'rgb(0, 130, 230)',
         }
       }
     }

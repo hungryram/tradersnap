@@ -12,5 +12,10 @@
   },
   "devDependencies": {
     "pnpm": "^8.15.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.33.5"
+    }
   }
 }

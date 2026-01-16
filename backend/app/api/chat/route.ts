@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Define usage limits based on plan
     const limits = {
-      maxMessages: profile.plan === 'pro' ? 200 : 50,
+      maxMessages: profile.plan === 'pro' ? 200 : 15,
       maxScreenshots: profile.plan === 'pro' ? 50 : 5,
       maxFavoritesInContext: profile.plan === 'pro' ? 20 : 3
     }
@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({
         error: "Daily message limit reached",
         message: profile.plan === 'pro' 
-          ? "You've reached your daily limit of 200 messages. Your limit resets at midnight UTC."
-          : "You've used all 50 free messages today. Upgrade to Pro for 200 messages/day and 50 chart analyses.",
+          ? "You've reached your daily limit of 500 messages. Your limit resets at midnight UTC."
+          : "You've used all 15 free messages today. Upgrade to Pro for 500 messages/day and 50 chart analyses.",
         limit: limits.maxMessages,
         current: profile.message_count,
         requiresUpgrade: profile.plan !== 'pro'

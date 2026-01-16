@@ -72,7 +72,7 @@ const TradingBuddyWidget = () => {
   const [size, setSize] = useState({ width: 384, height: 600 })
   const [isResizing, setIsResizing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
@@ -96,6 +96,8 @@ const TradingBuddyWidget = () => {
   const isInitialLoadRef = useRef(true)
   const skipNextScrollRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Function to load chat history from database
   const loadChatHistoryFromDB = async () => {
@@ -940,6 +942,30 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  const stopGeneration = () => {
+    // Abort fetch request if still in progress
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    
+    // Stop typing animation if in progress
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current)
+      typingIntervalRef.current = null
+      
+      // Show full message immediately
+      setMessages(prev => prev.map((msg, idx) => 
+        idx === prev.length - 1 && msg.isTyping 
+          ? { ...msg, isTyping: false, content: msg.fullContent || msg.content } 
+          : msg
+      ))
+    }
+    
+    setIsSending(false)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
   const handleSendMessage = async (text: string, includeChart: boolean = false) => {
     if (!text.trim() || isSending) return
     
@@ -1111,6 +1137,9 @@ const TradingBuddyWidget = () => {
         requestBody.isContextImage = true
       }
       
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController()
+      
       // Call chat API
       const apiResponse = await fetch(
         `${process.env.PLASMO_PUBLIC_API_URL}/api/chat`,
@@ -1120,7 +1149,8 @@ const TradingBuddyWidget = () => {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${supabase_session.access_token}`
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          signal: abortControllerRef.current.signal
         }
       )
 
@@ -1208,6 +1238,8 @@ const TradingBuddyWidget = () => {
         }
         setMessages(prev => [...prev, errorMsg])
         setIsSending(false)
+        abortControllerRef.current = null
+        setTimeout(() => inputRef.current?.focus(), 100)
         return
       }
       
@@ -1234,15 +1266,20 @@ const TradingBuddyWidget = () => {
       
       // Animate typing effect
       let charIndex = 0
-      const typingInterval = setInterval(() => {
+      typingIntervalRef.current = setInterval(() => {
         charIndex += 1 // Type 1 character at a time
         if (charIndex >= fullResponse.length) {
           charIndex = fullResponse.length
-          clearInterval(typingInterval)
+          clearInterval(typingIntervalRef.current!)
+          typingIntervalRef.current = null
           // Mark typing as complete
           setMessages(prev => prev.map((msg, idx) => 
             idx === prev.length - 1 ? { ...msg, isTyping: false, content: fullResponse } : msg
           ))
+          // Only now set isSending to false (after typing animation completes)
+          setIsSending(false)
+          abortControllerRef.current = null
+          setTimeout(() => inputRef.current?.focus(), 100)
         } else {
           setMessages(prev => prev.map((msg, idx) => 
             idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
@@ -1273,10 +1310,15 @@ const TradingBuddyWidget = () => {
         }
         setMessages(prev => [...prev, errorMsg])
       }
-    } finally {
+      
+      // Reset state on error
       setIsSending(false)
-      // Auto-focus input after AI responds
+      abortControllerRef.current = null
       setTimeout(() => inputRef.current?.focus(), 100)
+      
+    } finally {
+      // Don't set isSending to false here - it's now handled after typing animation completes
+      // This ensures the stop button stays visible while AI is typing
     }
   }
 
@@ -1479,7 +1521,7 @@ const TradingBuddyWidget = () => {
                 >
                   {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
                 </button>
-                <div className={`px-4 py-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className={`px-4 py-1.5 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
                   <div className="text-xs font-medium mb-1">Text Size</div>
                   <div className="flex gap-2">
                     <button
@@ -1630,7 +1672,7 @@ const TradingBuddyWidget = () => {
           )}
 
           {messages.length === 0 && (
-            <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
               <div className="text-4xl mb-2">👋</div>
               <p className="mb-2">Hi! I'm your trading psychology coach.</p>
               <p className="text-xs">Ask a question or analyze a chart to begin.</p>
@@ -1664,7 +1706,7 @@ const TradingBuddyWidget = () => {
                       {msg.content}
                     </div>
                     {msg.timestamp && (
-                      <div className="text-[10px] text-slate-400 mt-0.5 text-right px-1">
+                      <div className={`text-[10px] mt-0.5 text-right px-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
                         {formatMessageTime(msg.timestamp)}
                       </div>
                     )}
@@ -1698,7 +1740,7 @@ const TradingBuddyWidget = () => {
                 
                 {msg.type === 'error' && (
                   <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()}`}>
-                    <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                    <div className={`markdown-content ${theme === 'dark' ? 'dark' : ''}`} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                     {msg.requiresUpgrade && (
                       <button
                         onClick={() => window.open('https://admin.snapchartapp.com/dashboard/account', '_blank')}
@@ -1754,7 +1796,7 @@ const TradingBuddyWidget = () => {
                   
                   <div 
 
-                    className={`markdown-content px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-100' : 'bg-white border border-slate-200 text-slate-900'} ${
+                    className={`markdown-content ${theme === 'dark' ? 'dark' : ''} px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1762,7 +1804,7 @@ const TradingBuddyWidget = () => {
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
                   {msg.timestamp && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
+                    <div className={`text-[10px] mt-0.5 text-left px-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
                       {formatMessageTime(msg.timestamp)}
                     </div>
                   )}
@@ -1803,37 +1845,37 @@ const TradingBuddyWidget = () => {
                   )}
                   
                   {msg.content.ruleset_name && (
-                    <div className={`text-[10px] uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <div className={`text-[10px] uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
                       Analyzed with: {msg.content.ruleset_name}
                     </div>
                   )}
                   
-                  <div className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase mb-3 ${getVerdictColor(msg.content.setup_status)}`}>
+                  <div className={`inline-block px-2.5 py-1 rounded-sm text-xs font-semibold uppercase mb-3 ${getVerdictColor(msg.content.setup_status)}`}>
                     {msg.content.setup_status.replace(/_/g, ' ')}
                   </div>
 
                   {msg.content.validity_estimate && (
-                    <div className={`text-xs mb-2 px-3 py-2.5 rounded ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-100'}`}>
+                    <div className={`mb-6 px-3 py-2.5 rounded ${theme === 'dark' ? 'border-dark-border border bg-dark-bg' : 'bg-slate-100'}`}>
                       <div className="flex items-center justify-between">
-                        <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>
+                        <span className={theme === 'dark' ? 'text-white' : 'text-slate-600'}>
                           Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className={`text-[10px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
                           {msg.content.validity_estimate.confidence} confidence
                         </span>
                       </div>
                       {msg.content.validity_estimate.reason && (
-                        <div className={`text-[11px] mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <div className={`text-[11px] mt-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
                           {msg.content.validity_estimate.reason}
                         </div>
                       )}
                     </div>
                   )}
                   
-                  <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>{msg.content.summary}</div>
+                  <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-white font-bold' : 'text-slate-900'}`}>{msg.content.summary}</div>
                   
                   {msg.content.bullets && msg.content.bullets.length > 0 && (
-                    <ul className={`space-y-2 mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <ul className={`space-y-2 mb-3 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-700'}`}>
                       {msg.content.bullets.map((bullet: string, idx: number) => (
                         <li key={idx}>• {bullet}</li>
                       ))}
@@ -1841,8 +1883,8 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
-                    <div className={`rounded-lg p-3 mb-2 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
-                      <div className={`font-medium text-xs mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>Levels to Watch</div>
+                    <div className={`rounded-lg p-3 mb-2 mt-6 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
+                      <div className={`font-medium mb-4 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Levels to Watch</div>
                       {msg.content.levels_to_watch.map((level: any, idx: number) => {
                         const getTypeIcon = (type: string) => {
                           switch(type) {
@@ -1858,13 +1900,13 @@ const TradingBuddyWidget = () => {
                         }
                         
                         return (
-                          <div key={idx} className={`text-xs mb-1.5 last:mb-0 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                            <div className={`font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                          <div key={idx} className={`mb-1.5 last:mb-0 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-700'}`}>
+                            <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                               {getTypeIcon(level.type)} {level.label}
                             </div>
-                            <div className={`text-[11px] ml-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <div className={`text-[12px] ml-4 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-600'}`}>
                               {level.why_it_matters}
-                              {level.when_observed && <span className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}> ({level.when_observed})</span>}
+                              {level.when_observed && <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-500'}`}> ({level.when_observed})</span>}
                             </div>
                           </div>
                         )
@@ -1879,12 +1921,12 @@ const TradingBuddyWidget = () => {
                   )}
 
                   {/* Disclaimer for analyze results */}
-                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-slate-400 border-dark-border' : 'text-slate-500 border-slate-200'}`}>
+                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-dark-text border-dark-border' : 'text-slate-500 border-slate-200'}`}>
                     AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
                   </div>
                 </div>
                   {msg.timestamp && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 text-left px-1">
+                    <div className={`text-[10px] mt-0.5 text-left px-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
                       {formatMessageTime(msg.timestamp)}
                     </div>
                   )}
@@ -1916,7 +1958,7 @@ const TradingBuddyWidget = () => {
           
           {(isAnalyzing || isSending) && (
             <div className="flex justify-start">
-              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-slate-300' : 'bg-white border border-slate-200 text-slate-400'}`}>
+              <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
                 <div className="flex items-center gap-1">
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_infinite]"></span>
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]"></span>
@@ -1939,7 +1981,7 @@ const TradingBuddyWidget = () => {
                     <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       Mandatory Break
                     </div>
-                    <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <div className={`text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-600'}`}>
                       {timeoutReason}
                     </div>
                   </div>
@@ -1959,51 +2001,69 @@ const TradingBuddyWidget = () => {
             </div>
           ) : (
             <>
-              {/* Text input for chatting */}
-              <div className="flex gap-2">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending) {
-                      e.preventDefault()
-                      if (e.ctrlKey && e.altKey) {
-                        // Ctrl+Alt+Enter: Send with chart
-                        handleSendMessage(inputText, true)
-                      } else {
-                        // Regular Enter: Send without chart
-                        handleSendMessage(inputText, false)
+              {/* Chat input */}
+              <div className={`rounded-lg border px-3 py-2 ${theme === 'dark' ? 'border-dark-border bg-dark-surface' : 'border-slate-300 bg-white'}`}>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                      if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending && !isAnalyzing) {
+                        e.preventDefault()
+                        if (e.ctrlKey && e.altKey) {
+                          // Ctrl+Alt+Enter: Send with chart
+                          handleSendMessage(inputText, true)
+                        } else {
+                          // Regular Enter: Send without chart
+                          handleSendMessage(inputText, false)
+                        }
                       }
-                    }
-                  }}
-                  onKeyPress={(e) => e.stopPropagation()}
-                  onKeyUp={(e) => e.stopPropagation()}
-                  placeholder="What's on your mind?"
-                  disabled={isSending}
-                  maxLength={500}
-                  className={`flex-1 px-3 py-1.5 border rounded-lg ${getTextSizeClass()} focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === 'dark' ? 'bg-dark-surface border-dark-border text-white placeholder-slate-400 disabled:bg-dark-elevated' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 disabled:bg-slate-100'}`}
-                />
-                <button
-                  onClick={() => {
-                    if (inputText.trim() && !isSending) {
-                      handleSendMessage(inputText, false)
-                    }
-                  }}
-                  disabled={isSending || !inputText.trim()}
-                  className={`bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg ${getTextSizeClass()} font-medium`}
-                >
-                  {isSending ? "..." : "Send"}
-                </button>
+                    }}
+                    onKeyPress={(e) => e.stopPropagation()}
+                    onKeyUp={(e) => e.stopPropagation()}
+                    placeholder={isSending ? "AI is responding..." : "What's on your mind?"}
+                    disabled={false}
+                    maxLength={500}
+                    className={`flex-1 bg-transparent ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
+                  />
+                  {isSending ? (
+                    <button
+                      onClick={stopGeneration}
+                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-red-50 ${theme === 'dark' ? 'text-red-400 hover:bg-red-950' : 'text-red-600'}`}
+                      title="Stop generating"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="1"></rect>
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (inputText.trim()) {
+                          handleSendMessage(inputText, false)
+                        }
+                      }}
+                      disabled={!inputText.trim()}
+                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${!inputText.trim() ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'} ${theme === 'dark' ? 'text-dark-text hover:bg-slate-700' : 'text-slate-500'}`}
+                      title="Send message"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
+              
               {inputText.length > 0 && (
-                <div className={`${getHalfTextSizeClass()} ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className={`${getHalfTextSizeClass()} ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'} -mt-0.5`}>
                   {inputText.length}/500 characters{inputText.length >= 500 && ' (limit reached)'}
                 </div>
               )}
-              <div/>
               
               <div className="flex gap-2">
                 <button
@@ -2013,19 +2073,31 @@ const TradingBuddyWidget = () => {
                     }
                   }}
                   disabled={isSending || !inputText.trim()}
-                  className={`flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:text-slate-500 text-white px-2 py-1.5 rounded-lg ${getTextSizeClass()} font-medium flex items-center justify-center gap-1.5`}
+                  title={isSending ? "AI is responding..." : "Send message with chart screenshot"}
+                  className={`flex-1 px-3 py-2.5 rounded-lg border ${getTextSizeClass()} font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    isSending || !inputText.trim()
+                      ? 'opacity-40 cursor-not-allowed'
+                      : theme === 'dark'
+                      ? 'border-dark-border bg-transparent text-slate-300 hover:bg-dark-elevated'
+                      : 'border-slate-300 bg-transparent text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
-                  <span className="text-sm">📸</span>
-                  Send with Chart
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>{isSending ? "Sending..." : "Send with Chart"}</span>
                 </button>
                 
                 <button
                   onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className={`flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded-lg font-medium flex items-center justify-center gap-1.5 ${getTextSizeClass()}`}
+                  disabled={isAnalyzing || isSending}
+                  title={isSending ? "Please wait for AI response" : isAnalyzing ? "Analyzing chart..." : "Analyze chart without message"}
+                  className={`flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-1.5 ${getTextSizeClass()} transition-colors shadow-lg shadow-blue-600/20`}
                 >
-                  <span className="text-sm">🔍</span>
-                  {isAnalyzing ? "Analyzing..." : "Analyze Chart"}
+                  <div className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                  <span>{isAnalyzing ? "Analyzing..." : "Analyze Chart"}</span>
                 </button>
               </div>
 
@@ -2033,7 +2105,7 @@ const TradingBuddyWidget = () => {
               {currentUsage && (
                 <button
                   onClick={() => setShowUsage(!showUsage)}
-                  className={`${getHalfTextSizeClass()} underline ${theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                  className={`${getHalfTextSizeClass()} underline ${theme === 'dark' ? 'text-dark-text hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
                 >
                   {showUsage ? "Hide Usage" : "View Usage"}
                 </button>
