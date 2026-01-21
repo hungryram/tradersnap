@@ -59,11 +59,7 @@ Describe levels clearly in text only.`
   const userRulesBlock = `USER RULES
 ${userRules}`
 
-  const savedContext = tier === "pro"
-    ? `SAVED CONTEXT
-You may reference favorited messages, earlier decisions, and repeated patterns.
-Use the trader's own language when quoting.`
-    : null
+  const savedContext = `You may reference favorited messages, earlier decisions, and repeated patterns. Use the trader's own language when quoting.`
 
   const safety = `SAFETY & BOUNDARIES (NON-NEGOTIABLE)
 NO:
@@ -75,12 +71,7 @@ NO:
 YES:
 - Market state
 - What price has or has not proven
-- What would confirm or invalidate a state
-
-Say:
-"Above VWAP, trend intact."
-Never say:
-"Go long above VWAP."`
+- What would confirm or invalidate a state`
 
   const confidence = tier === "pro"
     ? `CONFIDENCE
