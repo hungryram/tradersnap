@@ -53,7 +53,23 @@ export async function POST(request: NextRequest) {
 
     let customerId = profile?.stripe_customer_id
 
-    // Create Stripe customer if doesn't exist
+    // Verify customer exists in Stripe, or create a new one
+    if (customerId) {
+      try {
+        // Check if customer exists in Stripe
+        await stripe.customers.retrieve(customerId)
+      } catch (err: any) {
+        // Customer doesn't exist in Stripe (wrong environment, deleted, etc.)
+        if (err.code === 'resource_missing') {
+          console.log(`Customer ${customerId} not found in Stripe, creating new one`)
+          customerId = null // Will create new customer below
+        } else {
+          throw err // Re-throw other errors
+        }
+      }
+    }
+
+    // Create Stripe customer if doesn't exist or was invalid
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email || profile?.email,
