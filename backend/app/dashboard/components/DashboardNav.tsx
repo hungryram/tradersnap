@@ -24,6 +24,8 @@ export default function DashboardNav() {
   const navLinks = [
     { href: '/dashboard/rules', label: 'Rules' },
     { href: '/dashboard/saved-messages', label: 'Favorites' },
+    { href: '/dashboard/guide', label: 'Start Here' },
+    { href: '/dashboard/faq', label: 'FAQ' },
     { href: 'https://snapchart.canny.io/', label: 'Feature Requests', external: true },
     { href: 'https://snapchart.canny.io/bugs-and-issues', label: 'Report Issue', external: true },
     { href: '/dashboard/account', label: 'My Account' },
