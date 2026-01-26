@@ -72,6 +72,7 @@ const TradingBuddyWidget = () => {
   const [size, setSize] = useState({ width: 384, height: 600 })
   const [isResizing, setIsResizing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
@@ -1373,6 +1374,20 @@ const TradingBuddyWidget = () => {
     }
   }, [isDragging])
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!showMenu) return
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
   // Resize handlers
   const startSizeRef = useRef({ width: 0, height: 0 })
   const startPosRef = useRef({ x: 0, y: 0 })
@@ -1611,7 +1626,12 @@ const TradingBuddyWidget = () => {
               ⋮
             </button>
             {showMenu && (
-              <div className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-dark-surface border-dark-border' : 'bg-white border-slate-200'}`}>
+              <div 
+                ref={menuRef} 
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-dark-surface border-dark-border' : 'bg-white border-slate-200'}`}
+              >
                 <button
                   onClick={() => {
                     window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')
@@ -1729,6 +1749,15 @@ const TradingBuddyWidget = () => {
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   Feature Requests
+                </button>
+                <button
+                  onClick={() => {
+                    window.open('https://discord.gg/vCSS8mbV3U', '_blank')
+                    setShowMenu(false)
+                  }}
+                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  Join Discord
                 </button>
                 <button
                   onClick={() => {
