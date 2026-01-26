@@ -13,12 +13,20 @@ function addCorsHeaders(response: NextResponse, origin: string | null) {
     'https://tradingview.com'
   ]
   
+  // Trading platforms and exchanges supported by the extension
+  const tradingDomains = [
+    'tradingview.com', 'tradovate.com', 'thinkorswim.com', 'tdameritrade.com',
+    'ninjatrader.com', 'tradestation.com', 'interactivebrokers.com', 'etrade.com',
+    'schwab.com', 'fidelity.com', 'robinhood.com', 'webull.com', 'tastytrade.com',
+    'tastyworks.com', 'metatrader4.com', 'metatrader5.com', 'ctrader.com',
+    'tradier.com', 'lightspeed.com', 'speedtrader.com', 'topstepx.com', 'rithmic.com',
+    'binance.com', 'coinbase.com', 'kraken.com', 'bybit.com'
+  ]
+  
   const isAllowed = origin && (
     allowedOrigins.includes(origin) ||
     origin.startsWith('chrome-extension://') ||
-    origin.includes('tradingview.com') ||
-    origin.includes('tradovate.com') ||
-    origin.includes('thinkorswim.com')
+    tradingDomains.some(domain => origin.includes(domain))
   )
   
   if (isAllowed && origin) {

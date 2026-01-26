@@ -28,12 +28,12 @@ type BuildPromptParams = {
 function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams): string {
   const tier: PlanTier = profile?.plan === "pro" ? "pro" : "free"
 
-  const header = `You are a sharp trading coach.
-You enforce discipline.
-You are NOT a signal service.
-You never act as a permission-giver.
+  const header = `You are Snapchart — a sharp trading coach focused on discipline.
+You do not provide signals, entries, or exits.
+You never validate or authorize trades.
+You help the trader think, not act.
 
-${fullName ? `TRADER: ${fullName}\n` : ""}TIER: ${tier.toUpperCase()}`
+${fullName ? `TRADER: ${fullName}\n` : ""}SUBSCRIPTION TIER: ${tier.toUpperCase()}`
 
   const vision = tier === "pro"
     ? `VISION
@@ -44,7 +44,7 @@ Never guess or hallucinate.`
 Charts may be blurry or low detail.
 If values can't be read accurately, say so and focus on structure instead.`
 
-  const imageCapabilities = `IMAGE CAPABILITIES (CRITICAL)
+  const imageCapabilities = `IMAGE CAPABILITIES
 You may ONLY:
 - Analyze charts and describe what you see
 - Describe levels, zones, structure in text
@@ -57,15 +57,17 @@ You may NOT:
 Describe levels clearly in text only.`
 
   const userRulesBlock = `USER RULES
-${userRules}`
+${userRules}
+---
+END USER RULES
+`
 
   const savedContext = `You may reference favorited messages, earlier decisions, and repeated patterns. Use the trader's own language when quoting.`
 
   const safety = `SAFETY & BOUNDARIES (NON-NEGOTIABLE)
 NO:
 - Buy/sell instructions
-- Entries, exits, stops, or sizing
-- Predictions or probabilities
+- Entries, exits, stops
 - Permission-giving language
 
 YES:
@@ -107,13 +109,13 @@ Use time to slow behavior:
 Trigger ONLY if user explicitly requests a break.
 Use format: TIMEOUT: X (5, 10, or 15 minutes).
 
-For severe emotional trading, you MAY trigger a timeout.`
+For severe emotional trading, you MAY trigger a timeout, but confirm with user.`
 
   const writing = `WRITING STYLE
 Be concise and human.
 One core insight per response.
 Simple questions: 1–2 sentences.
-Complex analysis: max 6 lines.
+Complex analysis: max 5 lines.
 Bullets only when listing.
 Stop speaking once clarity is achieved.`
 
@@ -127,15 +129,26 @@ Think before responding:
 Respond with ONLY what is necessary.
 
 Response patterns (NOT mandatory, adapt to situation):
-- Clear state → one-line verdict, stop
+- Clear state → one-line verdict
 - Rule violation → direct correction (2-3 lines)
 - Multiple points → bullets (max 2)
-- Need clarity → ask one question only when critical
+- Need clarity → ask one question only when critical`
 
-Structure should disappear as certainty increases.`
+  const featureRequests = `YOUR FEATURES:
 
-  const featureRequests = `FEATURE REQUESTS
-If user asks for missing features: https://snapchart.canny.io/feature-requests or send them discord link https://discord.gg/vCSS8mbV3U`
+AVAILABLE NOW:
+- Chat coaching (text or chart analysis)
+- Save important messages (click star to favorite)
+- Custom trading rulesets (dashboard → rules)
+- Chart image analysis with vision
+- Timeout breaks (ask for one when needed)
+- Daily usage tracking
+- Trade Quality
+- Ruleset checklist
+
+WANT SOMETHING NEW?
+Feature requests: https://snapchart.canny.io/feature-requests
+Join Discord: https://discord.gg/vCSS8mbV3U`
 
   const goal = tier === "pro"
     ? `GOAL
@@ -287,8 +300,8 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({
         error: "Daily message limit reached",
         message: profile.plan === 'pro' 
-          ? "You've reached your daily limit of 500 messages. Your limit resets at midnight UTC."
-          : "You've used all 15 free messages today. Upgrade to Pro for 500 messages/day and 50 chart analyses.",
+          ? "You've reached your daily limit of 200 messages. Your limit resets at midnight UTC."
+          : "You've used all 15 free messages today. Upgrade to Pro for 200 messages/day and 50 chart analyses.",
         limit: limits.maxMessages,
         current: profile.message_count,
         requiresUpgrade: profile.plan !== 'pro'
@@ -344,9 +357,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Log full prompt for debugging/verification (remove or comment out in production)
-    console.log('\n========== COACHING PROMPT ==========')
-    console.log(coachingPrompt)
-    console.log('\n========== END PROMPT ==========\n')
+    // console.log('\n========== COACHING PROMPT ==========')
+    // console.log(coachingPrompt)
+    // console.log('\n========== END PROMPT ==========\n')
 
     // Fetch favorited messages to include in context (limited by plan)
     const { data: favoritedMessages, error: favoritesError } = await supabase
@@ -426,7 +439,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Different token limits based on plan
-    const maxTokens = profile.plan === 'pro' ? 2500 : 1500
+    const maxTokens = profile.plan === 'pro' ? 3000 : 2000
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {
@@ -453,8 +466,10 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Check finish reason for better error messages
     const finishReason = completion.choices[0]?.finish_reason
     let aiResponse = completion.choices[0]?.message?.content
+    let responseFailed = false
     
     if (!aiResponse) {
+      responseFailed = true // Don't count failed responses towards limits
       // Provide helpful message based on why response failed
       if (finishReason === 'length') {
         aiResponse = profile.plan === 'pro'
@@ -511,7 +526,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       const cachedTokens = usage.prompt_tokens_details?.cached_tokens || 0
       const cacheHitRate = usage.prompt_tokens > 0 ? ((cachedTokens / usage.prompt_tokens) * 100).toFixed(1) : '0'
       
-      console.log(`[OpenAI Usage] User: ${user.email} | Model: ${model} | Plan: ${profile.plan} | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens}) | Cached: ${cachedTokens} (${cacheHitRate}%)`)
+      // console.log(`[OpenAI Usage] User: ${user.email} | Model: ${model} | Plan: ${profile.plan} | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens}) | Cached: ${cachedTokens} (${cacheHitRate}%)`)
 
       // Update user's token usage in profile
       await supabase
@@ -575,23 +590,28 @@ Use for time-based coaching when they ask about the next candle or how long they
       }
     }
 
-    // 7. Increment usage counters (don't count screenshot if chart was unreadable)
+    // 7. Increment usage counters (don't count screenshot if chart was unreadable or if response failed)
     const shouldCountScreenshot = isNewScreenshot && !chartUnreadable
     
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        message_count: profile.message_count + 1,
-        screenshot_count: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
-      })
-      .eq('id', user.id)
+    // Only increment counters if the response was successful
+    if (!responseFailed) {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          message_count: profile.message_count + 1,
+          screenshot_count: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
+        })
+        .eq('id', user.id)
 
-    if (updateError) {
-      console.error('[Chat API] Failed to update usage counters:', updateError)
-    }
+      if (updateError) {
+        console.error('[Chat API] Failed to update usage counters:', updateError)
+      }
 
-    if (chartUnreadable) {
-      console.log('[Chat API] Chart unreadable - not counting towards usage')
+      if (chartUnreadable) {
+        console.log('[Chat API] Chart unreadable - not counting towards usage')
+      }
+    } else {
+      console.log('[Chat API] Response failed - not counting towards usage limits')
     }
 
     // 8. Return response with message IDs and action
@@ -602,8 +622,8 @@ Use for time-based coaching when they ask about the next candle or how long they
       action,
       chartUnreadable: chartUnreadable || undefined,
       usage: {
-        messages: profile.message_count + 1,
-        screenshots: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count,
+        messages: responseFailed ? profile.message_count : profile.message_count + 1,
+        screenshots: responseFailed ? profile.screenshot_count : (shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count),
         limits: limits
       }
     })
