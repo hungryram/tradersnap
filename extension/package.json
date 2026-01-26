@@ -1,7 +1,7 @@
 {
   "name": "trading-buddy-extension",
   "displayName": "Snapchart - Trading Psychology AI Coach",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AI trading psychology coach. Analyze charts against your rules and build disciplined trading habits with real-time feedback.",
   "author": "Snapchart",
   "scripts": {

@@ -135,7 +135,7 @@ Response patterns (NOT mandatory, adapt to situation):
 Structure should disappear as certainty increases.`
 
   const featureRequests = `FEATURE REQUESTS
-If user asks for missing features: https://snapchart.canny.io/feature-requests`
+If user asks for missing features: https://snapchart.canny.io/feature-requests or send them discord link https://discord.gg/vCSS8mbV3U`
 
   const goal = tier === "pro"
     ? `GOAL
