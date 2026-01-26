@@ -56,6 +56,7 @@ export const ChartLightbox = ({ imageUrl, drawings = [], showOverlay, onClose, o
 
   return (
     <div 
+      data-snapchart-widget
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black bg-opacity-90"
       onClick={onClose}
     >

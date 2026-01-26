@@ -93,6 +93,7 @@ const TradingBuddyWidget = () => {
   const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const widgetRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const skipNextScrollRef = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -142,10 +143,13 @@ const TradingBuddyWidget = () => {
             id: msg.id,
             type: msg.role === 'user' ? 'user' : 'assistant',
             content: content,
-            timestamp: new Date(msg.created_at),
+            timestamp: msg.created_at ? new Date(msg.created_at) : new Date(),
             isFavorited: msg.is_favorited || false
           }
         })
+        
+        // Sort by timestamp to ensure chronological order (oldest first)
+        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
         
         setMessages(formattedMessages)
         
@@ -153,7 +157,8 @@ const TradingBuddyWidget = () => {
         chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
       }
     } catch (error) {
-      console.error('[Content] Error loading chat history:', error)
+      // Silently fail - chat history is optional, app works fine without it
+      // Common reasons: offline, CORS, server maintenance
     }
   }
 
@@ -171,8 +176,24 @@ const TradingBuddyWidget = () => {
 
   // Format timestamp like iPhone messages
   const formatMessageTime = (timestamp: Date) => {
+    // Handle both Date objects and strings/numbers
+    let msgDate: Date
+    
+    if (timestamp instanceof Date) {
+      msgDate = timestamp
+    } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      msgDate = new Date(timestamp)
+    } else {
+      // Invalid input, return empty string silently
+      return ""
+    }
+    
+    // Validate the date
+    if (isNaN(msgDate.getTime())) {
+      return "" // Return empty string instead of "Invalid Date"
+    }
+    
     const now = new Date()
-    const msgDate = new Date(timestamp)
     const diffMs = now.getTime() - msgDate.getTime()
     const diffMins = Math.floor(diffMs / 60000)
     
@@ -756,7 +777,7 @@ const TradingBuddyWidget = () => {
       if (analysis.chartUnreadable) {
         setMessages(prev => [...prev, {
           type: 'info',
-          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer.',
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer. The chart might be too messy.',
           timestamp: new Date()
         }])
       }
@@ -1186,7 +1207,7 @@ const TradingBuddyWidget = () => {
       if (chatResult.chartUnreadable) {
         setMessages(prev => [...prev, {
           type: 'info',
-          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer.',
+          content: 'ℹ️ Chart quality insufficient - screenshot not counted. Try zooming in or making the chart clearer. The chart might be too messy.',
           timestamp: new Date()
         }])
       }
@@ -1267,7 +1288,7 @@ const TradingBuddyWidget = () => {
       // Animate typing effect
       let charIndex = 0
       typingIntervalRef.current = setInterval(() => {
-        charIndex += 1 // Type 1 character at a time
+        charIndex += 2 // Type 2 characters at a time
         if (charIndex >= fullResponse.length) {
           charIndex = fullResponse.length
           clearInterval(typingIntervalRef.current!)
@@ -1285,7 +1306,7 @@ const TradingBuddyWidget = () => {
             idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
           ))
         }
-      }, 25) // 25ms per character
+      }, 20) // 20ms per update
       
     } catch (error) {
       console.error("[Content] Chat failed:", error)
@@ -1365,24 +1386,74 @@ const TradingBuddyWidget = () => {
   }
 
   const handleResizeMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return
+    e.preventDefault()
+    e.stopPropagation()
     const deltaX = e.clientX - startPosRef.current.x
     const deltaY = e.clientY - startPosRef.current.y
     const newWidth = Math.max(300, Math.min(800, startSizeRef.current.width + deltaX))
     const newHeight = Math.max(400, Math.min(900, startSizeRef.current.height + deltaY))
+    
+    // Directly set DOM styles to bypass React and any site interference
+    if (widgetRef.current) {
+      widgetRef.current.style.setProperty('width', `${newWidth}px`, 'important')
+      widgetRef.current.style.setProperty('height', `${newHeight}px`, 'important')
+      widgetRef.current.style.setProperty('max-width', 'none', 'important')
+      widgetRef.current.style.setProperty('max-height', 'none', 'important')
+    }
     setSize({ width: newWidth, height: newHeight })
-  }, [])
+  }, [isResizing])
 
-  const handleResizeMouseUp = useCallback(() => {
+  const handleResizeMouseUp = useCallback((e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     setIsResizing(false)
   }, [])
 
   useEffect(() => {
     if (isResizing) {
-      document.addEventListener("mousemove", handleResizeMouseMove)
-      document.addEventListener("mouseup", handleResizeMouseUp)
+      // Multiple layers of mouseup detection to ensure we catch it
+      const handleMouseUpCapture = (e: MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsResizing(false)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }
+      
+      const handleMouseUpBubble = (e: MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsResizing(false)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }
+      
+      // Use capture phase to intercept events before page handlers
+      document.addEventListener("mousemove", handleResizeMouseMove, true)
+      document.addEventListener("mouseup", handleMouseUpCapture, true)
+      document.addEventListener("mouseup", handleMouseUpBubble, false)
+      window.addEventListener("mouseup", handleMouseUpBubble, false)
+      
+      // Prevent text selection during resize
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'nwse-resize'
+      
+      // Safety timeout - force end resize after 30 seconds of no mouseup
+      const safetyTimeout = setTimeout(() => {
+        setIsResizing(false)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }, 30000)
+      
       return () => {
-        document.removeEventListener("mousemove", handleResizeMouseMove)
-        document.removeEventListener("mouseup", handleResizeMouseUp)
+        clearTimeout(safetyTimeout)
+        document.removeEventListener("mousemove", handleResizeMouseMove, true)
+        document.removeEventListener("mouseup", handleMouseUpCapture, true)
+        document.removeEventListener("mouseup", handleMouseUpBubble, false)
+        window.removeEventListener("mouseup", handleMouseUpBubble, false)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
       }
     }
   }, [isResizing, handleResizeMouseMove, handleResizeMouseUp])
@@ -1390,6 +1461,7 @@ const TradingBuddyWidget = () => {
   if (!isOpen) {
     return (
       <div
+        data-snapchart-widget
         style={{
           position: "fixed",
           bottom: "20px",
@@ -1423,11 +1495,42 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  const getVerdictLabel = (status: string) => {
+    switch (status) {
+      case "valid":
+      case "aligned":
+      case "pass": return "VALID SETUP"
+      case "potentially_valid":
+      case "incomplete":
+      case "warn": return "INCOMPLETE SETUP"
+      case "invalid":
+      case "violated":
+      case "fail": return "INVALID SETUP"
+      default: return status.replace(/_/g, ' ').toUpperCase()
+    }
+  }
+
   return (
     <>
+      {/* Resize overlay - captures all mouse events during resize */}
+      {isResizing && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 2147483646,
+            cursor: 'nwse-resize',
+            backgroundColor: 'transparent'
+          }}
+        />
+      )}
+      
       {/* Welcome Modal */}
       {showWelcomeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
+        <div data-snapchart-widget className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
           <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-dark-surface text-slate-100' : 'bg-white text-slate-900'}`}>
             <div className="flex items-center gap-3 mb-4">
               <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" />
@@ -1468,17 +1571,25 @@ const TradingBuddyWidget = () => {
 
       {/* Main Widget */}
       <div
+      ref={widgetRef}
+      data-snapchart-widget
       style={{
         position: "fixed",
         left: `${position.x}px`,
         top: `${position.y}px`,
-        zIndex: 2147483647
+        zIndex: 2147483647,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        maxWidth: 'none',
+        maxHeight: 'none',
+        minWidth: '300px',
+        minHeight: '400px'
       }}
       onKeyDown={(e) => e.stopPropagation()}
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
-      <div className={`${theme === 'dark' ? 'bg-dark-bg text-white border-dark-border' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: `${size.width}px`, height: `${size.height}px` }}>
+      <div className={`${theme === 'dark' ? 'bg-dark-bg text-white border-dark-border' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: '100%', height: '100%' }}>
         {/* Header - Draggable */}
         <div
           className={`select-none flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-dark-border bg-gradient-to-r from-dark-surface to-dark-elevated' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
@@ -1846,22 +1957,52 @@ const TradingBuddyWidget = () => {
                   
                   {msg.content.ruleset_name && (
                     <div className={`text-[10px] uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                      Analyzed with: {msg.content.ruleset_name}
+                      Analyzed with Your Ruleset: {msg.content.ruleset_name}
                     </div>
                   )}
                   
                   <div className={`inline-block px-2.5 py-1 rounded-sm text-xs font-semibold uppercase mb-3 ${getVerdictColor(msg.content.setup_status)}`}>
-                    {msg.content.setup_status.replace(/_/g, ' ')}
+                    {getVerdictLabel(msg.content.setup_status)}
                   </div>
+
+                  {msg.content.rule_checks && msg.content.rule_checks.length > 0 && (
+                    <div className={`mb-4 p-3 rounded-lg ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-slate-50 border border-slate-200'}`}>
+                      <div className={`font-medium mb-2 text-xs ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rule Checklist</div>
+                      <div className="space-y-1.5">
+                        {msg.content.rule_checks.map((check: any, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className={`text-base leading-none ${
+                              check.status === 'pass' ? 'text-green-600' : 
+                              check.status === 'fail' ? 'text-red-600' : 
+                              'text-yellow-600'
+                            }`}>
+                              {check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '?'}
+                            </span>
+                            <div className="flex-1">
+                              <div className={`text-xs font-medium ${
+                                check.status === 'pass' ? theme === 'dark' ? 'text-green-400' : 'text-green-700' : 
+                                check.status === 'fail' ? theme === 'dark' ? 'text-red-400' : 'text-red-700' : 
+                                theme === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
+                              }`}>
+                                {check.rule}
+                              </div>
+                              {check.note && (
+                                <div className={`text-[10px] mt-0.5 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                                  {check.note}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {msg.content.validity_estimate && (
                     <div className={`mb-6 px-3 py-2.5 rounded ${theme === 'dark' ? 'border-dark-border border bg-dark-bg' : 'bg-slate-100'}`}>
                       <div className="flex items-center justify-between">
                         <span className={theme === 'dark' ? 'text-white' : 'text-slate-600'}>
-                          Validity: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}%
-                        </span>
-                        <span className={`text-[10px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
-                          {msg.content.validity_estimate.confidence} confidence
+                          Trade Quality: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}% ({msg.content.validity_estimate.confidence} confidence)
                         </span>
                       </div>
                       {msg.content.validity_estimate.reason && (
@@ -2165,7 +2306,9 @@ const TradingBuddyWidget = () => {
           className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
           style={{
             background: 'linear-gradient(135deg, transparent 50%, #cbd5e1 50%)',
-            borderBottomRightRadius: '8px'
+            borderBottomRightRadius: '8px',
+            pointerEvents: 'auto',
+            touchAction: 'none'
           }}
         />
       </div>

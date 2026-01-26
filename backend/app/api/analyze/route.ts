@@ -27,6 +27,11 @@ const analyzeRequestSchema = z.object({
 // Response schema
 const analysisResponseSchema = z.object({
   setup_status: z.enum(["aligned", "incomplete", "violated"]),
+  rule_checks: z.array(z.object({
+    rule: z.string(),
+    status: z.enum(["pass", "fail", "unclear"]),
+    note: z.string().optional()
+  })).optional(),
   validity_estimate: z.object({
     percent_range: z.tuple([z.number(), z.number()]),
     confidence: z.enum(["low", "medium", "high"]),
@@ -210,6 +215,12 @@ TASK
 
 2) Check rules
    - Are they aligned, incomplete, or violated?
+   - EVALUATE EACH RULE INDIVIDUALLY (REQUIRED):
+     * Break down the ruleset into distinct checkable criteria (volume, indicators, price levels, structure, etc.)
+     * For each criterion, determine: pass / fail / unclear
+     * Add brief notes explaining the status
+     * ALWAYS return rule_checks array - this is NOT optional
+     * Minimum 3 rule checks, maximum 8
 
 3) Classify setup state
    - aligned / incomplete / violated
@@ -249,6 +260,11 @@ Return ONLY valid JSON. No markdown. No extra text.
 
 {
   "setup_status": "aligned" | "incomplete" | "violated",
+  "rule_checks": [{
+    "rule": "Brief description of the specific rule criterion",
+    "status": "pass" | "fail" | "unclear",
+    "note": "Brief explanation (e.g., 'Volume at 15.2M' or 'Cannot verify from chart')"
+  }],  // REQUIRED: Always include 3-8 rule checks
   "validity_estimate": {
     "percent_range": [min, max],
     "confidence": "low | medium | high",
