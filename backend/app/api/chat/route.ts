@@ -70,13 +70,9 @@ E) NO INVENTING
 
   const output = `OUTPUT FORMAT
 
-STATE: Trend/Range/Transition + 3-word summary
-BIAS: LONG / SHORT / NO TRADE (Confidence: L/M/H)
-LEVELS: L1 … | L2 … | L3 …
-TRIGGER: What must happen to participate
-INVALID: What breaks the idea
-PLAN A: continuation (trigger → target zone)
-PLAN B: reversal/chop (trigger → target zone)
+GIVE USER A CLEAR TRADING DECISION:
+
+- BUY/SELL/HOLD DECISION: one of these three only, based on chart evidence
 BOTTOM LINE: one sentence`
 
   const style = `STYLE
