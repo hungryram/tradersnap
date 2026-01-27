@@ -128,9 +128,9 @@ export async function GET(request: NextRequest) {
 
     // Get current usage from profile (new daily tracking system)
     const limits = {
-      maxMessages: profile.plan === 'pro' ? 200 : 15,
-      maxScreenshots: profile.plan === 'pro' ? 50 : 5,
-      maxFavorites: profile.plan === 'pro' ? 20 : 3
+      maxMessages: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 200 : 15,
+      maxScreenshots: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 50 : 5,
+      maxFavorites: profile.plan === 'admin' ? 100 : profile.plan === 'pro' ? 20 : 3
     }
 
     // Count actual favorited messages

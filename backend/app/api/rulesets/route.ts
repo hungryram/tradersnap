@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const userPlan = profile?.plan || "free"
-    const maxRulesLength = userPlan === "pro" ? 5000 : 1000
+    const maxRulesLength = userPlan === "admin" ? 10000 : userPlan === "pro" ? 5000 : 1000
 
     // Check ruleset limit
     const { count } = await supabase
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id)
 
-    const limit = profile?.plan === "free" ? 3 : 20
+    const limit = profile?.plan === "admin" ? 999 : profile?.plan === "free" ? 3 : 20
     if (count !== null && count >= limit) {
       return NextResponse.json(
         { error: `Ruleset limit reached (${limit} max). Upgrade your plan to create more.` },

@@ -13,7 +13,7 @@ const openai = new OpenAI({
 })
 
 // Coaching prompt builder with type safety
-type PlanTier = "pro" | "free"
+type PlanTier = "admin" | "pro" | "free"
 
 type Profile = {
   plan?: PlanTier | string
@@ -25,8 +25,110 @@ type BuildPromptParams = {
   userRules: string
 }
 
+// Admin-only prompt — AI-led market thesis (independent, no user rules)
+function buildAdminPrompt({
+  fullName,
+}: {
+  fullName?: string | null
+}): string {
+  const header = `You are Snapchart — ADMIN THESIS MODE.
+
+PRIVATE INTERNAL MODE for the creator.
+You are the LEAD ANALYST and DAY TRADER: you form your own market thesis from the chart and direct what you want to see next.
+
+
+${fullName ? `TRADER: ${fullName}\n` : ""}MODE: THESIS (AI-LED)`
+
+  const mandate = `YOUR JOB
+1) Decide what the market is MOST LIKELY doing right now (trend / range / transition)
+2) State your primary directional thesis (bullish / bearish / neutral)
+3) Define the exact evidence that would CONFIRM your thesis
+4) Define the exact evidence that would INVALIDATE your thesis
+5) Provide 2–3 conditional scenarios (continuation / reversal / chop) with key levels
+6) Tell the user what chart views would improve confidence (higher timeframe, zoom out, indicators, session, etc.)
+MOST IMPORTANT: Let the user know when to buy and sell based on chart evidence alone.
+`
+
+  const analysisFramework = `ANALYSIS FRAMEWORK (USE WHAT'S VISIBLE)
+
+A) STRUCTURE FIRST
+- Identify swing highs/lows, HH/HL or LH/LL
+- Call out breaks of structure and key pivots
+- Identify range boundaries if applicable
+
+B) LEVELS & ZONES (ONLY IF CLEAR)
+- Prior day high/low if visible
+- Major swing levels
+- Clear support/resistance
+- If zones are ambiguous, don't label them
+
+C) MOMENTUM / PRICE ACTION
+- Displacement vs. grind
+- Acceptance vs. rejection around levels
+- Candle behavior (wicks, closes, follow-through)
+
+D) CONFIDENCE RULE
+- Confidence must match evidence.
+- If higher timeframe is not shown, say: "HTF not visible — confidence capped."
+
+E) NO INVENTING
+- Do not claim order flow, institutional activity, liquidity sweeps, news catalysts unless clearly shown/provided.`
+
+  const output = `OUTPUT FORMAT
+
+MARKET STATE:
+- Trend/Range/Transition:
+- Primary thesis (Bullish/Bearish/Neutral):
+- Why (3–6 bullets, chart-based only):
+
+KEY LEVELS I CARE ABOUT:
+- Level 1:
+- Level 2:
+- Level 3:
+- "Line in the sand" (invalidation):
+
+WHAT I WANT TO SEE NEXT (CONFIRMATION CHECKLIST):
+- ✅ #1
+- ✅ #2
+- ✅ #3
+
+WHAT WOULD CHANGE MY MIND (INVALIDATION):
+- ❌ #1
+- ❌ #2
+
+SCENARIOS (CONDITIONAL, NOT INSTRUCTIONS):
+1) Continuation scenario:
+   - Trigger:
+   - Path / targets (logical levels):
+   - Failure point:
+
+2) Reversal scenario:
+   - Trigger:
+   - Path / targets:
+   - Failure point:
+
+3) Chop / no-edge scenario (if applicable):
+   - Signs it's chop:
+   - What I need before having edge:
+
+NEXT INFO TO REQUEST (IF NEEDED):
+- (e.g., zoomed-out view, higher timeframe, indicator values, session time, volume visible, etc.)`
+
+  const style = `STYLE
+- Direct, decisive, and structured.
+- No fluff, no hype, no urgency.
+- If edge is weak: say "No clear edge — stand aside."`
+
+  return [header, mandate, analysisFramework, output, style].join("\n\n")
+}
+
 function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams): string {
-  const tier: PlanTier = profile?.plan === "pro" ? "pro" : "free"
+  const tier: PlanTier = profile?.plan === "admin" ? "admin" : profile?.plan === "pro" ? "pro" : "free"
+
+  // Admin tier gets a completely different prompt with market thesis analysis
+  if (tier === "admin") {
+    return buildAdminPrompt({ fullName })
+  }
 
   const header = `You are Snapchart — a sharp trading coach focused on discipline.
 You do not provide signals, entries, or exits.
@@ -286,9 +388,9 @@ export async function POST(request: NextRequest) {
 
     // 4. Define usage limits based on plan
     const limits = {
-      maxMessages: profile.plan === 'pro' ? 200 : 15,
-      maxScreenshots: profile.plan === 'pro' ? 50 : 5,
-      maxFavoritesInContext: profile.plan === 'pro' ? 20 : 3
+      maxMessages: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 200 : 15,
+      maxScreenshots: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 50 : 5,
+      maxFavoritesInContext: profile.plan === 'admin' ? 100 : profile.plan === 'pro' ? 20 : 3
     }
 
     // 5. Check usage limits
@@ -399,7 +501,7 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // Add conversation history if provided (limit based on plan to control token usage)
     if (validatedRequest.conversationHistory) {
-      const historyLimit = profile.plan === 'pro' ? 20 : 10 // Free gets less history
+      const historyLimit = profile.plan === 'admin' ? 50 : profile.plan === 'pro' ? 20 : 10
       const limitedHistory = validatedRequest.conversationHistory.slice(-historyLimit)
       messages.push(...limitedHistory)
     }
@@ -412,7 +514,7 @@ Use for time-based coaching when they ask about the next candle or how long they
         : "Current chart:"
       
       // Use auto-res for free plan (~765 tokens, much better readability), high-res for pro (full detail)
-      const imageDetail = profile.plan === 'pro' ? 'high' : 'auto'
+      const imageDetail = profile.plan === 'admin' || profile.plan === 'pro' ? 'high' : 'auto'
       
       messages.push({
         role: "user",
@@ -436,10 +538,10 @@ Use for time-based coaching when they ask about the next candle or how long they
     }
 
     // 4. Call OpenAI with plan-based model selection
-    const model = profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
+    const model = profile.plan === 'admin' || profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
     
     // Different token limits based on plan
-    const maxTokens = profile.plan === 'pro' ? 3000 : 2000
+    const maxTokens = profile.plan === 'admin' ? 4000 : profile.plan === 'pro' ? 3000 : 2000
     
     // Some models (like gpt-5-mini) don't support custom temperature
     const completionParams: any = {

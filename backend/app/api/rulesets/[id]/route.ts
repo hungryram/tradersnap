@@ -83,7 +83,7 @@ export async function PATCH(
       .single()
 
     const userPlan = profile?.plan || "free"
-    const maxRulesLength = userPlan === "pro" ? 5000 : 1000
+    const maxRulesLength = userPlan === "admin" ? 10000 : userPlan === "pro" ? 5000 : 1000
 
     const body = await request.json()
     const validated = updateRulesetSchema.parse(body)
