@@ -475,7 +475,7 @@ Use for time-based coaching when they ask about the next candle or how long they
         : "Current chart:"
       
       // Use auto-res for free plan (~765 tokens, much better readability), high-res for pro (full detail)
-      const imageDetail = profile.plan === 'admin' || profile.plan === 'pro' ? 'high' : 'auto'
+      const imageDetail = profile.plan === 'admin' || profile.plan === 'pro' ? 'high' : 'high'
       
       messages.push({
         role: "user",
