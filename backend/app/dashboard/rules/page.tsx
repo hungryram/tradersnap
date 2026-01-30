@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import { RULE_TEMPLATES, type RuleTemplate } from "@/lib/rule-templates"
 import DashboardNav from "../components/DashboardNav"
 
 interface Ruleset {
@@ -25,10 +26,20 @@ export default function RulesPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [userPlan, setUserPlan] = useState<string>("free")
+  const [showTemplates, setShowTemplates] = useState(false)
 
   useEffect(() => {
     checkAuthAndLoad()
   }, [])
+
+  function applyTemplate(template: RuleTemplate) {
+    setRulesText(template.rules)
+    if (!rulesetName || rulesetName === currentRuleset?.name) {
+      setRulesetName(template.name)
+    }
+    setSuccess(`Template "${template.name}" applied! Customize it to match your style.`)
+    setTimeout(() => setSuccess(null), 5000)
+  }
 
   async function checkAuthAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -295,6 +306,41 @@ export default function RulesPage() {
                 <p className="pt-2 border-t border-slate-200 mt-3">
                   💡 <strong>Multiple Rulesets:</strong> Create different rulesets for different strategies or market conditions. Select one as your <strong>primary ruleset</strong> for your AI Coach to follow.
                 </p>
+                <div className="pt-3 border-t border-slate-200 mt-3">
+                  <p className="font-medium text-slate-700 mb-2">Ready to use Snapchart? Open your platform:</p>
+                  <div className="flex flex-wrap gap-3">
+                    <a
+                      href="https://www.tradingview.com/chart"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-md text-slate-700 hover:text-blue-700 px-4 py-2.5 rounded-lg transition-all"
+                      title="Open TradingView"
+                    >
+                      <img src="/platforms/tradingview.svg" alt="TradingView" className="w-5 h-5" />
+                      <span className="text-sm font-medium">TradingView</span>
+                    </a>
+                    <a
+                      href="https://trader.tradovate.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-md text-slate-700 hover:text-blue-700 px-4 py-2.5 rounded-lg transition-all"
+                      title="Open Tradovate"
+                    >
+                      <img src="/platforms/tradovate.png" alt="Tradovate" className="w-5 h-5" />
+                      <span className="text-sm font-medium">Tradovate</span>
+                    </a>
+                    <a
+                      href="https://www.topstepx.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-md text-slate-700 hover:text-blue-700 px-4 py-2.5 rounded-lg transition-all"
+                      title="Open TopstepX"
+                    >
+                      <img src="/platforms/topstep.png" alt="TopstepX" className="w-5 h-5" />
+                      <span className="text-sm font-medium">TopstepX</span>
+                    </a>
+                  </div>
+                </div>
               </div>
               {userPlan && (
                 <p className="text-sm text-slate-500 mt-2">
@@ -302,14 +348,6 @@ export default function RulesPage() {
                 </p>
               )}
             </div>
-            {currentRuleset && rulesets.length > 1 && !currentRuleset.is_primary && (
-              <button
-                onClick={() => handleDelete(currentRuleset.id)}
-                className="text-red-600 hover:text-red-700 text-sm px-3 py-1 border border-red-300 rounded hover:bg-red-50"
-              >
-                🗑️ Delete Ruleset
-              </button>
-            )}
           </div>
 
           {!currentRuleset ? (
@@ -386,18 +424,58 @@ export default function RulesPage() {
               </div>
 
               <div>
-                <label htmlFor="rules" className="block text-sm font-medium text-slate-700 mb-2">
-                  Rules
-                  <span className="text-slate-500 text-xs ml-2">
-                    ({rulesText.length}/{userPlan === 'pro' ? 5000 : 1000} characters)
-                  </span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="rules" className="block text-sm font-medium text-slate-700">
+                    Rules
+                    <span className="text-slate-500 text-xs ml-2">
+                      ({rulesText.length}/{userPlan === 'pro' ? 5000 : 1000} characters)
+                    </span>
+                  </label>
+                  <button
+                    onClick={() => setShowTemplates(!showTemplates)}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    {showTemplates ? "Hide Templates" : "Use Template"}
+                  </button>
+                </div>
+
+                {showTemplates && (
+                  <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    {RULE_TEMPLATES.map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => applyTemplate(template)}
+                        className="text-left p-3 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-sm rounded-lg transition-all"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-900 text-sm">
+                            {template.name}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            template.category === 'beginner' ? 'bg-green-100 text-green-700' :
+                            template.category === 'trend' ? 'bg-blue-100 text-blue-700' :
+                            template.category === 'structure' ? 'bg-purple-100 text-purple-700' :
+                            template.category === 'mean-reversion' ? 'bg-orange-100 text-orange-700' :
+                            'bg-pink-100 text-pink-700'
+                          }`}>
+                            {template.category === 'mean-reversion' ? 'mean reversion' : template.category}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          {template.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <textarea
                   id="rules"
                   value={rulesText}
                   onChange={(e) => setRulesText(e.target.value)}
                   maxLength={userPlan === 'pro' ? 5000 : 1000}
                   rows={16}
+                  placeholder="Enter your trading rules here, or click 'Use Template' above to get started..."
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                 />
               </div>
@@ -440,6 +518,16 @@ export default function RulesPage() {
                 >
                   Save as New
                 </button>
+
+                {rulesets.length > 1 && !currentRuleset.is_primary && (
+                  <button
+                    onClick={() => handleDelete(currentRuleset.id)}
+                    disabled={isSaving}
+                    className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium px-6 py-2 rounded-lg ml-auto"
+                  >
+                    🗑️ Delete
+                  </button>
+                )}
               </div>
             </div>
           )}        </div>

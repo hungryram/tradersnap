@@ -248,7 +248,7 @@ export default function SavedMessagesPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Saved Messages</h1>
             <p className="text-slate-600 text-sm">
-              Messages you've favorited for the AI to remember
+              Messages you've favorited from your chats with Snapchart. Save important insights for easy access.
             </p>
           </div>
           <div className="text-right">

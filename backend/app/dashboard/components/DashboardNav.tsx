@@ -22,12 +22,12 @@ export default function DashboardNav() {
   }
 
   const navLinks = [
+    { href: 'https://www.snapchartapp.com/', label: 'Home', external: true },
     { href: '/dashboard/rules', label: 'Rules' },
     { href: '/dashboard/saved-messages', label: 'Favorites' },
     { href: '/dashboard/guide', label: 'Start Here' },
     { href: '/dashboard/faq', label: 'FAQ' },
-    { href: 'https://snapchart.canny.io/', label: 'Feature Requests', external: true },
-    { href: 'https://snapchart.canny.io/bugs-and-issues', label: 'Report Issue', external: true },
+    { href: 'https://discord.com/invite/fuxFDEsDph', label: 'Discord', external: true, icon: '/discord.svg', cta: true },
     { href: '/dashboard/account', label: 'My Account' },
   ]
 
@@ -36,10 +36,10 @@ export default function DashboardNav() {
       <div className="max-w-5xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <a href="https://www.snapchartapp.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <img src="/icon.png" alt="Snapchart" className="w-8 h-8" />
             <h1 className="text-xl font-bold text-slate-900">Snapchart</h1>
-          </div>
+          </a>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-4">
@@ -50,8 +50,12 @@ export default function DashboardNav() {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-slate-600 hover:text-slate-900"
+                  className={link.cta 
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                    : "text-sm text-slate-600 hover:text-slate-900"
+                  }
                 >
+                  {link.icon && <img src={link.icon} alt="" className={link.cta ? "w-4 h-4 brightness-0 invert" : "w-4 h-4"} />}
                   {link.label}
                 </a>
               ) : (
@@ -110,9 +114,13 @@ export default function DashboardNav() {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-sm text-slate-600 hover:text-slate-900 py-2"
+                  className={link.cta
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors justify-center"
+                    : "block text-sm text-slate-600 hover:text-slate-900 py-2"
+                  }
                   onClick={() => setMobileMenuOpen(false)}
                 >
+                  {link.icon && <img src={link.icon} alt="" className={link.cta ? "w-4 h-4 brightness-0 invert" : "w-4 h-4"} />}
                   {link.label}
                 </a>
               ) : (

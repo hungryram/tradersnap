@@ -661,7 +661,7 @@ const TradingBuddyWidget = () => {
       if (!rulesetResponse.ok) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'No active ruleset found. Please set one in the dashboard.',
+          content: 'No active ruleset found. Please [set one in the dashboard](https://admin.snapchartapp.com/dashboard/rules).',
           timestamp: new Date()
         }])
         return
@@ -1488,7 +1488,7 @@ const TradingBuddyWidget = () => {
           onClick={() => setIsOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium flex items-center gap-2"
         >
-          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" />
+          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" onError={(e) => e.currentTarget.style.display = 'none'} />
           Snapchart
         </button>
       </div>
@@ -1548,7 +1548,7 @@ const TradingBuddyWidget = () => {
         <div data-snapchart-widget className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
           <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-dark-surface text-slate-100' : 'bg-white text-slate-900'}`}>
             <div className="flex items-center gap-3 mb-4">
-              <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" />
+              <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" onError={(e) => e.currentTarget.style.display = 'none'} />
               <h2 className="text-2xl font-bold">Welcome to Snapchart!</h2>
             </div>
             <p className={`mb-4 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -1611,7 +1611,7 @@ const TradingBuddyWidget = () => {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-1.5">
-            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" />
+            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" onError={(e) => e.currentTarget.style.display = 'none'} />
             <div className="text-sm font-medium text-white">Snapchart</div>
           </div>
           <div className="flex items-center gap-1 relative">

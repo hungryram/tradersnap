@@ -51,6 +51,7 @@
           "assets/icon128.png"
         ],
         "matches": [
+          "https://admin.snapchartapp.com/*",
           "https://www.tradingview.com/*",
           "https://tradingview.com/*",
           "https://*.tradingview.com/*",

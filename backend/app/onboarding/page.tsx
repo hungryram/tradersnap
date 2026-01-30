@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import { RULE_TEMPLATES, type RuleTemplate } from "@/lib/rule-templates"
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -12,10 +13,16 @@ export default function OnboardingPage() {
   const [rulesetName, setRulesetName] = useState("My Trading Rules")
   const [rulesText, setRulesText] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
 
   useEffect(() => {
     checkAuth()
   }, [])
+
+  function applyTemplate(template: RuleTemplate) {
+    setRulesText(template.rules)
+    setRulesetName(template.name)
+  }
 
   async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -35,6 +42,7 @@ export default function OnboardingPage() {
 
     if (response.ok) {
       const data = await response.json()
+      // Temporarily disabled to test templates
       if (data.user.onboarded) {
         router.push("/dashboard/rules")
         return
@@ -140,21 +148,62 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label htmlFor="rules" className="block text-sm font-medium text-slate-700 mb-2">
-                Your Trading Rules
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="rules" className="block text-sm font-medium text-slate-700">
+                  Your Trading Rules
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  {showTemplates ? "Hide Templates" : "📋 Use Template"}
+                </button>
+              </div>
+
+              {showTemplates && (
+                <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  {RULE_TEMPLATES.map((template, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => applyTemplate(template)}
+                      className="text-left p-3 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-sm rounded-lg transition-all"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-slate-900 text-sm">
+                          {template.name}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          template.category === 'beginner' ? 'bg-green-100 text-green-700' :
+                          template.category === 'trend' ? 'bg-blue-100 text-blue-700' :
+                          template.category === 'structure' ? 'bg-purple-100 text-purple-700' :
+                          template.category === 'mean-reversion' ? 'bg-orange-100 text-orange-700' :
+                          'bg-pink-100 text-pink-700'
+                        }`}>
+                          {template.category === 'mean-reversion' ? 'mean reversion' : template.category}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {template.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <textarea
                 id="rules"
                 value={rulesText}
                 onChange={(e) => setRulesText(e.target.value)}
-                placeholder="Enter your trading rules here. For example:
+                placeholder="Click 'Use Template' above to get started, or enter your own trading rules here.
 
+Example:
 - Only trade with the trend on higher timeframe
 - Wait for pullback to key support/resistance
 - Enter only after bullish/bearish confirmation candle
 - Stop loss below/above swing low/high
-- Risk max 1% per trade
-- Take profit at 1:2 or 1:3 R/R"
+- Risk max 1% per trade"
                 rows={12}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                 required
