@@ -26,24 +26,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    // Get user's profile with Stripe customer ID
+    // Get user profile for Stripe customer lookup/create fallback.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, email")
       .eq("id", user.id)
       .single()
 
-    if (!profile?.stripe_customer_id) {
-      return NextResponse.json(
-        { error: "No Stripe customer found" },
-        { status: 404 }
-      )
+    let customerId = profile?.stripe_customer_id || null
+
+    // Reconcile stale Stripe IDs (e.g., test/live mismatch), then create customer if needed.
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId)
+      } catch (err: any) {
+        if (err.code === "resource_missing") {
+          console.log(`Customer ${customerId} not found in Stripe, creating new one`)
+          customerId = null
+        } else {
+          throw err
+        }
+      }
     }
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email || profile?.email,
+        metadata: {
+          supabase_user_id: user.id
+        }
+      })
+
+      customerId = customer.id
+
+      await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", user.id)
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://admin.snapchartapp.com"
 
     // Create Stripe Customer Portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/account`
+      customer: customerId,
+      return_url: `${baseUrl}/dashboard/account`
     })
 
     return NextResponse.json({ url: session.url })

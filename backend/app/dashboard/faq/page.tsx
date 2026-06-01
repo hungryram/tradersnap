@@ -230,7 +230,7 @@ export default function FAQPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <a 
-              href="https://snapchart.canny.io/bugs-and-issues"
+              href="mailto:help@snapchartapp.com"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -238,7 +238,7 @@ export default function FAQPage() {
               Report an Issue
             </a>
             <a 
-              href="https://snapchart.canny.io/"
+              href="mailto:help@snapchartapp.com"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors border border-gray-300"

@@ -108,9 +108,12 @@ export default function AccountPage() {
         }
       )
 
-      if (!response.ok) throw new Error("Failed to create portal session")
-
       const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create portal session")
+      }
+
       window.open(data.url, '_blank')
       setIsLoadingPortal(false)
       
@@ -409,25 +412,85 @@ export default function AccountPage() {
           {/* Billing */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Billing</h2>
-            
-            {userData?.user.plan === "free" ? (
-              <>
-                <p className="text-sm text-slate-600 mb-4">
-                  Upgrade to Pro for 200 messages and 50 chart screenshots per day, plus 20 favorites in AI context.
-                </p>
-                <div className="flex gap-3">
+
+            <p className="text-sm text-slate-600 mb-4">
+              Start free and upgrade when you need more.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`rounded-xl border p-5 ${userData?.user.plan === "free" ? "border-blue-300 bg-blue-50" : "border-slate-200"}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold text-slate-900">Free</h3>
+                  {userData?.user.plan === "free" && (
+                    <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      Current plan
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-3xl font-bold text-slate-900">$0<span className="text-base font-medium text-slate-600">/month</span></p>
+
+                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  <li>15 messages/day</li>
+                  <li>5 screenshots/day</li>
+                  <li>GPT-5 Mini model</li>
+                  <li>Lower quality screenshots</li>
+                  <li>3 favorited messages</li>
+                  <li>3 rulesets</li>
+                </ul>
+
+                <button
+                  disabled
+                  className="mt-5 w-full border border-slate-300 text-slate-500 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
+                >
+                  {userData?.user.plan === "free" ? "Current Plan" : "Free Plan"}
+                </button>
+              </div>
+
+              <div className={`rounded-xl border p-5 ${userData?.user.plan === "pro" ? "border-blue-500 bg-blue-50" : "border-blue-300"}`}>
+                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                  <h3 className="text-lg font-semibold text-slate-900">Pro</h3>
+                  <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                    Limited-time launch discount - 61% OFF
+                  </span>
+                </div>
+
+                <div className="mb-1 text-sm text-slate-500 line-through">$49/month</div>
+                <p className="text-3xl font-bold text-slate-900">$19<span className="text-base font-medium text-slate-600">/month</span></p>
+                <p className="text-sm font-medium text-green-700 mt-1">You save $30 every month</p>
+
+                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  <li>200 messages/day</li>
+                  <li>50 screenshots/day</li>
+                  <li>Latest GPT-5.1 model</li>
+                  <li>High quality screenshots for better accuracy</li>
+                  <li>More detailed analysis</li>
+                  <li>20 favorited messages</li>
+                  <li>20 rulesets</li>
+                </ul>
+
+                {userData?.user.plan === "free" ? (
                   <button
                     onClick={upgradeToProPlan}
                     disabled={isLoadingPortal}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
+                    className="mt-5 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium"
                   >
-                    {isLoadingPortal ? "Loading..." : "Upgrade to Pro"}
+                    {isLoadingPortal ? "Loading..." : "Upgrade to Pro ($19/mo)"}
                   </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-slate-600 mb-4">
+                ) : (
+                  <button
+                    disabled
+                    className="mt-5 w-full border border-slate-300 text-slate-500 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
+                  >
+                    Current Plan
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {userData?.user.plan === "pro" && (
+              <div className="mt-5">
+                <p className="text-sm text-slate-600 mb-3">
                   Manage your subscription, payment methods, and billing history.
                 </p>
                 <button
@@ -437,8 +500,12 @@ export default function AccountPage() {
                 >
                   {isLoadingPortal ? "Loading..." : "Manage Billing"}
                 </button>
-              </>
+              </div>
             )}
+
+            <p className="text-xs text-slate-500 mt-4">
+              Daily usage limits reset at midnight UTC. Pricing may change after beta based on feedback.
+            </p>
           </div>
 
           {/* Extension */}
@@ -448,8 +515,9 @@ export default function AccountPage() {
               Install the Snapchart extension to analyze your charts.
             </p>
             <a
-              href="chrome://extensions"
+              href="https://chromewebstore.google.com/detail/snapchart-trading-psychol/bppbpeodpbepcmjifjjihejcnofdnibe"
               className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
+              target="_blank"
             >
               Open Extensions Page
             </a>
