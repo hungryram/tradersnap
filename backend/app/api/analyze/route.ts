@@ -1,80 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
-import OpenAI from "openai"
+import { analyzeChart } from "@/lib/llm"
+import { analysisResponseSchema } from "@/lib/analysis-schema"
+import { consumeUsage, getLimits, refundUsage } from "@/lib/usage"
+import { signChartToken } from "@/lib/chart-token"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
 // Request validation schema
 const analyzeRequestSchema = z.object({
   rulesetId: z.string().uuid(),
   sessionId: z.string().uuid().optional(),
   context: z.object({
-    symbol: z.string().optional(),
-    timeframe: z.string().optional(),
-    notes: z.string().optional()
+    symbol: z.string().max(50).optional(),
+    timeframe: z.string().max(20).optional(),
+    notes: z.string().max(1000).optional()
   }).optional(),
-  image: z.string().regex(/^data:image\/(png|jpeg|jpg);base64,/)
-})
-
-// Response schema
-const analysisResponseSchema = z.object({
-  setup_status: z.enum(["aligned", "incomplete", "violated"]),
-  rule_checks: z.array(z.object({
-    rule: z.string(),
-    status: z.enum(["pass", "fail", "unclear"]),
-    note: z.string().optional()
-  })).optional(),
-  validity_estimate: z.object({
-    percent_range: z.tuple([z.number(), z.number()]),
-    confidence: z.enum(["low", "medium", "high"]),
-    reason: z.string()
-  }).nullable(),
-  summary: z.string(),
-  bullets: z.array(z.string()),
-  levels_to_watch: z.array(z.object({
-    label: z.string(),
-    type: z.enum(["support", "resistance", "structure", "invalidation", "trendline", "breakout_level", "consolidation"]),
-    relative_location: z.string(),
-    when_observed: z.string(),
-    why_it_matters: z.string(),
-    confidence: z.enum(["low", "medium", "high"])
-  })),
-  rule_violations: z.array(z.string()),
-  missing_confirmations: z.array(z.string()),
-  behavioral_nudge: z.string(),
-  follow_up_questions: z.array(z.string()).optional(),
-  drawings: z.array(z.union([
-    z.object({
-      type: z.literal("trendline"),
-      anchors: z.array(z.object({
-        x_rel: z.number().min(0).max(1),
-        price: z.number()
-      })).length(2),
-      label: z.string(),
-      color: z.enum(["blue", "red", "green", "yellow", "purple"]),
-      style: z.enum(["solid", "dashed"]).optional(),
-      confidence: z.enum(["low", "medium", "high"]).optional()
-    }),
-    z.object({
-      type: z.literal("zone"),
-      x_start_rel: z.number().min(0).max(1),
-      x_end_rel: z.number().min(0).max(1),
-      price_min: z.number(),
-      price_max: z.number(),
-      label: z.string(),
-      color: z.enum(["blue", "red", "green", "yellow", "purple"]),
-      style: z.enum(["solid", "dashed"]).optional(),
-      confidence: z.enum(["low", "medium", "high"]).optional()
-    })
-  ])).optional()
+  image: z.string().max(8_000_000).regex(/^data:image\/(png|jpeg|jpg);base64,/)
 })
 
 // Helper to add CORS headers
@@ -93,8 +39,12 @@ export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(response, origin)
 }
 
+const screenshotCost = { messages: 0, screenshots: 1 }
+
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin")
+  // Set once usage is reserved; cleared on success. Any failure after that refunds it.
+  let refundUserId: string | null = null
   
   try {
     // 1. Validate JWT from Authorization header
@@ -115,10 +65,10 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 2. Fetch user profile with usage data
+    // 2. Fetch user plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, message_count, screenshot_count, usage_reset_date')
+      .select('plan')
       .eq('id', user.id)
       .single()
 
@@ -128,44 +78,11 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // Check if usage needs to be reset
-    const today = new Date().toISOString().split('T')[0]
-    if (profile.usage_reset_date < today) {
-      await supabase
-        .from('profiles')
-        .update({ 
-          message_count: 0, 
-          screenshot_count: 0, 
-          usage_reset_date: today 
-        })
-        .eq('id', user.id)
-      profile.message_count = 0
-      profile.screenshot_count = 0
-    }
-
-    // 3. Check daily screenshot limit
-    const limits = {
-      maxScreenshots: profile.plan === 'pro' ? 50 : 5
-    }
-
-    if (profile.screenshot_count >= limits.maxScreenshots) {
-      const response = NextResponse.json({
-        error: "Daily screenshot limit reached",
-        message: profile.plan === 'pro'
-          ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-          : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
-        limit: limits.maxScreenshots,
-        current: profile.screenshot_count,
-        requiresUpgrade: profile.plan !== 'pro'
-      }, { status: 429 })
-      return addCorsHeaders(response, origin)
-    }
-
-    // 4. Parse and validate request body
+    // 3. Parse and validate request body
     const body = await request.json()
     const validatedRequest = analyzeRequestSchema.parse(body)
 
-    // 5. Fetch ruleset
+    // 4. Fetch ruleset
     const { data: ruleset } = await supabase
       .from("rulesets")
       .select("*")
@@ -178,7 +95,26 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // 6. Call OpenAI Vision API with base + tier modifier prompt
+    // 5. Atomically check + reserve one screenshot (refunded below if the analysis fails)
+    const limits = getLimits(profile.plan)
+    const usage = await consumeUsage(supabase, user.id, screenshotCost, limits)
+
+    if (!usage.allowed) {
+      const isPaid = profile.plan === 'pro' || profile.plan === 'admin'
+      const response = NextResponse.json({
+        error: "Daily screenshot limit reached",
+        message: isPaid
+          ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
+          : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
+        limit: limits.maxScreenshots,
+        current: usage.screenshots,
+        requiresUpgrade: !isPaid
+      }, { status: 429 })
+      return addCorsHeaders(response, origin)
+    }
+    refundUserId = user.id
+
+    // 6. Build base + tier modifier prompt
     const basePrompt = `You are a sharp, experienced trading coach.
 You enforce discipline.
 You are NOT a signal service.
@@ -259,6 +195,7 @@ OUTPUT (JSON ONLY)
 Return ONLY valid JSON. No markdown. No extra text.
 
 {
+  "chart_readable": true | false,  // false ONLY if the image is not a price chart or is too unclear to analyze at all
   "setup_status": "aligned" | "incomplete" | "violated",
   "rule_checks": [{
     "rule": "Brief description of the specific rule criterion",
@@ -340,62 +277,18 @@ LIMITS:
 
     const coachingPrompt = basePrompt + tierModifier
 
-    // Use auto-res for free plan (~765 tokens, much better readability), high-res for pro (full detail)
-    const imageDetail = profile.plan === 'pro' ? 'high' : 'auto'
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      messages: [
-        { role: "system", content: coachingPrompt },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: validatedRequest.image,
-                detail: imageDetail
-              }
-            },
-            { type: "text", text: "Analyze this chart." }
-          ]
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 1500
+    // Provider + model selection live in lib/llm
+    const aiResponse = await analyzeChart({
+      system: coachingPrompt,
+      image: validatedRequest.image,
+      prompt: "Analyze this chart.",
+      schema: analysisResponseSchema,
+      plan: profile.plan
     })
-
-    const aiResponse = JSON.parse(completion.choices[0].message.content || "{}")
     const validatedResponse = analysisResponseSchema.parse(aiResponse)
 
-    // Check if AI couldn't read the chart properly
-    const cantReadIndicators = [
-      'unable to read',
-      'cannot read',
-      'can\'t see',
-      'cannot see',
-      'too blurry',
-      'zoom in',
-      'unclear image',
-      'image quality',
-      'clean up chart',
-      'remove indicators',
-      'hard to read',
-      'difficult to read',
-      'unclear chart',
-      'lacks visible',
-      'not visible',
-      'not displayed',
-      'is absent',
-      'are absent',
-      'no visible',
-      'information is absent',
-      'lacks candlestick',
-      'lacks price action'
-    ]
-    
-    const responseText = `${validatedResponse.summary} ${validatedResponse.bullets.join(' ')}`.toLowerCase()
-    const chartUnreadable = cantReadIndicators.some(indicator => responseText.includes(indicator))
+    // Unreadable charts don't count towards usage (reported by the model as a structured field)
+    const chartUnreadable = validatedResponse.chart_readable === false
 
     // Map setup_status to verdict for backward compatibility
     const verdict = validatedResponse.setup_status === 'aligned' ? 'pass'
@@ -424,6 +317,8 @@ LIMITS:
 
     if (messagesError) {
       console.error('[Analyze API] Failed to save messages:', messagesError)
+      await refundUsage(supabase, user.id, screenshotCost)
+      refundUserId = null
       const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
       return addCorsHeaders(response, origin)
     }
@@ -434,6 +329,8 @@ LIMITS:
 
     if (!userMsg || !assistantMsg) {
       console.error('[Analyze API] Failed to retrieve message IDs')
+      await refundUsage(supabase, user.id, screenshotCost)
+      refundUserId = null
       const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
       return addCorsHeaders(response, origin)
     }
@@ -449,26 +346,18 @@ LIMITS:
 
     if (insertError) {
       console.error('[Analyze API] Failed to save analysis:', insertError)
+      await refundUsage(supabase, user.id, screenshotCost)
+      refundUserId = null
       const response = NextResponse.json({ error: "Failed to save analysis" }, { status: 500 })
       return addCorsHeaders(response, origin)
     }
 
-    // Only increment counter if everything succeeded AND chart was readable
-    if (!chartUnreadable) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          screenshot_count: profile.screenshot_count + 1
-        })
-        .eq('id', user.id)
-
-      if (updateError) {
-        console.error('[Analyze API] Failed to increment counter:', updateError)
-        // Don't fail the request - analysis already succeeded
-      }
-    } else {
+    // Usage was reserved up front; give it back if the chart was unreadable
+    if (chartUnreadable) {
       console.log('[Analyze API] Chart unreadable - not counting towards usage')
+      await refundUsage(supabase, user.id, screenshotCost)
     }
+    refundUserId = null
 
     // Include ruleset name and message IDs in response
     const responseWithRuleset = {
@@ -476,7 +365,9 @@ LIMITS:
       ruleset_name: ruleset.name,
       userMessageId: userMsg.id,
       assistantMessageId: assistantMsg.id,
-      chartUnreadable: chartUnreadable || undefined
+      chartUnreadable: chartUnreadable || undefined,
+      // Lets the extension re-send this exact image as follow-up context without being charged again
+      chartToken: signChartToken(user.id, validatedRequest.image)
     }
 
     const response = NextResponse.json(responseWithRuleset)
@@ -484,6 +375,10 @@ LIMITS:
 
   } catch (error) {
     console.error("Analysis error:", error)
+
+    if (refundUserId) {
+      await refundUsage(supabase, refundUserId, screenshotCost)
+    }
     
     if (error instanceof z.ZodError) {
       const response = NextResponse.json(

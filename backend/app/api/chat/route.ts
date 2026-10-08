@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
-import OpenAI from "openai"
+import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
+import { consumeUsage, getLimits, refundUsage, type UsageCost } from "@/lib/usage"
+import { verifyChartToken } from "@/lib/chart-token"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
 
 // Coaching prompt builder with type safety
 type PlanTier = "admin" | "pro" | "free"
@@ -244,14 +242,15 @@ Waiting is a valid outcome.`
 }
 
 const chatRequestSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).max(4000),
   includeChart: z.boolean().optional(),
-  image: z.string().regex(/^data:image\/(png|jpeg|jpg);base64,/).optional(),
+  image: z.string().max(8_000_000).regex(/^data:image\/(png|jpeg|jpg);base64,/).optional(),
   isContextImage: z.boolean().optional(), // Flag to indicate image is from previous analysis
+  chartToken: z.string().max(100).optional(), // Server-issued proof the context image was already counted
   conversationHistory: z.array(z.object({
     role: z.enum(["user", "assistant"]),
-    content: z.string()
-  })).optional(),
+    content: z.string().max(8000)
+  })).max(50).optional(),
   timestamp: z.string().optional(), // ISO timestamp from client
   timezone: z.string().optional() // IANA timezone (e.g., "America/New_York")
 })
@@ -296,6 +295,8 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin")
+  // Set once usage is reserved; cleared on success. Any failure after that refunds it.
+  let reserved: { userId: string, cost: UsageCost } | null = null
   
   try {
     // 1. Validate JWT
@@ -317,7 +318,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user profile with usage data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, message_count, screenshot_count, usage_reset_date, first_name, last_name, total_tokens_used, total_input_tokens, total_output_tokens')
+      .select('plan, first_name, last_name, total_tokens_used, total_input_tokens, total_output_tokens')
       .eq('id', user.id)
       .single()
 
@@ -327,64 +328,51 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // Check if usage needs to be reset
-    const today = new Date().toISOString().split('T')[0]
-    if (profile.usage_reset_date < today) {
-      await supabase
-        .from('profiles')
-        .update({ 
-          message_count: 0, 
-          screenshot_count: 0, 
-          usage_reset_date: today 
-        })
-        .eq('id', user.id)
-      profile.message_count = 0
-      profile.screenshot_count = 0
-    }
-
     // 3. Parse request
     const body = await request.json()
     
     const validatedRequest = chatRequestSchema.parse(body)
 
     // 4. Define usage limits based on plan
-    const limits = {
-      maxMessages: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 200 : 15,
-      maxScreenshots: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 50 : 5,
-      maxFavoritesInContext: profile.plan === 'admin' ? 100 : profile.plan === 'pro' ? 20 : 3
+    const limits = getLimits(profile.plan)
+    const isPaid = profile.plan === 'pro' || profile.plan === 'admin'
+
+    // A context image is only free if it carries a valid token from /api/analyze.
+    // Without one, drop the image instead of charging (keeps older extension versions working).
+    if (validatedRequest.image && validatedRequest.isContextImage &&
+        !verifyChartToken(user.id, validatedRequest.image, validatedRequest.chartToken)) {
+      validatedRequest.image = undefined
     }
 
-    // 5. Check usage limits
     const hasImage = !!validatedRequest.image
     const isNewScreenshot = hasImage && !validatedRequest.isContextImage
-    
-    // Check message limit
-    if (profile.message_count >= limits.maxMessages) {
-      const response = NextResponse.json({
-        error: "Daily message limit reached",
-        message: profile.plan === 'pro' 
-          ? "You've reached your daily limit of 200 messages. Your limit resets at midnight UTC."
-          : "You've used all 15 free messages today. Upgrade to Pro for 200 messages/day and 50 chart analyses.",
-        limit: limits.maxMessages,
-        current: profile.message_count,
-        requiresUpgrade: profile.plan !== 'pro'
-      }, { status: 429 })
-      return addCorsHeaders(response, origin)
-    }
 
-    // Check screenshot limit (only for new screenshots, not context images)
-    if (isNewScreenshot && profile.screenshot_count >= limits.maxScreenshots) {
-      const response = NextResponse.json({
+    // 5. Atomically check + reserve usage (refunded below if the response fails)
+    const cost: UsageCost = { messages: 1, screenshots: isNewScreenshot ? 1 : 0 }
+    const quota = await consumeUsage(supabase, user.id, cost, limits)
+
+    if (!quota.allowed) {
+      const messageLimitHit = quota.messages >= limits.maxMessages
+      const response = NextResponse.json(messageLimitHit ? {
+        error: "Daily message limit reached",
+        message: isPaid
+          ? `You've reached your daily limit of ${limits.maxMessages} messages. Your limit resets at midnight UTC.`
+          : `You've used all ${limits.maxMessages} free messages today. Upgrade to Pro for ${getLimits('pro').maxMessages} messages/day and ${getLimits('pro').maxScreenshots} chart analyses.`,
+        limit: limits.maxMessages,
+        current: quota.messages,
+        requiresUpgrade: !isPaid
+      } : {
         error: "Daily screenshot limit reached",
-        message: profile.plan === 'pro'
-          ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-          : "You've used all 5 free chart analyses today. Upgrade to Pro for 50 charts/day.",
+        message: isPaid
+          ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
+          : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
         limit: limits.maxScreenshots,
-        current: profile.screenshot_count,
-        requiresUpgrade: profile.plan !== 'pro'
+        current: quota.screenshots,
+        requiresUpgrade: !isPaid
       }, { status: 429 })
       return addCorsHeaders(response, origin)
     }
+    reserved = { userId: user.id, cost }
 
     // 6. Fetch user's ruleset (primary first, then any ruleset)
     let { data: ruleset } = await supabase
@@ -412,7 +400,7 @@ export async function POST(request: NextRequest) {
     const lastName = profile.last_name?.trim()
     const fullName = [firstName, lastName].filter(Boolean).join(' ')
 
-    // 4. Build conversation with system prompt using type-safe builder
+    // 7. Build conversation with system prompt using type-safe builder
     const coachingPrompt = buildCoachingPrompt({
       profile,
       fullName,
@@ -425,7 +413,7 @@ export async function POST(request: NextRequest) {
     // console.log('\n========== END PROMPT ==========\n')
 
     // Fetch favorited messages to include in context (limited by plan)
-    const { data: favoritedMessages, error: favoritesError } = await supabase
+    const { data: favoritedMessages } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('user_id', user.id)
@@ -433,176 +421,82 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false }) // Most recent first
       .limit(limits.maxFavoritesInContext) // 3 for free, 20 for pro
 
-    const messages: any[] = [
-      { role: "system", content: coachingPrompt }
-    ]
-
-    // Add time context for coaching
+    // Time context for coaching
+    let timeContext: string | null = null
     if (validatedRequest.timestamp && validatedRequest.timezone) {
       const clientTime = new Date(validatedRequest.timestamp)
-      const timeContext = `CURRENT TIME: ${clientTime.toLocaleString('en-US', { timeZone: validatedRequest.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
+      timeContext = `CURRENT TIME: ${clientTime.toLocaleString('en-US', { timeZone: validatedRequest.timezone, weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
 
 Use for time-based coaching when they ask about the next candle or how long they've been trading.`
-      
-      messages.push({
-        role: "system",
-        content: timeContext
-      })
     }
 
-    // Add favorited messages first (AI's persistent memory)
-    if (favoritedMessages && favoritedMessages.length > 0) {
-      const favoritedContext = `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
-      messages.push({
-        role: "system",
-        content: favoritedContext
-      })
-    } else {
-    }
+    // Favorited messages (AI's persistent memory)
+    const favoritedContext = favoritedMessages && favoritedMessages.length > 0
+      ? `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
+      : null
 
-    // Add conversation history if provided (limit based on plan to control token usage)
-    if (validatedRequest.conversationHistory) {
-      const historyLimit = profile.plan === 'admin' ? 50 : profile.plan === 'pro' ? 20 : 10
-      const limitedHistory = validatedRequest.conversationHistory.slice(-historyLimit)
-      messages.push(...limitedHistory)
-    }
+    // Conversation history (limit based on plan to control token usage)
+    const historyLimit = profile.plan === 'admin' ? 50 : profile.plan === 'pro' ? 20 : 10
+    const history = (validatedRequest.conversationHistory ?? []).slice(-historyLimit)
 
-    // Add current message
-    if (validatedRequest.image) {
-      // Message with chart image (either new capture or context from previous analysis)
-      const imageDescription = validatedRequest.isContextImage 
-        ? "Here's the chart I analyzed earlier:"
-        : "Current chart:"
-      
-      // Use auto-res for free plan (~765 tokens, much better readability), high-res for pro (full detail)
-      const imageDetail = profile.plan === 'admin' || profile.plan === 'pro' ? 'high' : 'high'
-      
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: `${imageDescription}\n\n${validatedRequest.message}` },
-          { 
-            type: "image_url", 
-            image_url: { 
-              url: validatedRequest.image,
-              detail: imageDetail
-            } 
-          }
-        ]
-      })
-    } else {
-      // Text-only message
-      messages.push({
-        role: "user",
-        content: validatedRequest.message
-      })
-    }
+    // Message with chart image (either new capture or context from previous analysis)
+    const imageDescription = validatedRequest.isContextImage
+      ? "Here's the chart I analyzed earlier:"
+      : "Current chart:"
+    const userMessage = validatedRequest.image
+      ? `${imageDescription}\n\n${validatedRequest.message}`
+      : validatedRequest.message
 
-    // 4. Call OpenAI with plan-based model selection
-    const model = profile.plan === 'admin' || profile.plan === 'pro' ? 'gpt-5.1' : 'gpt-5-mini'
-    
-    // Different token limits based on plan
-    const maxTokens = profile.plan === 'admin' ? 4000 : profile.plan === 'pro' ? 3000 : 2000
-    
-    // Some models (like gpt-5-mini) don't support custom temperature
-    const completionParams: any = {
-      model,
-      messages,
-      max_completion_tokens: maxTokens
-    }
-    
-    // Only add temperature for models that support it (gpt-5.1)
-    if (model === 'gpt-5.1') {
-      completionParams.temperature = 0.7
-      // Extended prompt caching (24h retention) for Pro users
-      // Significantly reduces cost and latency for repeated system prompts
-      completionParams.prompt_cache_retention = '24h'
-    }
-    
-    // Cache key based on user rules to group similar prompts together
-    // This improves cache hit rates when users have the same ruleset
-    const cacheKey = `v1:${profile.plan}:${ruleset?.id || 'norules'}`
-    completionParams.prompt_cache_key = cacheKey
-    
-    const completion = await openai.chat.completions.create(completionParams)
+    // 8. Call the model (provider + model selection live in lib/llm)
+    const result = await llmChat({
+      system: coachingPrompt,
+      memory: favoritedContext,
+      volatileContext: timeContext,
+      history,
+      message: userMessage,
+      image: validatedRequest.image,
+      plan: profile.plan,
+      // Cache key based on user rules to group similar prompts together
+      cacheKey: `v1:${profile.plan}:${ruleset?.id || 'norules'}`
+    })
 
-    // Check finish reason for better error messages
-    const finishReason = completion.choices[0]?.finish_reason
-    let aiResponse = completion.choices[0]?.message?.content
+    let aiResponse = result.text
     let responseFailed = false
     
     if (!aiResponse) {
       responseFailed = true // Don't count failed responses towards limits
+      console.error('[Chat API] Empty response from model:', {
+        provider: llmProvider,
+        model: result.model,
+        plan: profile.plan,
+        finishReason: result.finishReason
+      })
       // Provide helpful message based on why response failed
-      if (finishReason === 'length') {
+      if (result.finishReason === 'length') {
         aiResponse = profile.plan === 'pro'
           ? "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? I'm here to help!"
           : "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? (Pro users get longer responses for more detailed analysis)"
+      } else if (result.finishReason === 'refusal') {
+        aiResponse = "I can't help with that one. Try rephrasing, or ask about your chart and rules."
       } else {
         aiResponse = "I'm sorry, I couldn't generate a response. Please try again."
       }
     }
-    
-    // Check if AI couldn't read the chart properly (for screenshot tracking)
-    const cantReadIndicators = [
-      'unable to read',
-      'cannot read',
-      'can\'t see',
-      'cannot see',
-      'too blurry',
-      'zoom in',
-      'unclear image',
-      'image quality',
-      'clean up chart',
-      'remove indicators',
-      'hard to read',
-      'difficult to read',
-      'unclear chart',
-      'lacks visible',
-      'not visible',
-      'not displayed',
-      'is absent',
-      'are absent',
-      'no visible',
-      'information is absent',
-      'lacks candlestick',
-      'lacks price action'
-    ]
-    
-    const responseText = aiResponse.toLowerCase()
-    const chartUnreadable = isNewScreenshot && cantReadIndicators.some(indicator => responseText.includes(indicator))
-    
-    // Log if response is empty
-    if (!completion.choices[0]?.message?.content) {
-      console.error('[Chat API] Empty response from OpenAI:', {
-        model,
-        plan: profile.plan,
-        finishReason: completion.choices[0]?.finish_reason,
-        choices: completion.choices.length,
-        hasContent: !!completion.choices[0]?.message?.content
-      })
-    }
 
-    // Track token usage (model-agnostic - check OpenAI dashboard for actual costs)
-    const usage = completion.usage
+    // Track token usage (check the provider dashboard for actual costs)
+    const usage = result.usage
     if (usage) {
-      const cachedTokens = usage.prompt_tokens_details?.cached_tokens || 0
-      const cacheHitRate = usage.prompt_tokens > 0 ? ((cachedTokens / usage.prompt_tokens) * 100).toFixed(1) : '0'
-      
-      // console.log(`[OpenAI Usage] User: ${user.email} | Model: ${model} | Plan: ${profile.plan} | Tokens: ${usage.total_tokens} (in: ${usage.prompt_tokens}, out: ${usage.completion_tokens}) | Cached: ${cachedTokens} (${cacheHitRate}%)`)
-
-      // Update user's token usage in profile
       await supabase
         .from('profiles')
         .update({
-          total_tokens_used: profile.total_tokens_used ? profile.total_tokens_used + usage.total_tokens : usage.total_tokens,
-          total_input_tokens: profile.total_input_tokens ? profile.total_input_tokens + usage.prompt_tokens : usage.prompt_tokens,
-          total_output_tokens: profile.total_output_tokens ? profile.total_output_tokens + usage.completion_tokens : usage.completion_tokens
+          total_tokens_used: (profile.total_tokens_used || 0) + usage.totalTokens,
+          total_input_tokens: (profile.total_input_tokens || 0) + usage.inputTokens,
+          total_output_tokens: (profile.total_output_tokens || 0) + usage.outputTokens
         })
         .eq('id', user.id)
     }
 
-    // 5. Save messages to database for audit trail
+    // 9. Save messages to database for audit trail
     let userMessageId: string | null = null
     let assistantMessageId: string | null = null
     
@@ -641,7 +535,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       // Continue anyway - chat works even if audit trail fails
     }
 
-    // 6. Check if AI recommended a timeout
+    // 10. Check if AI recommended a timeout
     let action = null
     const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(\d+)/)
     if (timeoutMatch) {
@@ -653,40 +547,22 @@ Use for time-based coaching when they ask about the next candle or how long they
       }
     }
 
-    // 7. Increment usage counters (don't count screenshot if chart was unreadable or if response failed)
-    const shouldCountScreenshot = isNewScreenshot && !chartUnreadable
-    
-    // Only increment counters if the response was successful
-    if (!responseFailed) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          message_count: profile.message_count + 1,
-          screenshot_count: shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count
-        })
-        .eq('id', user.id)
-
-      if (updateError) {
-        console.error('[Chat API] Failed to update usage counters:', updateError)
-      }
-
-      if (chartUnreadable) {
-        console.log('[Chat API] Chart unreadable - not counting towards usage')
-      }
-    } else {
+    // 11. Usage was reserved up front; give it back if the response failed
+    if (responseFailed) {
       console.log('[Chat API] Response failed - not counting towards usage limits')
+      await refundUsage(supabase, user.id, cost)
     }
+    reserved = null
 
-    // 8. Return response with message IDs and action
+    // 12. Return response with message IDs and action
     const response = NextResponse.json({ 
       message: aiResponse,
       userMessageId,
       assistantMessageId,
       action,
-      chartUnreadable: chartUnreadable || undefined,
       usage: {
-        messages: responseFailed ? profile.message_count : profile.message_count + 1,
-        screenshots: responseFailed ? profile.screenshot_count : (shouldCountScreenshot ? profile.screenshot_count + 1 : profile.screenshot_count),
+        messages: responseFailed ? quota.messages - cost.messages : quota.messages,
+        screenshots: responseFailed ? quota.screenshots - cost.screenshots : quota.screenshots,
         limits: limits
       }
     })
@@ -694,6 +570,10 @@ Use for time-based coaching when they ask about the next candle or how long they
 
   } catch (error) {
     console.error("Chat error:", error)
+
+    if (reserved) {
+      await refundUsage(supabase, reserved.userId, reserved.cost)
+    }
     
     if (error instanceof z.ZodError) {
       console.error('[Chat API] Validation errors:', JSON.stringify(error.issues, null, 2))

@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { timingSafeEqual } from "crypto"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Simple admin key check (set ADMIN_SECRET in your env)
-const ADMIN_SECRET = process.env.ADMIN_SECRET || "change-me-in-production"
+// Simple admin key check (set ADMIN_SECRET in your env). No fallback: unset means disabled.
+const ADMIN_SECRET = process.env.ADMIN_SECRET
+
+function isAdminSecret(token: string) {
+  if (!ADMIN_SECRET) return false
+  const expected = Buffer.from(ADMIN_SECRET)
+  const received = Buffer.from(token)
+  return expected.length === received.length && timingSafeEqual(expected, received)
+}
 
 // GET /api/admin/usage - View token usage by user
 export async function GET(request: NextRequest) {
@@ -21,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.substring(7)
     
-    if (token !== ADMIN_SECRET) {
+    if (!isAdminSecret(token)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

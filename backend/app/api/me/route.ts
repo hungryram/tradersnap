@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { getLimits } from "@/lib/usage"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -127,10 +128,11 @@ export async function GET(request: NextRequest) {
       .single()
 
     // Get current usage from profile (new daily tracking system)
+    const planLimits = getLimits(profile.plan)
     const limits = {
-      maxMessages: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 200 : 15,
-      maxScreenshots: profile.plan === 'admin' ? 999999 : profile.plan === 'pro' ? 50 : 5,
-      maxFavorites: profile.plan === 'admin' ? 100 : profile.plan === 'pro' ? 20 : 3
+      maxMessages: planLimits.maxMessages,
+      maxScreenshots: planLimits.maxScreenshots,
+      maxFavorites: planLimits.maxFavoritesInContext
     }
 
     // Count actual favorited messages

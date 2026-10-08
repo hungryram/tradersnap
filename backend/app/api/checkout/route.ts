@@ -27,13 +27,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    const { priceId, plan } = await request.json()
+    // Price and plan are decided server-side; never trust the client for either
+    const priceId = process.env.STRIPE_PRICE_ID_PRO || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO
+    const plan = "pro"
 
-    if (!priceId || !plan) {
-      return NextResponse.json(
-        { error: "Missing priceId or plan" },
-        { status: 400 }
-      )
+    if (!priceId) {
+      console.error("Checkout error: STRIPE_PRICE_ID_PRO is not configured")
+      return NextResponse.json({ error: "Checkout unavailable" }, { status: 500 })
     }
 
     // Get user's profile to check for existing Stripe customer

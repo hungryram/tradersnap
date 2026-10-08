@@ -69,6 +69,7 @@ const TradingBuddyWidget = () => {
   const [inputText, setInputText] = useState("")
   const [isSending, setIsSending] = useState(false)
   const [lastChartImage, setLastChartImage] = useState<string | null>(null)
+  const [lastChartToken, setLastChartToken] = useState<string | null>(null)
   const [size, setSize] = useState({ width: 384, height: 600 })
   const [isResizing, setIsResizing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -713,6 +714,7 @@ const TradingBuddyWidget = () => {
 
       const chartImage = screenshotResponse.dataUrl
       setLastChartImage(chartImage)
+      setLastChartToken(null)
       analytics.chartUploaded('screenshot', { sessionId: session?.id })
 
       // Add user message
@@ -752,6 +754,7 @@ const TradingBuddyWidget = () => {
       }
 
       const analysis = await analyzeResponse.json()
+      setLastChartToken(analysis.chartToken || null)
       analytics.analysisFinished(analysis.setup_status || 'unknown', { sessionId: session?.id })
 
       // Update user message with database ID
@@ -1157,6 +1160,7 @@ const TradingBuddyWidget = () => {
         // Include last chart for context in follow-up questions
         requestBody.image = lastChartImage
         requestBody.isContextImage = true
+        requestBody.chartToken = lastChartToken
       }
       
       // Create abort controller for this request

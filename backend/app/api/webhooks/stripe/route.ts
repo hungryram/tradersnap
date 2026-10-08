@@ -11,6 +11,41 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Map a Stripe price to a plan using server-side config only.
+// Returns null for unknown prices so we never grant a plan we didn't sell.
+function planForPrice(price: Stripe.Price): string | null {
+  const proPriceIds = [process.env.STRIPE_PRICE_ID_PRO, process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO].filter(Boolean)
+  if (proPriceIds.includes(price.id) || price.lookup_key === "pro") return "pro"
+  return null
+}
+
+// Plan changes from Stripe never touch admin accounts (admin is set manually in SQL)
+const NOT_ADMIN = "plan.is.null,plan.neq.admin"
+
+async function syncSubscription(subscription: Stripe.Subscription) {
+  const updates: Record<string, string> = {
+    subscription_status: subscription.status
+  }
+
+  // Keep pro plan active even if cancel_at_period_end is true
+  // Only downgrade when subscription.deleted fires at period end
+  if (subscription.status === "active" || subscription.status === "trialing") {
+    const price = subscription.items.data[0]?.price
+    const plan = price ? planForPrice(price) : null
+    if (plan) {
+      updates.plan = plan
+    } else {
+      console.warn("[Stripe webhook] Unknown price on subscription:", subscription.id, price?.id)
+    }
+  }
+
+  await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("stripe_customer_id", subscription.customer as string)
+    .or(NOT_ADMIN)
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")!
@@ -32,30 +67,13 @@ export async function POST(request: NextRequest) {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
-      const subscription = event.data.object as Stripe.Subscription
-      
-      // Keep pro plan active even if cancel_at_period_end is true
-      // Only downgrade when subscription.deleted fires at period end
-      const updates: any = {
-        subscription_status: subscription.status
-      }
-      
-      // Only update plan if subscription is active (not canceled)
-      if (subscription.status === "active" || subscription.status === "trialing") {
-        updates.plan = subscription.items.data[0].price.lookup_key || "pro"
-      }
-      
-      await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("stripe_customer_id", subscription.customer)
-      
+      await syncSubscription(event.data.object as Stripe.Subscription)
       break
     }
 
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription
-      
+
       // Only now (at period end) do we downgrade to free
       await supabase
         .from("profiles")
@@ -63,32 +81,29 @@ export async function POST(request: NextRequest) {
           subscription_status: "canceled",
           plan: "free"
         })
-        .eq("stripe_customer_id", subscription.customer)
-      
+        .eq("stripe_customer_id", subscription.customer as string)
+        .or(NOT_ADMIN)
+
       break
     }
 
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session
-      
-      // Update profile with plan from metadata
+
       if (session.metadata?.supabase_user_id && session.customer) {
-        const updates: any = {
-          stripe_customer_id: session.customer as string
-        }
-        
-        // Set plan if provided in metadata
-        if (session.metadata.plan) {
-          updates.plan = session.metadata.plan
-          updates.subscription_status = "active"
-        }
-        
+        // Link the customer first so the subscription sync below can find the profile
         await supabase
           .from("profiles")
-          .update(updates)
+          .update({ stripe_customer_id: session.customer as string })
           .eq("id", session.metadata.supabase_user_id)
+
+        // Plan comes from the subscription's actual price, never from session metadata
+        if (session.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+          await syncSubscription(subscription)
+        }
       }
-      
+
       break
     }
   }
