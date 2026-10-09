@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { finishLogin } from "@/lib/after-login"
 
-type Mode = "start" | "code" | "password" | "reset-sent"
+type Mode = "start" | "code" | "password" | "reset-sent" | "confirm-sent"
 
 // Turn on after enabling the Google provider in Supabase (Auth -> Providers -> Google)
 const GOOGLE_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"
 
-// Google first, email one-time code second, password only for existing accounts that have one
+// Google first, then an emailed sign-in link (or code), then email + password for people who prefer it
 export default function AuthPanel({ intro }: { intro?: string }) {
   const router = useRouter()
   const supabase = createClient()
@@ -18,6 +18,7 @@ export default function AuthPanel({ intro }: { intro?: string }) {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [password, setPassword] = useState("")
+  const [passwordAction, setPasswordAction] = useState<"signin" | "signup">("signin")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,6 +66,29 @@ export default function AuthPanel({ intro }: { intro?: string }) {
     router.push(await finishLogin(data.session))
   })
 
+  const signUpWithPassword = () => run(async () => {
+    if (password.length < 8) throw new Error("Use at least 8 characters for your password.")
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/success` }
+    })
+    if (error) {
+      if (/already (registered|exists)/i.test(error.message)) {
+        setPasswordAction("signin")
+        throw new Error("This email already has an account. Sign in instead.")
+      }
+      throw error
+    }
+    // Supabase answers an existing email with a user that has no identities
+    if (data.user && !data.session && data.user.identities?.length === 0) {
+      setPasswordAction("signin")
+      throw new Error("This email already has an account. Sign in instead.")
+    }
+    if (data.session) router.push(await finishLogin(data.session))
+    else setMode("confirm-sent")
+  })
+
   const sendReset = () => run(async () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/reset-password`
@@ -103,13 +127,13 @@ export default function AuthPanel({ intro }: { intro?: string }) {
           <form onSubmit={e => { e.preventDefault(); sendCode() }} className="space-y-3">
             <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className={input} autoComplete="email" />
             <button type="submit" disabled={busy || !email} className={primary}>
-              {busy ? "Sending..." : "Email me a sign-in code"}
+              {busy ? "Sending..." : "Email me a sign-in link"}
             </button>
           </form>
 
           <div className="text-center">
             <button onClick={() => { setError(null); setMode("password") }} className={link}>
-              Have a password? Sign in with it
+              Use a password instead
             </button>
           </div>
         </div>
@@ -118,7 +142,7 @@ export default function AuthPanel({ intro }: { intro?: string }) {
       {mode === "code" && (
         <form onSubmit={e => { e.preventDefault(); verifyCode() }} className="space-y-4">
           <p className="text-sm text-ink-text">
-            We sent a 6-digit code to <span className="text-ink-body font-medium">{email}</span>. Enter it below, or click the link in the email.
+            Check your inbox: we sent a sign-in link to <span className="text-ink-body font-medium">{email}</span>. Click it to continue. If the email shows a 6-digit code instead, enter it here.
           </p>
           <input
             inputMode="numeric"
@@ -135,23 +159,54 @@ export default function AuthPanel({ intro }: { intro?: string }) {
           </button>
           <div className="flex justify-between">
             <button type="button" onClick={() => setMode("start")} className={link}>← Different email</button>
-            <button type="button" onClick={sendCode} disabled={busy} className={link}>Send a new code</button>
+            <button type="button" onClick={sendCode} disabled={busy} className={link}>Send it again</button>
           </div>
         </form>
       )}
 
       {mode === "password" && (
-        <form onSubmit={e => { e.preventDefault(); signInWithPassword() }} className="space-y-3">
+        <form onSubmit={e => { e.preventDefault(); passwordAction === "signup" ? signUpWithPassword() : signInWithPassword() }} className="space-y-3">
+          <div className="grid grid-cols-2 rounded-lg border border-ink-border p-1 text-sm">
+            {(["signin", "signup"] as const).map(action => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => { setError(null); setPasswordAction(action) }}
+                className={`rounded-md py-2 transition-colors ${passwordAction === action ? "bg-ink-elevated text-ink-body" : "text-ink-text hover:text-ink-body"}`}
+              >
+                {action === "signin" ? "Sign in" : "Create account"}
+              </button>
+            ))}
+          </div>
           <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className={input} autoComplete="email" />
-          <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" className={input} autoComplete="current-password" />
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder={passwordAction === "signup" ? "Password (8+ characters)" : "Password"}
+            className={input}
+            autoComplete={passwordAction === "signup" ? "new-password" : "current-password"}
+          />
           <button type="submit" disabled={busy || !email || !password} className={primary}>
-            {busy ? "Signing in..." : "Sign in"}
+            {busy ? "One moment..." : passwordAction === "signup" ? "Create account" : "Sign in"}
           </button>
           <div className="flex justify-between">
             <button type="button" onClick={() => setMode("start")} className={link}>← Other ways to sign in</button>
-            <button type="button" onClick={sendReset} disabled={busy || !email} className={link}>Forgot password?</button>
+            {passwordAction === "signin" && (
+              <button type="button" onClick={sendReset} disabled={busy || !email} className={link}>Forgot password?</button>
+            )}
           </div>
         </form>
+      )}
+
+      {mode === "confirm-sent" && (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-text">
+            Almost done: we sent a confirmation link to <span className="text-ink-body font-medium">{email}</span>. Click it to finish creating your account.
+          </p>
+          <button onClick={() => { setPasswordAction("signin"); setMode("password") }} className={link}>← Back to sign in</button>
+        </div>
       )}
 
       {mode === "reset-sent" && (
