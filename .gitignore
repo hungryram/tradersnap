@@ -29,3 +29,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 .vercel
+
+# Saved trading pages for building trade detection (may contain account info)
+samples/

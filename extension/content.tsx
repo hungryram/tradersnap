@@ -4,6 +4,9 @@ import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import { analytics } from "~lib/analytics"
+import { readTradingView } from "~lib/trades/tradingview"
+import { startTradeTracking } from "~lib/trades/tracker"
+import type { ClosedTrade } from "~lib/trades/types"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
 
@@ -78,6 +81,8 @@ const TradingBuddyWidget = () => {
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [expandedDetails, setExpandedDetails] = useState<{[key: number]: boolean}>({})
+  const [autoDetectTrades, setAutoDetectTrades] = useState(false)
+  const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number } | null>(null)
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -226,7 +231,7 @@ const TradingBuddyWidget = () => {
   // Load messages, theme, and session from storage on mount
   useEffect(() => {
     const loadData = async () => {
-      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'textSize', 'supabase_session', 'timeout_end'])
+      const result = await chrome.storage.local.get(['chat_messages', 'theme', 'textSize', 'supabase_session', 'timeout_end', 'auto_detect_trades'])
       
       // Check for active timeout
       if (result.timeout_end) {
@@ -258,6 +263,10 @@ const TradingBuddyWidget = () => {
       
       if (result.textSize) {
         setTextSize(result.textSize)
+      }
+
+      if (result.auto_detect_trades) {
+        setAutoDetectTrades(true)
       }
       
       if (result.supabase_session) {
@@ -305,6 +314,10 @@ const TradingBuddyWidget = () => {
 
         setSession(changes.supabase_session.newValue)
       }
+
+      if (areaName === 'local' && changes.auto_detect_trades) {
+        setAutoDetectTrades(!!changes.auto_detect_trades.newValue)
+      }
       
       // Listen for chat sync events from other tabs
       if (areaName === 'local' && changes.chat_sync) {
@@ -321,6 +334,83 @@ const TradingBuddyWidget = () => {
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
+
+  // Today's trades, counted from the trader's local midnight
+  const fetchTradeStats = useCallback(async () => {
+    const { supabase_session } = await chrome.storage.local.get('supabase_session')
+    if (!supabase_session?.access_token) return
+    const midnight = new Date()
+    midnight.setHours(0, 0, 0, 0)
+    try {
+      const response = await fetch(
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/trades?since=${encodeURIComponent(midnight.toISOString())}`,
+        { headers: { Authorization: `Bearer ${supabase_session.access_token}` } }
+      )
+      if (response.ok) setTradeStats((await response.json()).stats)
+    } catch (error) {
+      console.error('[Content] Failed to load trades:', error)
+    }
+  }, [])
+
+  // Auto-detect trades from TradingView's trading panel (opt-in from the menu)
+  const isSignedIn = !!session
+  useEffect(() => {
+    if (!autoDetectTrades || !isSignedIn) return
+    fetchTradeStats()
+
+    // Any tab that logs a trade bumps trade_sync so every tab refreshes its counts
+    const handleTradeSync = (changes: any, areaName: string) => {
+      if (areaName === 'local' && changes.trade_sync) fetchTradeStats()
+    }
+    chrome.storage.onChanged.addListener(handleTradeSync)
+
+    if (!window.location.hostname.endsWith('tradingview.com')) {
+      return () => chrome.storage.onChanged.removeListener(handleTradeSync)
+    }
+
+    const unsent: ClosedTrade[] = []
+    let sending = false
+    const sendTrades = async () => {
+      if (sending || unsent.length === 0) return
+      sending = true
+      try {
+        const { supabase_session } = await chrome.storage.local.get('supabase_session')
+        if (!supabase_session?.access_token) return
+        while (unsent.length > 0) {
+          const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supabase_session.access_token}`
+            },
+            body: JSON.stringify(unsent[0])
+          }).catch(() => null)
+          // Network or server trouble: keep the trade and retry later. A 400 will never succeed.
+          if (!response || (!response.ok && response.status !== 400)) return
+          unsent.shift()
+        }
+        chrome.storage.local.set({ trade_sync: Date.now() })
+      } finally {
+        sending = false
+      }
+    }
+
+    const stopTracking = startTradeTracking({
+      platform: 'tradingview',
+      read: () => readTradingView(),
+      onTrade: (trade) => {
+        unsent.push(trade)
+        sendTrades()
+      }
+    })
+    const retryTimer = setInterval(sendTrades, 30000)
+
+    return () => {
+      stopTracking()
+      clearInterval(retryTimer)
+      chrome.storage.onChanged.removeListener(handleTradeSync)
+    }
+  }, [autoDetectTrades, isSignedIn, fetchTradeStats])
 
   // Check if this is first launch
   useEffect(() => {
@@ -1715,6 +1805,21 @@ const TradingBuddyWidget = () => {
                     </button>
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    const next = !autoDetectTrades
+                    setAutoDetectTrades(next)
+                    chrome.storage.local.set({ auto_detect_trades: next })
+                    if (!next) setTradeStats(null)
+                  }}
+                  title="Logs your trades and wins/losses by reading TradingView's trading panel. Keep the panel open while you trade."
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  <span>Auto-detect trades</span>
+                  <span className={`text-xs font-medium ${autoDetectTrades ? 'text-green-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                    {autoDetectTrades ? 'On' : 'Off'}
+                  </span>
+                </button>
                 {messages.length > 0 && (
                   <button
                     onClick={async () => {
@@ -1806,6 +1911,30 @@ const TradingBuddyWidget = () => {
             </button>
           </div>
         </div>
+
+        {/* Today's detected trades */}
+        {autoDetectTrades && session && (
+          <div className={`flex items-center gap-3 px-3 py-1.5 text-xs border-b ${theme === 'dark' ? 'bg-dark-bg border-dark-border text-dark-text' : 'bg-white border-slate-200 text-slate-600'}`}>
+            <span className={`font-semibold ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Today</span>
+            {tradeStats && tradeStats.count > 0 ? (
+              <>
+                <span>{tradeStats.count} {tradeStats.count === 1 ? 'trade' : 'trades'}</span>
+                <span>
+                  <span className="text-green-500">{tradeStats.wins}W</span>{' '}
+                  <span className="text-red-500">{tradeStats.losses}L</span>
+                </span>
+                <span className={tradeStats.net >= 0 ? 'text-green-500' : 'text-red-500'}>
+                  {tradeStats.net < 0 ? '\u2212' : '+'}${Math.abs(tradeStats.net).toFixed(2)}
+                </span>
+                {tradeStats.lossStreak >= 2 && (
+                  <span className="ml-auto font-medium text-amber-500">{tradeStats.lossStreak} losses in a row</span>
+                )}
+              </>
+            ) : (
+              <span>No trades yet{window.location.hostname.endsWith('tradingview.com') ? ' \u00b7 keep the trading panel open' : ''}</span>
+            )}
+          </div>
+        )}
 
         {/* Messages */}
         <div 
