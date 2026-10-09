@@ -36,6 +36,10 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 - [ ] End-of-day recap in the chat (trades, rules broken, one lesson).
 - [ ] Weekly email report (biggest leak, best/worst time of day, rules broken). Needs an email provider (e.g. Resend).
 
+**Owner analytics**
+- [x] Admin page `/dashboard/admin` (admin plan + `ADMIN_EMAILS`, 404 for everyone else): users, weekly actives, paying/MRR, funnel (signed up -> rules -> 1st check -> 3rd check -> paid), retention by sign-up week (1/2/4/8 weeks), revenue, uninstall reasons, thumbs-down verdicts, user list. *You:* set `ADMIN_EMAILS` on Vercel; run `20261013_admin.sql`.
+- [x] Thumbs up/down on analysis cards (`/api/ratings`, verdict snapshot kept for review). Ships with the next extension release.
+
 **Phase 3: revenue**
 - [ ] Upgrade prompts at the moment of value (limit hit right after a useful analysis) instead of a generic $19 button.
 - [ ] Referral ("give a week of Pro, get a week").

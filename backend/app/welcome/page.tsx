@@ -56,7 +56,7 @@ export default function WelcomePage() {
             <div className="space-y-4">
               <p className="text-sm text-ink-text">You're already signed in.</p>
               <button onClick={continueSignedIn} className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 transition-colors">
-                Continue →
+                Continue
               </button>
             </div>
           ) : (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { getLimits } from "@/lib/usage"
+import { isAdminEmail } from "@/lib/admin"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -153,6 +154,7 @@ export async function GET(request: NextRequest) {
         trading_profile: profile.trading_profile ?? null,
         trading_limits: profile.trading_limits ?? null,
         plan: profile.plan,
+        is_admin: profile.plan === "admin" && isAdminEmail(user.email),
         subscription_status: profile.subscription_status,
         created_at: profile.created_at
       },

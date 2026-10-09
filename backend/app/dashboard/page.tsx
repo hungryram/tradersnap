@@ -35,14 +35,14 @@ export default function TodayPage() {
       <PageHeader
         title={`${greeting}${me.user.first_name ? `, ${me.user.first_name}` : ""}`}
         subtitle={new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        actions={<a href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer" className={buttonPrimary}>Open TradingView ↗</a>}
+        actions={<a href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer" className={buttonPrimary}>Open TradingView</a>}
       />
 
       {!me.ruleset && (
         <div className="mb-6">
           <Notice tone="warn">
             You haven't set up your trading rules yet. Your coach needs them to check your charts.{" "}
-            <a href="/onboarding" className="underline font-medium">Set up your rules →</a>
+            <a href="/onboarding" className="underline font-medium">Set up your rules</a>
           </Notice>
         </div>
       )}
@@ -65,7 +65,7 @@ export default function TodayPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card title="Today's trades" action={<a href="/dashboard/journal" className="text-sm text-blue-400 hover:text-blue-300">Journal →</a>}>
+          <Card title="Today's trades" action={<a href="/dashboard/journal" className="text-sm text-blue-400 hover:text-blue-300">Journal</a>}>
             {trades.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-sm text-ink-text">No trades recorded today.</p>

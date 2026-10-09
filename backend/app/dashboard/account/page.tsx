@@ -188,7 +188,7 @@ export default function AccountPage() {
             rel="noopener noreferrer"
             className={buttonSecondary}
           >
-            Chrome Web Store ↗
+            Chrome Web Store
           </a>
         </Card>
 

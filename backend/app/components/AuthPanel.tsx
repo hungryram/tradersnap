@@ -158,7 +158,7 @@ export default function AuthPanel({ intro }: { intro?: string }) {
             {busy ? "Checking..." : "Continue"}
           </button>
           <div className="flex justify-between">
-            <button type="button" onClick={() => setMode("start")} className={link}>← Different email</button>
+            <button type="button" onClick={() => setMode("start")} className={link}>Different email</button>
             <button type="button" onClick={sendCode} disabled={busy} className={link}>Send it again</button>
           </div>
         </form>
@@ -192,7 +192,7 @@ export default function AuthPanel({ intro }: { intro?: string }) {
             {busy ? "One moment..." : passwordAction === "signup" ? "Create account" : "Sign in"}
           </button>
           <div className="flex justify-between">
-            <button type="button" onClick={() => setMode("start")} className={link}>← Other ways to sign in</button>
+            <button type="button" onClick={() => setMode("start")} className={link}>Other ways to sign in</button>
             {passwordAction === "signin" && (
               <button type="button" onClick={sendReset} disabled={busy || !email} className={link}>Forgot password?</button>
             )}
@@ -205,14 +205,14 @@ export default function AuthPanel({ intro }: { intro?: string }) {
           <p className="text-sm text-ink-text">
             Almost done: we sent a confirmation link to <span className="text-ink-body font-medium">{email}</span>. Click it to finish creating your account.
           </p>
-          <button onClick={() => { setPasswordAction("signin"); setMode("password") }} className={link}>← Back to sign in</button>
+          <button onClick={() => { setPasswordAction("signin"); setMode("password") }} className={link}>Back to sign in</button>
         </div>
       )}
 
       {mode === "reset-sent" && (
         <div className="space-y-4">
           <p className="text-sm text-ink-text">If <span className="text-ink-body font-medium">{email}</span> has an account, a password reset link is on its way.</p>
-          <button onClick={() => setMode("start")} className={link}>← Back</button>
+          <button onClick={() => setMode("start")} className={link}>Back</button>
         </div>
       )}
 

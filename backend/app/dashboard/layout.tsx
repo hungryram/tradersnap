@@ -23,12 +23,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const supabase = createClient()
   const [email, setEmail] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) window.location.href = "/"
-      else setEmail(session.user.email ?? null)
+      if (!session) {
+        window.location.href = "/"
+        return
+      }
+      setEmail(session.user.email ?? null)
+      fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => setIsAdmin(!!data?.user?.is_admin))
+        .catch(() => {})
     })
   }, [])
 
@@ -64,6 +72,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </a>
           </li>
         ))}
+        {isAdmin && (
+          <li>
+            <a
+              href="/dashboard/admin"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${isActive("/dashboard/admin") ? "bg-ink-elevated text-ink-body" : "text-ink-text hover:bg-ink-elevated/60 hover:text-ink-body"}`}
+            >
+              <ChartIcon />
+              Admin
+            </a>
+          </li>
+        )}
       </ul>
 
       <div className="mt-6 px-3">
@@ -73,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-medium text-white transition-colors"
         >
-          Open TradingView ↗
+          Open TradingView
         </a>
       </div>
 
@@ -86,7 +105,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className={`block rounded-lg px-3 py-1.5 text-sm transition-colors ${isActive(href) ? "text-ink-body" : "text-ink-muted hover:text-ink-body"}`}
               >
-                {label}{external ? " ↗" : ""}
+                {label}
               </a>
             </li>
           ))}
@@ -138,4 +157,5 @@ function SunIcon() { return <Svg><circle cx="12" cy="12" r="4" /><path d="M12 2v
 function BookIcon() { return <Svg><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z" /><path d="M8 7h8M8 11h6" /></Svg> }
 function ListIcon() { return <Svg><path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2" /></Svg> }
 function StarIcon() { return <Svg><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" /></Svg> }
+function ChartIcon() { return <Svg><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></Svg> }
 function UserIcon() { return <Svg><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></Svg> }

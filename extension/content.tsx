@@ -80,6 +80,8 @@ const TradingBuddyWidget = () => {
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
   const [expandedDetails, setExpandedDetails] = useState<{[key: number]: boolean}>({})
+  // 👍/👎 per analysis message id (kept for this page load)
+  const [ratings, setRatings] = useState<{[messageId: string]: 1 | -1}>({})
   const [autoDetectTrades, setAutoDetectTrades] = useState(false)
   const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number } | null>(null)
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | null>(null)
@@ -459,6 +461,21 @@ const TradingBuddyWidget = () => {
   }
 
   const isTradingView = window.location.hostname.endsWith('tradingview.com')
+
+  const rateAnalysis = async (messageId: string, rating: 1 | -1) => {
+    setRatings(prev => ({ ...prev, [messageId]: rating }))
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      if (!supabase_session?.access_token) return
+      await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/ratings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
+        body: JSON.stringify({ message_id: messageId, rating })
+      })
+    } catch {
+      // Ratings are best-effort
+    }
+  }
 
   // All checklist items done: record it once
   useEffect(() => {
@@ -1634,7 +1651,7 @@ const TradingBuddyWidget = () => {
               >
                 <button
                   onClick={() => {
-                    window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')
+                    window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard`, '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
@@ -2190,6 +2207,20 @@ const TradingBuddyWidget = () => {
                         {analysis.behavioral_nudge && (
                           <div className={`mt-3 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>
                             {analysis.behavioral_nudge}
+                          </div>
+                        )}
+
+                        {msg.id && (
+                          <div className={`mt-3 flex items-center gap-1 text-[11px] ${muted}`}>
+                            {ratings[msg.id] ? (
+                              <span>Thanks for the feedback.</span>
+                            ) : (
+                              <>
+                                <span className="mr-1">Was this verdict right?</span>
+                                <button onClick={() => rateAnalysis(msg.id, 1)} title="Yes" className={`rounded px-1.5 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👍</button>
+                                <button onClick={() => rateAnalysis(msg.id, -1)} title="No" className={`rounded px-1.5 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👎</button>
+                              </>
+                            )}
                           </div>
                         )}
 

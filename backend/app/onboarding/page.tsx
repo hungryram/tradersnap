@@ -236,7 +236,7 @@ export default function OnboardingPage() {
           {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
 
           <div className="flex justify-between">
-            <button onClick={() => setStep(1)} className="text-sm text-ink-text hover:text-ink-body">← Back</button>
+            <button onClick={() => setStep(1)} className="text-sm text-ink-text hover:text-ink-body">Back</button>
             <button onClick={finish} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
           </div>
         </div>
@@ -263,7 +263,7 @@ export default function OnboardingPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {(tradingPlatforms.length ? tradingPlatforms : PLATFORMS.slice(0, 1)).map(p => (
-              <a key={p.id} href={p.url} className={primary}>Open {p.label} →</a>
+              <a key={p.id} href={p.url} className={primary}>Open {p.label}</a>
             ))}
           </div>
           <a href="/dashboard" className="inline-block text-sm text-ink-text hover:text-ink-body">Go to my dashboard instead</a>
