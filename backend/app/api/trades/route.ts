@@ -38,6 +38,8 @@ const tradeSchema = z.object({
   side: z.enum(["long", "short"]),
   qty: z.number().positive().max(1_000_000),
   entry_price: z.number().nullable().optional(),
+  exit_price: z.number().nullable().optional(),
+  fill_count: z.number().int().min(1).max(10_000).nullable().optional(),
   realized_pnl: z.number().nullable().optional(),
   pnl_source: z.enum(["realized", "estimated"]).default("realized"),
   opened_at: z.string().datetime().nullable().optional(),
@@ -74,15 +76,17 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), origin)
     }
 
-    const parsed = tradeSchema.safeParse(await request.json())
+    // One trade, or { trades: [...] } when the order history is first read
+    const body = await request.json()
+    const parsed = z.array(tradeSchema).min(1).max(200).safeParse(Array.isArray(body?.trades) ? body.trades : [body])
     if (!parsed.success) {
       return addCorsHeaders(NextResponse.json({ error: "Invalid trade" }, { status: 400 }), origin)
     }
 
-    // Two open tabs report the same close; the unique key keeps one row
+    // Reloads and other open tabs re-send the same trades; the unique key keeps one row each
     const { error } = await supabase
       .from("trades")
-      .upsert({ ...parsed.data, user_id: user.id }, { onConflict: "user_id,client_trade_id", ignoreDuplicates: true })
+      .upsert(parsed.data.map(trade => ({ ...trade, user_id: user.id })), { onConflict: "user_id,client_trade_id", ignoreDuplicates: true })
 
     if (error) {
       console.error("[Trades] Insert error:", error)
@@ -113,7 +117,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("trades")
-      .select("id, platform, account, symbol, side, qty, entry_price, realized_pnl, pnl_source, opened_at, closed_at")
+      .select("id, platform, account, symbol, side, qty, entry_price, exit_price, fill_count, realized_pnl, pnl_source, opened_at, closed_at")
       .eq("user_id", user.id)
       .gte("closed_at", since.toISOString())
       .order("closed_at", { ascending: false })

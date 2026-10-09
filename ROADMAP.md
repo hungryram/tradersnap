@@ -54,15 +54,18 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 - [ ] Downscale + JPEG-compress screenshots before upload (Vercel 4.5 MB body limit; chrome.storage quota).
 - [ ] Reset daily limits in user timezone or at the 6pm ET futures session, not midnight UTC.
 - [ ] Trade loop: "Did you take it? Outcome?" → end-of-day review → weekly rule-break report.
-- [~] Auto-detect trades from the page (no broker API). Opt-in menu toggle "Auto-detect trades"; reads the trading panel once a second, a position that goes flat is a closed trade, win/loss = change in the platform's Realized PnL (falls back to last unrealized PnL). Saved to `trades` (`/api/trades`, dedup across tabs); header shows today's trades, W/L, net, losses in a row.
-  - [x] TradingView (Paper + brokers via `data-name="<Broker>.positions-table"`). Tested against live DOM samples.
-  - [ ] Run `backend/supabase/migrations/20261009_trades.sql` in Supabase.
-  - [x] Panel collapsed: falls back to the watchlist's "Long 1 @ price" tags (symbol must be in a visible watchlist; PnL estimated from price × point value).
-  - [ ] Confirm TradingView with a real broker connected (table name prefix, watchlist tags).
+- [~] Auto-detect trades from the page (no broker API). Opt-in menu toggle "Auto-detect trades".
+  - [x] TradingView: rebuilds trades from the panel's **Order history** (exact fills, order IDs, scale in/out, reversals, stop/target fills, commission). The extension opens that tab once per panel load (it only populates after a first open, then updates in the background). Columns found by header code names, so any language / column order works. Watchlist fallback removed (wrong sizes, symbol often not listed).
+  - [x] Status dot in the Today strip: green tracking / amber loading history / red "open TradingView's trading panel".
+  - [ ] Run `20261009_trades.sql` and `20261010_trades_fills.sql` in Supabase.
+  - [ ] Confirm with a real broker connected through TradingView (table names, commission column).
+  - [ ] SL/TP changes from the Activity log ("Modify position ... with TP ...") -> behavior flags (widened stop, no stop, added to loser, sized up after loss).
+  - [ ] "Send tracking diagnostics" button + reader-failure events.
   - [ ] Tradovate adapter (needs DOM samples).
   - [ ] TopstepX adapter (needs DOM samples).
   - [ ] Guardrails: stop-for-the-day pause when ruleset max trades / max losses / daily loss is hit.
   - [ ] Weekly report from `trades` + analyses.
+  - Limits: TradingView in Chrome only (not the desktop app); panel must be open (can be small); trades made while it's closed are picked up from history when it reopens (last 100 orders).
 - [ ] Tilt detection (repeated analyses of same chart, rapid-fire messages) → suggest timeout.
 - [ ] Prop-firm integration (Tradovate / TopstepX / Rithmic): import trades, enforce daily loss / max trades, hard lockouts.
 - [ ] Structured rule builder (checkable rules: "above VWAP", "max 3 trades", "no trades 11:30–1:30 ET").

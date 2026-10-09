@@ -4,8 +4,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import { analytics } from "~lib/analytics"
-import { createTradingViewReader } from "~lib/trades/tradingview"
-import { startTradeTracking } from "~lib/trades/tracker"
+import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
@@ -83,6 +82,7 @@ const TradingBuddyWidget = () => {
   const [expandedDetails, setExpandedDetails] = useState<{[key: number]: boolean}>({})
   const [autoDetectTrades, setAutoDetectTrades] = useState(false)
   const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number } | null>(null)
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | null>(null)
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -377,17 +377,18 @@ const TradingBuddyWidget = () => {
         const { supabase_session } = await chrome.storage.local.get('supabase_session')
         if (!supabase_session?.access_token) return
         while (unsent.length > 0) {
+          const batch = unsent.slice(0, 100)
           const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${supabase_session.access_token}`
             },
-            body: JSON.stringify(unsent[0])
+            body: JSON.stringify({ trades: batch })
           }).catch(() => null)
-          // Network or server trouble: keep the trade and retry later. A 400 will never succeed.
+          // Network or server trouble: keep the trades and retry later. A 400 will never succeed.
           if (!response || (!response.ok && response.status !== 400)) return
-          unsent.shift()
+          unsent.splice(0, batch.length)
         }
         chrome.storage.local.set({ trade_sync: Date.now() })
       } finally {
@@ -396,17 +397,17 @@ const TradingBuddyWidget = () => {
     }
 
     const stopTracking = startTradeTracking({
-      platform: 'tradingview',
-      read: createTradingViewReader(),
-      onTrade: (trade) => {
-        unsent.push(trade)
+      onTrades: (trades) => {
+        unsent.push(...trades)
         sendTrades()
-      }
+      },
+      onStatus: setTrackingStatus
     })
     const retryTimer = setInterval(sendTrades, 30000)
 
     return () => {
       stopTracking()
+      setTrackingStatus(null)
       clearInterval(retryTimer)
       chrome.storage.onChanged.removeListener(handleTradeSync)
     }
@@ -1812,7 +1813,7 @@ const TradingBuddyWidget = () => {
                     chrome.storage.local.set({ auto_detect_trades: next })
                     if (!next) setTradeStats(null)
                   }}
-                  title="Logs your trades and wins/losses by reading TradingView's trading panel, or the watchlist when the panel is collapsed."
+                  title="Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."
                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   <span>Auto-detect trades</span>
@@ -1915,8 +1916,17 @@ const TradingBuddyWidget = () => {
         {/* Today's detected trades */}
         {autoDetectTrades && session && (
           <div className={`flex items-center gap-3 px-3 py-1.5 text-xs border-b ${theme === 'dark' ? 'bg-dark-bg border-dark-border text-dark-text' : 'bg-white border-slate-200 text-slate-600'}`}>
+            {trackingStatus && (
+              <span
+                className={`inline-block w-2 h-2 rounded-full shrink-0 ${trackingStatus === 'tracking' ? 'bg-green-500' : trackingStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`}
+                title={trackingStatus === 'tracking' ? 'Tracking your trades' : trackingStatus === 'loading' ? 'Loading your order history' : "Not tracking: open TradingView's trading panel"}
+              />
+            )}
             <span className={`font-semibold ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Today</span>
-            {tradeStats && tradeStats.count > 0 ? (
+            {trackingStatus === 'no-panel' && (
+              <span className="text-red-500">Not tracking: open TradingView's trading panel (it can be small)</span>
+            )}
+            {trackingStatus === 'no-panel' ? null : tradeStats && tradeStats.count > 0 ? (
               <>
                 <span>{tradeStats.count} {tradeStats.count === 1 ? 'trade' : 'trades'}</span>
                 <span>
@@ -1931,7 +1941,7 @@ const TradingBuddyWidget = () => {
                 )}
               </>
             ) : (
-              <span>No trades yet{window.location.hostname.endsWith('tradingview.com') ? ' \u00b7 keep the trading panel or watchlist open' : ''}</span>
+              <span>{trackingStatus === 'loading' ? 'Loading your order history\u2026' : 'No trades yet'}</span>
             )}
           </div>
         )}

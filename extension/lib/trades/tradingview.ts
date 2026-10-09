@@ -1,116 +1,131 @@
-import { parseNumber, type Position, type Snapshot } from "./types"
+import { parseNumber, type Fill } from "./types"
 
-// Reads TradingView's trading panel (Paper Trading or a connected broker), and
-// falls back to the watchlist's position tags when the panel is collapsed.
-// Uses data-* / aria-label / title attributes; TradingView's class names carry
-// build hashes (value-WrxTGWVE) that change with every release, so only their
+// Reads TradingView's trading panel (Paper Trading or a connected broker).
+// Columns are found by their code names in the table header (side-column,
+// qty-column, ...), which stay the same in every language and column order.
+// TradingView's class names carry build hashes (value-WrxTGWVE), so only their
 // stable prefixes are matched.
-// Returns null when neither is on the page, so a closed panel is never
-// mistaken for "all positions closed".
-export function createTradingViewReader(): (doc?: Document) => Snapshot | null {
-  // The watchlist can't see the account or Realized PnL; reuse the last values the panel showed
-  let lastAccount: string | null = null
-  let lastRealized: number | null = null
 
-  return (doc: Document = document) => {
-    const panel = readPanel(doc)
-    if (panel) {
-      lastAccount = panel.account
-      lastRealized = panel.realizedPnl
-      return panel
-    }
-    const watchlist = readWatchlist(doc)
-    if (!watchlist) return null
-    return { ...watchlist, account: lastAccount, realizedPnl: lastRealized }
-  }
+export type PanelState = {
+  account: string | null
+  // Open positions by symbol, signed: +2 long, -1 short
+  positions: Map<string, number>
+  // Filled orders from Order history; null until that tab has loaded once
+  fills: Fill[] | null
 }
 
-export function readTradingView(doc: Document = document): Snapshot | null {
-  return readPanel(doc) ?? readWatchlist(doc)
-}
+// Panels whose Order history tab has already been opened once
+const opened = new WeakSet<Element>()
 
-function readPanel(doc: Document): Snapshot | null {
-  // data-name is "<Broker>.positions-table", e.g. "Paper.positions-table"
-  const table = doc.querySelector<HTMLTableElement>('table[data-name$=".positions-table"]')
-  if (!table) return null
+export function readTradingViewPanel(doc: Document = document): PanelState | null {
+  const positionsTable = doc.querySelector<HTMLTableElement>('table[data-name$=".positions-table"]')
+  if (!positionsTable) return null
 
-  const broker = table.getAttribute("data-name")!.split(".")[0]
-  const manager = table.closest('[aria-label="Account manager"]') ?? doc
-
-  const positions = new Map<string, Position>()
-  table.querySelectorAll<HTMLTableRowElement>("tbody tr[data-row-id]").forEach(row => {
-    const cell = (label: string) => row.querySelector(`td[data-label="${label}"]`)?.textContent?.trim() ?? null
-    const symbol = row.getAttribute("data-row-id")!
-    const sideText = cell("Side")?.toLowerCase()
-    const qty = parseNumber(cell("Quantity"))
-    if (!sideText || !qty) return
-
-    positions.set(symbol, {
-      symbol,
-      side: sideText.startsWith("short") || sideText.startsWith("sell") ? "short" : "long",
-      qty: Math.abs(qty),
-      avgPrice: parseNumber(cell("Avg fill price")),
-      unrealizedPnl: parseNumber(cell("Unrealized PnL"))
-    })
-  })
-
+  const broker = positionsTable.getAttribute("data-name")!.split(".")[0]
+  const manager = positionsTable.closest('[aria-label="Account manager"]') ?? doc
   const accountName = manager.querySelector('[data-qa-id="account-selector"] [class*="accountName"]')?.textContent?.trim()
+
+  const positions = new Map<string, number>()
+  for (const row of tableRows(positionsTable)) {
+    const qty = parseNumber(row.text("qty-column"))
+    const side = sideOf(row.cell("side-column"))
+    if (!qty || !side) continue
+    positions.set(row.id, side === "buy" ? Math.abs(qty) : -Math.abs(qty))
+  }
 
   return {
     account: accountName ? `${broker}:${accountName}` : broker,
-    realizedPnl: readSummaryField(manager, "Realized PnL"),
-    positions
+    positions,
+    fills: readFills(manager)
   }
 }
 
-// Account summary bar: <span class="title-…">Realized PnL</span> next to <div class="value-…">+2,068.50</div>
-function readSummaryField(root: ParentNode, title: string): number | null {
-  for (const span of Array.from(root.querySelectorAll("span"))) {
-    if (span.textContent?.trim() !== title) continue
-    const field = span.closest('[class*="accountSummaryField"]')
-    const value = field?.querySelector('[class*="value-"]')
-    if (value) return parseNumber(value.textContent)
+function readFills(manager: ParentNode): Fill[] | null {
+  const table = manager.querySelector<HTMLTableElement>('table[data-name$=".history-table"]')
+  if (!table) return null
+  const rows = tableRows(table)
+  // Empty before the tab was opened means "not loaded"; empty after means no orders yet
+  if (rows.length === 0) return opened.has(manager as Element) ? [] : null
+
+  const fills: Fill[] = []
+  for (const row of rows) {
+    // Cancelled and working orders have no fill price
+    const price = parseNumber(row.text("avgPrice-column"))
+    const qty = parseNumber(row.text("qty-column"))
+    const side = sideOf(row.cell("side-column"))
+    const time = parseLocalTime(row.text("closeDate-column") ?? row.text("placingTime-column"))
+    const symbol = row.cell("symbol-column")?.querySelector('[class*="titleContent"]')?.textContent?.trim()
+      ?? row.text("symbol-column")
+    if (price === null || !qty || !side || time === null || !symbol) continue
+
+    fills.push({
+      orderId: row.text("id-column") || row.id,
+      symbol,
+      qty: side === "buy" ? Math.abs(qty) : -Math.abs(qty),
+      price,
+      time,
+      commission: parseNumber(row.text("commission-column"))
+    })
   }
+  return fills
+}
+
+// Order history only fills in after its tab has been opened once; after that
+// TradingView keeps it updated in the background. Open it once per panel and
+// switch straight back to whatever tab the trader was on.
+export function ensureOrderHistoryLoaded(doc: Document = document): void {
+  const manager = doc.querySelector('[aria-label="Account manager"]')
+  if (!manager || opened.has(manager)) return
+  const historyTab = manager.querySelector<HTMLElement>('button[role="tab"]#history')
+  if (!historyTab) return
+  opened.add(manager)
+
+  if (historyTab.getAttribute("aria-selected") === "true") return
+  const current = manager.querySelector<HTMLElement>('button[role="tab"][aria-selected="true"]')
+  historyTab.click()
+  if (current) setTimeout(() => current.click(), 300)
+}
+
+type Row = { id: string; cell: (column: string) => Element | null; text: (column: string) => string | null }
+
+// Maps header data-name -> column index, so cells are found the same way in any language
+function tableRows(table: HTMLTableElement): Row[] {
+  const columns = new Map<string, number>()
+  table.querySelectorAll("thead th").forEach((th, index) => {
+    const name = th.getAttribute("data-name")
+    if (name) columns.set(name, index)
+  })
+
+  return Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr[data-row-id]")).map(tr => {
+    const cell = (column: string) => {
+      const index = columns.get(column)
+      return index === undefined ? null : tr.children[index] ?? null
+    }
+    return {
+      id: tr.getAttribute("data-row-id")!,
+      cell,
+      text: (column: string) => cell(column)?.textContent?.trim() || null
+    }
+  })
+}
+
+// "Buy"/"Long" are translated, but TradingView colors buys blue (or green) and sells red
+function sideOf(cell: Element | null): "buy" | "sell" | null {
+  if (!cell) return null
+  const text = cell.textContent?.trim().toLowerCase() ?? ""
+  if (/^(buy|long)/.test(text)) return "buy"
+  if (/^(sell|short)/.test(text)) return "sell"
+  if (cell.querySelector('[class*="blue-"], [class*="green-"]')) return "buy"
+  if (cell.querySelector('[class*="red-"]')) return "sell"
   return null
 }
 
-// Watchlist rows (data-symbol-full="CME_MINI:MNQZ2026") carry a tag like
-// title="Long 1 @ 31,158.00" while a position is open. Only rows scrolled into
-// view exist, so the snapshot lists which symbols it could see.
-function readWatchlist(doc: Document): Snapshot | null {
-  const rows = doc.querySelectorAll<HTMLElement>("[data-symbol-full]")
-  if (rows.length === 0) return null
-
-  const positions = new Map<string, Position>()
-  const coverage = new Set<string>()
-  rows.forEach(row => {
-    const symbol = row.getAttribute("data-symbol-full")!
-    coverage.add(symbol)
-
-    const tag = Array.from(row.querySelectorAll<HTMLElement>("[title]"))
-      .map(el => el.getAttribute("title")!.match(/^(Long|Short)\s+([\d.,]+)\s+@\s+([\d.,]+)/i))
-      .find(Boolean)
-    if (!tag) return
-
-    const side = tag[1].toLowerCase() === "short" ? "short" : "long"
-    const qty = parseNumber(tag[2])
-    const avgPrice = parseNumber(tag[3])
-    if (!qty) return
-    const last = parseNumber(row.querySelector('[class*="cell-"][class*="last-"]')?.textContent)
-
-    positions.set(symbol, {
-      symbol,
-      side,
-      qty,
-      avgPrice,
-      // No PnL in the watchlist: estimate it from the last price and the contract's dollar value per point
-      unrealizedPnl: last !== null && avgPrice !== null
-        ? Math.round((last - avgPrice) * qty * pointValue(symbol) * (side === "long" ? 1 : -1) * 100) / 100
-        : null
-    })
-  })
-
-  return { account: null, realizedPnl: null, positions, coverage }
+// TradingView shows order times as "2026-10-09 13:31:28" in the computer's local time
+function parseLocalTime(text: string | null): number | null {
+  const m = text?.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (!m) return null
+  const date = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0))
+  return isNaN(date.getTime()) ? null : date.getTime()
 }
 
 // Dollars per 1.0 point of price for common futures; anything else (stocks, ETFs) is 1
@@ -121,9 +136,13 @@ const POINT_VALUES: Record<string, number> = {
   BTC: 5, MBT: 0.1, ETH: 50, MET: 0.1
 }
 
-// "CME_MINI:MNQZ2026" or "CME_MINI:MNQ1!" -> MNQ
-export function pointValue(symbol: string): number {
+const FUTURES_TICKER = /[FGHJKMNQUVXZ]\d{2,4}$|\d+!$/
+
+// "CME_MINI:MNQZ2026" or "CME_MINI:MNQ1!" -> { value: 2, known: true }
+export function pointValue(symbol: string): { value: number; known: boolean } {
   const ticker = symbol.split(":").pop() ?? symbol
   const root = ticker.replace(/[FGHJKMNQUVXZ]\d{2,4}$/, "").replace(/\d+!$/, "")
-  return POINT_VALUES[root] ?? 1
+  if (POINT_VALUES[root] !== undefined) return { value: POINT_VALUES[root], known: true }
+  // Stocks and ETFs really are $1 per point; an unlisted futures contract is a guess
+  return { value: 1, known: !FUTURES_TICKER.test(ticker) }
 }
