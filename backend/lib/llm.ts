@@ -12,6 +12,8 @@ export const provider: Provider = process.env.AI_PROVIDER === "anthropic" ? "ant
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5"
 // Model for free-tier chat (e.g. set to claude-sonnet-5-5 to lower free-tier cost)
 const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_MODEL
+// Thinking effort for chart analysis: higher is more careful but slower
+const ANALYZE_EFFORT = (process.env.ANTHROPIC_ANALYZE_EFFORT || "medium") as "low" | "medium" | "high"
 
 // Opt into server-side refusal fallbacks: a declined request is re-run on the
 // model Anthropic recommends for that refusal category instead of failing.
@@ -62,7 +64,7 @@ export async function analyzeChart(opts: {
       betas: [FALLBACK_BETA],
       fallbacks: "default",
       output_config: {
-        effort: "high",
+        effort: ANALYZE_EFFORT,
         format: betaZodOutputFormat(opts.schema)
       },
       system: opts.system,

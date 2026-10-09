@@ -77,6 +77,7 @@ const TradingBuddyWidget = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium')
   const [showOverlays, setShowOverlays] = useState<{[key: number]: boolean}>({})
+  const [expandedDetails, setExpandedDetails] = useState<{[key: number]: boolean}>({})
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -150,8 +151,11 @@ const TradingBuddyWidget = () => {
           }
         })
         
-        // Sort by timestamp to ensure chronological order (oldest first)
-        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+        // Sort by timestamp to ensure chronological order (oldest first).
+        // Older messages share a timestamp with their reply, so put the user's message first on ties.
+        formattedMessages.sort((a, b) =>
+          a.timestamp.getTime() - b.timestamp.getTime() || (a.type === 'user' ? -1 : 0) - (b.type === 'user' ? -1 : 0)
+        )
         
         setMessages(formattedMessages)
         
@@ -244,7 +248,8 @@ const TradingBuddyWidget = () => {
       
       // Load cached messages for instant display
       if (result.chat_messages) {
-        setMessages(result.chat_messages)
+        // Errors are transient; drop any saved by older versions
+        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error'))
       }
       
       if (result.theme) {
@@ -483,13 +488,15 @@ const TradingBuddyWidget = () => {
 
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {
-    if (messages.length > 0) {
+    // Errors are transient; don't restore them on the next page load
+    const savable = messages.filter(msg => msg.type !== 'error')
+    if (savable.length > 0) {
       // Keep only last 20 messages to avoid storage quota exceeded errors
-      const recentMessages = messages.slice(-20)
+      const recentMessages = savable.slice(-20)
       chrome.storage.local.set({ chat_messages: recentMessages }).catch(err => {
         console.error('[Content] Failed to save messages:', err)
         // If storage fails, try saving just last 10
-        chrome.storage.local.set({ chat_messages: messages.slice(-10) }).catch(() => {
+        chrome.storage.local.set({ chat_messages: savable.slice(-10) }).catch(() => {
           console.error('[Content] Storage quota critically exceeded')
         })
       })
@@ -549,9 +556,9 @@ const TradingBuddyWidget = () => {
   // Get text size classes based on current size setting
   const getTextSizeClass = () => {
     switch (textSize) {
-      case 'small': return 'text-xs'
-      case 'large': return 'text-base'
-      default: return 'text-sm' // medium
+      case 'small': return 'text-[13px] leading-relaxed'
+      case 'large': return 'text-[17px] leading-relaxed'
+      default: return 'text-[15px] leading-relaxed' // medium
     }
   }
 
@@ -645,7 +652,8 @@ const TradingBuddyWidget = () => {
       if (!supabase_session) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'Session expired. Please reload the extension.',
+          content: "You're not signed in.",
+          requiresLogin: true,
           timestamp: new Date()
         }])
         return
@@ -738,7 +746,9 @@ const TradingBuddyWidget = () => {
           },
           body: JSON.stringify({
             rulesetId: ruleset.id,
-            image: chartImage
+            image: chartImage,
+            timestamp: new Date().toISOString(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
           })
         }
       )
@@ -899,7 +909,8 @@ const TradingBuddyWidget = () => {
         // Show error to user
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'Session expired. Please reload the extension to continue.',
+          content: "You're not signed in.",
+          requiresLogin: true,
           timestamp: new Date()
         }])
         return
@@ -1082,7 +1093,8 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session missing. Please [sign in](https://admin.snapchartapp.com/) or use the extension popup (click the icon in your toolbar).',
+          content: "You're not signed in.",
+          requiresLogin: true,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1097,7 +1109,8 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session expired. Please sign in again from the extension popup.',
+          content: 'Your session expired. Sign in again to continue.',
+          requiresLogin: true,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1112,7 +1125,8 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session expired. Please sign in again from the extension popup.',
+          content: 'Your session expired. Sign in again to continue.',
+          requiresLogin: true,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1324,7 +1338,8 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Session expired. Please [sign in](https://admin.snapchartapp.com/) or use the extension popup to continue.',
+          content: 'Your session expired. Sign in again to continue.',
+          requiresLogin: true,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1518,13 +1533,13 @@ const TradingBuddyWidget = () => {
     switch (status) {
       case "valid":
       case "aligned":
-      case "pass": return "VALID SETUP"
+      case "pass": return "LINES UP WITH YOUR RULES"
       case "potentially_valid":
       case "incomplete":
       case "warn": return "INCOMPLETE SETUP"
       case "invalid":
       case "violated":
-      case "fail": return "INVALID SETUP"
+      case "fail": return "RULE BROKEN"
       default: return status.replace(/_/g, ' ').toUpperCase()
     }
   }
@@ -1842,7 +1857,7 @@ const TradingBuddyWidget = () => {
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.type === 'user' && (
                   <div className="max-w-[80%]">
-                    <div className={`bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm ${getTextSizeClass()} transition-all ${
+                    <div className={`${theme === 'dark' ? 'bg-dark-bubble text-dark-body' : 'bg-slate-200 text-slate-900'} px-4 py-2 rounded-2xl rounded-tr-sm ${getTextSizeClass()} transition-all ${
                       msg.isFavorited ? 'border-l-4 border-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1887,11 +1902,22 @@ const TradingBuddyWidget = () => {
                     <div className={`markdown-content ${theme === 'dark' ? 'dark' : ''}`} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                     {msg.requiresUpgrade && (
                       <button
-                        onClick={() => window.open('https://admin.snapchartapp.com/dashboard/account', '_blank')}
+                        onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
                         className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                       >
-                        Upgrade to Pro - $49/mo
+                        Upgrade to Pro - $19/mo
                       </button>
+                    )}
+                    {msg.requiresLogin && (
+                      <>
+                        <button
+                          onClick={() => window.open(process.env.PLASMO_PUBLIC_API_URL, '_blank')}
+                          className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          Sign in
+                        </button>
+                        <p className="mt-2 text-xs opacity-80">After signing in, come back here and try again.</p>
+                      </>
                     )}
                   </div>
                 )}
@@ -1940,7 +1966,7 @@ const TradingBuddyWidget = () => {
                   
                   <div 
 
-                    className={`markdown-content ${theme === 'dark' ? 'dark' : ''} px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-900'} ${
+                    className={`markdown-content ${theme === 'dark' ? 'dark' : ''} px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-body' : 'bg-white border border-slate-200 text-slate-900'} ${
                       msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
                     } ${
                       glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
@@ -1988,116 +2014,147 @@ const TradingBuddyWidget = () => {
                     </div>
                   )}
                   
-                  {msg.content.ruleset_name && (
-                    <div className={`text-[10px] uppercase tracking-wide mb-2 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                      Analyzed with Your Ruleset: {msg.content.ruleset_name}
-                    </div>
-                  )}
-                  
-                  <div className={`inline-block px-2.5 py-1 rounded-sm text-xs font-semibold uppercase mb-3 ${getVerdictColor(msg.content.setup_status)}`}>
-                    {getVerdictLabel(msg.content.setup_status)}
-                  </div>
+                  {(() => {
+                    const analysis = msg.content
+                    const dark = theme === 'dark'
+                    const muted = dark ? 'text-dark-text' : 'text-slate-500'
+                    const sectionLabel = `text-[11px] font-semibold uppercase tracking-wide mb-1 ${muted}`
+                    const checks: any[] = analysis.rule_checks || []
+                    const selfChecks: string[] = analysis.self_check_rules || []
+                    const passed = checks.filter(check => check.status === 'pass').length
+                    const failed = checks.filter(check => check.status === 'fail').length
+                    const unclear = checks.length - passed - failed
+                    const detailsOpen = !!expandedDetails[i]
+                    const levelDot = (type: string) =>
+                      type === 'support' ? 'bg-green-500'
+                      : type === 'resistance' ? 'bg-red-500'
+                      : type === 'invalidation' ? 'bg-orange-500'
+                      : 'bg-blue-500'
 
-                  {msg.content.rule_checks && msg.content.rule_checks.length > 0 && (
-                    <div className={`mb-4 p-3 rounded-lg ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-slate-50 border border-slate-200'}`}>
-                      <div className={`font-medium mb-2 text-xs ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rule Checklist</div>
-                      <div className="space-y-1.5">
-                        {msg.content.rule_checks.map((check: any, idx: number) => (
-                          <div key={idx} className="flex items-start gap-2">
-                            <span className={`text-base leading-none ${
-                              check.status === 'pass' ? 'text-green-600' : 
-                              check.status === 'fail' ? 'text-red-600' : 
-                              'text-yellow-600'
-                            }`}>
-                              {check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '?'}
-                            </span>
-                            <div className="flex-1">
-                              <div className={`text-xs font-medium ${
-                                check.status === 'pass' ? theme === 'dark' ? 'text-green-400' : 'text-green-700' : 
-                                check.status === 'fail' ? theme === 'dark' ? 'text-red-400' : 'text-red-700' : 
-                                theme === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
-                              }`}>
-                                {check.rule}
-                              </div>
-                              {check.note && (
-                                <div className={`text-[10px] mt-0.5 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                                  {check.note}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.content.validity_estimate && (
-                    <div className={`mb-6 px-3 py-2.5 rounded ${theme === 'dark' ? 'border-dark-border border bg-dark-bg' : 'bg-slate-100'}`}>
-                      <div className="flex items-center justify-between">
-                        <span className={theme === 'dark' ? 'text-white' : 'text-slate-600'}>
-                          Trade Quality: {msg.content.validity_estimate.percent_range[0]}–{msg.content.validity_estimate.percent_range[1]}% ({msg.content.validity_estimate.confidence} confidence)
-                        </span>
-                      </div>
-                      {msg.content.validity_estimate.reason && (
-                        <div className={`text-[11px] mt-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                          {msg.content.validity_estimate.reason}
+                    return (
+                      <>
+                        {/* Verdict first */}
+                        <div className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-semibold uppercase tracking-wide mb-1.5 ${getVerdictColor(analysis.setup_status)}`}>
+                          {analysis.headline || getVerdictLabel(analysis.setup_status)}
                         </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className={`font-medium mb-2 ${theme === 'dark' ? 'text-white font-bold' : 'text-slate-900'}`}>{msg.content.summary}</div>
-                  
-                  {msg.content.bullets && msg.content.bullets.length > 0 && (
-                    <ul className={`space-y-2 mb-3 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-700'}`}>
-                      {msg.content.bullets.map((bullet: string, idx: number) => (
-                        <li key={idx}>• {bullet}</li>
-                      ))}
-                    </ul>
-                  )}
+                        {analysis.headline_reason && (
+                          <div className={`text-[13px] mb-3 ${muted}`}>{analysis.headline_reason}</div>
+                        )}
 
-                  {msg.content.levels_to_watch && msg.content.levels_to_watch.length > 0 && (
-                    <div className={`rounded-lg p-3 mb-2 mt-6 ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-blue-50'}`}>
-                      <div className={`font-medium mb-4 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Levels to Watch</div>
-                      {msg.content.levels_to_watch.map((level: any, idx: number) => {
-                        const getTypeIcon = (type: string) => {
-                          switch(type) {
-                            case 'resistance': return '🔴'
-                            case 'support': return '🟢'
-                            case 'structure': return '🔵'
-                            case 'invalidation': return '❌'
-                            case 'trendline': return '📈'
-                            case 'breakout_level': return '⚡'
-                            case 'consolidation': return '🔶'
-                            default: return '📍'
-                          }
-                        }
-                        
-                        return (
-                          <div key={idx} className={`mb-1.5 last:mb-0 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-700'}`}>
-                            <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              {getTypeIcon(level.type)} {level.label}
-                            </div>
-                            <div className={`text-[12px] ml-4 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-600'}`}>
-                              {level.why_it_matters}
-                              {level.when_observed && <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-500'}`}> ({level.when_observed})</span>}
+                        <div className={`mb-3 ${dark ? 'text-dark-body' : 'text-slate-900'}`}>{analysis.summary}</div>
+
+                        {analysis.wait_for?.length > 0 && (
+                          <div className="mb-3">
+                            <div className={sectionLabel}>Wait for</div>
+                            <ul className="space-y-1">
+                              {analysis.wait_for.map((item: string, idx: number) => (
+                                <li key={idx} className="flex gap-2">
+                                  <span className={muted}>›</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {analysis.levels_to_watch?.length > 0 && (
+                          <div className="mb-3">
+                            <div className={sectionLabel}>Levels</div>
+                            <div className="space-y-1">
+                              {analysis.levels_to_watch.map((level: any, idx: number) => (
+                                <div key={idx} className="flex items-baseline gap-2">
+                                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${levelDot(level.type)}`} />
+                                  <span className="font-medium">{level.label}</span>
+                                  {level.why_it_matters && (
+                                    <span className={`text-[13px] ${muted}`}>{level.why_it_matters}</span>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                        )}
 
-                  {msg.content.behavioral_nudge && (
-                    <div className={`rounded-lg p-3 border ${theme === 'dark' ? 'bg-amber-950/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-                      💡 {msg.content.behavioral_nudge}
-                    </div>
-                  )}
+                        {/* Rule tally; full checklist lives in Details */}
+                        <button
+                          onClick={() => setExpandedDetails(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className={`w-full flex items-center justify-between gap-2 text-[13px] pt-2 mt-1 border-t ${dark ? 'border-dark-border' : 'border-slate-200'}`}
+                        >
+                          <span className="flex flex-wrap gap-x-3">
+                            {passed > 0 && <span className="text-green-500">✓ {passed} pass</span>}
+                            {failed > 0 && <span className="text-red-500">✗ {failed} fail</span>}
+                            {unclear > 0 && <span className="text-yellow-500">? {unclear} unclear</span>}
+                            {selfChecks.length > 0 && <span className={muted}>{selfChecks.length} to confirm</span>}
+                          </span>
+                          <span className={`shrink-0 ${muted}`}>{detailsOpen ? 'Hide ▴' : 'Details ▾'}</span>
+                        </button>
 
-                  {/* Disclaimer for analyze results */}
-                  <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${theme === 'dark' ? 'text-dark-text border-dark-border' : 'text-slate-500 border-slate-200'}`}>
-                    AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
-                  </div>
+                        {detailsOpen && (
+                          <div className="mt-3 space-y-3 text-[13px]">
+                            {checks.length > 0 && (
+                              <div>
+                                <div className={sectionLabel}>Chart rules</div>
+                                <div className="space-y-1.5">
+                                  {checks.map((check: any, idx: number) => (
+                                    <div key={idx} className="flex items-start gap-2">
+                                      <span className={check.status === 'pass' ? 'text-green-500' : check.status === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
+                                        {check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '?'}
+                                      </span>
+                                      <div>
+                                        <div className="font-medium">{check.rule}</div>
+                                        {check.note && <div className={`text-[12px] ${muted}`}>{check.note}</div>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {selfChecks.length > 0 && (
+                              <div>
+                                <div className={sectionLabel}>Confirm yourself</div>
+                                <ul className="space-y-1">
+                                  {selfChecks.map((rule: string, idx: number) => (
+                                    <li key={idx} className="flex gap-2">
+                                      <span className={muted}>☐</span>
+                                      <span>{rule}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {analysis.bullets?.length > 0 && (
+                              <div>
+                                <div className={sectionLabel}>What I see</div>
+                                <ul className="space-y-1">
+                                  {analysis.bullets.map((bullet: string, idx: number) => (
+                                    <li key={idx} className="flex gap-2">
+                                      <span className={muted}>•</span>
+                                      <span>{bullet}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {analysis.ruleset_name && (
+                              <div className={`text-[11px] ${muted}`}>Ruleset: {analysis.ruleset_name}</div>
+                            )}
+                          </div>
+                        )}
+
+                        {analysis.behavioral_nudge && (
+                          <div className={`mt-3 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>
+                            {analysis.behavioral_nudge}
+                          </div>
+                        )}
+
+                        <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${dark ? 'text-dark-text border-dark-border' : 'text-slate-500 border-slate-200'}`}>
+                          AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
                   {msg.timestamp && (
                     <div className={`text-[10px] mt-0.5 text-left px-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>

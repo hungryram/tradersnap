@@ -25,9 +25,9 @@ Status: `[x]` done · `[~]` in progress / needs deploy step · `[ ]` not started
 Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe → eval → switch to Claude → market data.
 
 - [x] **Provider layer** (`backend/lib/llm.ts`): routes call `analyzeChart()` / `chat()`; `AI_PROVIDER=openai|anthropic` switches. OpenAI path keeps current behavior.
-- [~] **Claude path** (`claude-opus-5-5`, effort `high` for analysis / `medium` for chat, structured outputs via zod, prompt caching, refusal fallbacks, screenshots downscaled to ≤2576px).
+- [~] **Claude path** (`claude-opus-5-5`, effort `medium` for analysis and chat (`ANTHROPIC_ANALYZE_EFFORT` to tune), structured outputs via zod, prompt caching, refusal fallbacks, screenshots downscaled to ≤2576px).
   Smoke-tested live 2026-10-08 on a synthetic 4K MNQ chart: prices/times/VWAP read correctly, rules evaluated individually, chase behavior called out. Next: test on a Vercel preview (`AI_PROVIDER=anthropic`, Preview scope only).
-- [ ] **Analysis latency: ~37s at effort `high`** (chat 9–16s). Too slow for day trading — try effort `medium`/`low` on the eval set, and stream responses.
+- [~] **Analysis latency**: 37s → 16–20s (new prompt + effort `medium`; `high` was 24s with no visible quality gain). Next: stream responses, try `low` on the eval set.
 - [ ] Verify prompt-cache hits in production (`cachedTokens` > 0 on repeat chats). Smoke test prompt was below the cache minimum, so this wasn't verified.
 - [ ] Decide free-tier chat model (`ANTHROPIC_MODEL_FREE`, defaults to Opus 5.5; Sonnet 5.5 is cheaper).
 - [ ] Eval set: ~50 real screenshots with expected readings/rule checks; score OpenAI vs Claude before flipping production.
@@ -35,7 +35,8 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 - [ ] Fix free-tier `gpt-5-mini` empty replies (reasoning tokens exhaust `max_completion_tokens: 2000`).
 - [ ] Send symbol + timeframe (parse from TradingView URL/DOM) — analyze currently always gets "(not provided)".
 - [ ] Feed real market data: OHLCV + computed VWAP, EMAs, ATR, prior day H/L/C, opening range as text alongside the screenshot.
-- [ ] Rewrite prompts: remove contradictions (no-probabilities vs `validity_estimate` %, "max 5 lines" vs 3–8 rule checks), cut the feature list from the system prompt.
+- [x] **Analysis prompt rewrite** (`lib/analysis-prompt.ts`): verdict-first card (headline, wait_for, ≤3 levels), chart rules vs. self-check rules, Trade Quality % removed, current time (ET + local) sent from the extension.
+- [ ] Chat prompt rewrite: remove contradictions ("max 5 lines" etc.), cut the feature list from the system prompt, move the admin buy/sell prompt out.
 - [ ] Keep the full structured analysis in follow-up context instead of summary + bullets.
 - [ ] Use `rules_json` (structured checklist) instead of re-interpreting free text each time.
 - [ ] Either ask for `drawings` in the prompt or remove the dead overlay code.
@@ -44,7 +45,11 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 
 ## 3. Day-trader UX
 
+- [~] **Analysis card redesign** (extension): verdict → summary → wait for → levels → rule tally with collapsible Details. Claude.ai-style warm palette, larger text. Ships with next Chrome Web Store release.
+- [ ] Self-check rules as tickable checkboxes (later: auto-fill from broker/trade log).
+
 - [ ] Refresh Supabase tokens in the extension (sessions currently die after ~1h mid-session).
+- [ ] Sign-in UX: login only syncs when the user clicks the popup on the web-app tab. Sync automatically after login; replace hard-coded `admin.snapchartapp.com` links in `content.tsx` with `PLASMO_PUBLIC_API_URL`.
 - [ ] Stream responses (replace fake typing animation).
 - [ ] Downscale + JPEG-compress screenshots before upload (Vercel 4.5 MB body limit; chrome.storage quota).
 - [ ] Reset daily limits in user timezone or at the 6pm ET futures session, not midnight UTC.

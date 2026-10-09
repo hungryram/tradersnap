@@ -78,6 +78,8 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }) // Most recent first for pagination
+      // Older rows share a timestamp with their reply; this puts the user message first after the reverse below
+      .order('role', { ascending: true })
       .range(offset, offset + limit - 1) // Supabase pagination
 
     // Optional: filter by session_id if provided

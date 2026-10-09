@@ -295,6 +295,9 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin")
+  // Explicit timestamps keep the user message ordered before the reply
+  // (a single insert would give both rows the same NOW())
+  const requestStartedAt = new Date().toISOString()
   // Set once usage is reserved; cleared on success. Any failure after that refunds it.
   let reserved: { userId: string, cost: UsageCost } | null = null
   
@@ -506,12 +509,14 @@ Use for time-based coaching when they ask about the next candle or how long they
           user_id: user.id,
           role: 'user',
           content: validatedRequest.message,
-          screenshot_url: null // Chart images stored in extension chrome.storage
+          screenshot_url: null, // Chart images stored in extension chrome.storage
+          created_at: requestStartedAt
         },
         {
           user_id: user.id,
           role: 'assistant',
-          content: aiResponse
+          content: aiResponse,
+          created_at: new Date().toISOString()
         }
       ]
 

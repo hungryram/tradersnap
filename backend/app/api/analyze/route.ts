@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
-import { analysisResponseSchema } from "@/lib/analysis-schema"
+import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
+import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
 import { consumeUsage, getLimits, refundUsage } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
@@ -20,7 +21,9 @@ const analyzeRequestSchema = z.object({
     timeframe: z.string().max(20).optional(),
     notes: z.string().max(1000).optional()
   }).optional(),
-  image: z.string().max(8_000_000).regex(/^data:image\/(png|jpeg|jpg);base64,/)
+  image: z.string().max(8_000_000).regex(/^data:image\/(png|jpeg|jpg);base64,/),
+  timestamp: z.string().max(50).optional(), // ISO timestamp from client
+  timezone: z.string().max(64).optional() // IANA timezone (e.g., "America/New_York")
 })
 
 // Helper to add CORS headers
@@ -43,6 +46,9 @@ const screenshotCost = { messages: 0, screenshots: 1 }
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin")
+  // Explicit timestamps keep the user message ordered before the reply
+  // (a single insert would give both rows the same NOW())
+  const requestStartedAt = new Date().toISOString()
   // Set once usage is reserved; cleared on success. Any failure after that refunds it.
   let refundUserId: string | null = null
   
@@ -114,178 +120,22 @@ export async function POST(request: NextRequest) {
     }
     refundUserId = user.id
 
-    // 6. Build base + tier modifier prompt
-    const basePrompt = `You are a sharp, experienced trading coach.
-You enforce discipline.
-You are NOT a signal service.
-You never give permission to trade.
-
-Direct. No corporate speak.
-
-RULES:
-${ruleset.rules_text}
-
-CONTEXT:
-Symbol: ${validatedRequest.context?.symbol ?? '(not provided)'}
-Timeframe: ${validatedRequest.context?.timeframe ?? '(not provided)'}
-Notes: ${validatedRequest.context?.notes ?? '(none)'}
-
-BOUNDARIES (STRICT)
-
-DO NOT:
-- Give buy/sell instructions
-- Give entries, exits, stops, or targets
-- Predict outcomes or probabilities
-- Invent indicator meanings or values
-
-DO:
-- Speak in observations only
-- Reference structure, levels, and rules
-- Say "wait" when rules aren't met
-- Challenge emotional reasoning
-
-TASK
-
-1) Read the chart structurally
-   - Trend, range, rejection, breakout, chop
-
-2) Check rules
-   - Are they aligned, incomplete, or violated?
-   - EVALUATE EACH RULE INDIVIDUALLY (REQUIRED):
-     * Break down the ruleset into distinct checkable criteria (volume, indicators, price levels, structure, etc.)
-     * For each criterion, determine: pass / fail / unclear
-     * Add brief notes explaining the status
-     * ALWAYS return rule_checks array - this is NOT optional
-     * Minimum 3 rule checks, maximum 8
-
-3) Classify setup state
-   - aligned / incomplete / violated
-
-4) Coach behavior
-   - Call out FOMO, impatience, fear, forcing
-
-5) Handle uncertainty correctly
-   - Explain what's unclear
-   - Ask for clarification
-   - Refuse to guess if needed
-
-Never hallucinate.
-
-TIME DISCIPLINE
-
-Use time to slow decisions:
-"One candle."
-"Next 5m close."
-"If nothing changes, nothing changes."
-
-VALIDITY ESTIMATE
-
-Provide an estimate of how likely this setup is VALID per the user's rules and what is visible on the chart.
-This is NOT a prediction of profit and NOT a market forecast.
-
-Rules:
-- Output a RANGE, not a single percent. Example: [60, 75]
-- Include confidence: low/medium/high
-- If key details are missing or unreadable, set validity_estimate to null and ask clarifying questions
-- Tighten the range only when confirmations are clearly visible
-- Always explain what would increase/decrease the estimate
-
-OUTPUT (JSON ONLY)
-
-Return ONLY valid JSON. No markdown. No extra text.
-
-{
-  "chart_readable": true | false,  // false ONLY if the image is not a price chart or is too unclear to analyze at all
-  "setup_status": "aligned" | "incomplete" | "violated",
-  "rule_checks": [{
-    "rule": "Brief description of the specific rule criterion",
-    "status": "pass" | "fail" | "unclear",
-    "note": "Brief explanation (e.g., 'Volume at 15.2M' or 'Cannot verify from chart')"
-  }],  // REQUIRED: Always include 3-8 rule checks
-  "validity_estimate": {
-    "percent_range": [min, max],
-    "confidence": "low | medium | high",
-    "reason": "Short reason tied to rules + clarity"
-  },
-  "summary": "One punchy sentence describing what's happening",
-  "bullets": ["One clear observation per line"],
-  "levels_to_watch": [{
-    "label": "Include PRICE if visible",
-    "type": "support | resistance | structure | invalidation | trendline | breakout_level | consolidation",
-    "relative_location": "above | below | current price",
-    "when_observed": "Read TIMESTAMP from X-axis if visible (e.g., '10:30 AM', '2:45 PM', 'around 3:00'). If unreadable, describe timing (e.g., 'twice today', 'recent low')",
-    "why_it_matters": "Brief reason",
-    "confidence": "low | medium | high"
-  }],
-  "rule_violations": [],
-  "missing_confirmations": [],
-  "behavioral_nudge": "One sharp coaching sentence",
-  "follow_up_questions": []
-}
-
-LEVELS TO WATCH:
-- ALWAYS include price/zone in label when visible
-- Use ranges for zones: "25,730-25,740"
-- Use approximate if unclear: "around 25,600"
-- PRIORITIZE reading timestamp from X-axis: "10:30 AM", "2:45 PM", "around 3:15"
-- If timestamp unreadable, describe timing. Example:"twice today", "recent rejection"
-- Only use generic labels if price unreadable
-
-SETUP STATUS MEANING:
-aligned → chart behavior matches their rules (not permission)
-incomplete → something required is missing
-violated → rules are clearly broken`
-
-    const tierModifier = profile.plan === 'pro'
-      ? `
-
-TIER: PRO
-VISION: HIGH-RESOLUTION
-
-VALIDITY ESTIMATE:
-- Use tight ranges when confirmations are clear
-- High confidence requires all critical confirmations visible
-- Always pair estimate with what would raise/lower it
-
-ADDITIONAL CONTEXT:
-- You may reference saved messages
-- You may call out repeated behavioral patterns
-- You may use the trader's own words
-
-LIMITS:
-- Ask up to TWO follow-up questions
-- Use conditional framing when helpful:
-  "If X happens → Y becomes valid"`
-      : `
-
-TIER: FREE
-VISION: LOW-RESOLUTION (512x512)
-
-VISION RULES:
-- Do NOT invent numbers you cannot read
-- Use zones instead of exact prices
-- Focus on structure over precision
-
-VALIDITY ESTIMATE:
-- Use wider ranges if details are unclear
-- Focus on structural alignment with rules
-- Set to null if key confirmations can't be verified
-
-LIMITS:
-- Ask at most ONE follow-up question
-- Keep bullets concise`
-
-    const coachingPrompt = basePrompt + tierModifier
+    // 6. Build prompt from the trader's rules and context
+    const coachingPrompt = buildAnalysisPrompt(ruleset.rules_text, {
+      ...validatedRequest.context,
+      timestamp: validatedRequest.timestamp,
+      timezone: validatedRequest.timezone
+    })
 
     // Provider + model selection live in lib/llm
     const aiResponse = await analyzeChart({
       system: coachingPrompt,
       image: validatedRequest.image,
       prompt: "Analyze this chart.",
-      schema: analysisResponseSchema,
+      schema: analysisOutputSchema,
       plan: profile.plan
     })
-    const validatedResponse = analysisResponseSchema.parse(aiResponse)
+    const validatedResponse = trimAnalysis(analysisResponseSchema.parse(aiResponse))
 
     // Unreadable charts don't count towards usage (reported by the model as a structured field)
     const chartUnreadable = validatedResponse.chart_readable === false
@@ -301,12 +151,14 @@ LIMITS:
         user_id: user.id,
         role: 'user',
         content: '📸 Analyze this chart',
-        screenshot_url: null // Chart images stored in extension chrome.storage
+        screenshot_url: null, // Chart images stored in extension chrome.storage
+        created_at: requestStartedAt
       },
       {
         user_id: user.id,
         role: 'assistant',
-        content: JSON.stringify(validatedResponse)
+        content: JSON.stringify(validatedResponse),
+        created_at: new Date().toISOString()
       }
     ]
 
