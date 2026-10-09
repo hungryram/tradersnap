@@ -24,7 +24,6 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 - [x] Extension renews its session in the background (alarm every minute, 10 min before expiry; also when the tab regains focus).
 - [x] Onboarding back on as 3 screens (existing users with rules skip it): (1) what you trade + platform (TradingView / Tradovate / TopstepX) + prop firm? (2) rules from a template card + **limits as numbers** (max trades/day, max daily loss, stop after N losses, trading hours) (3) "Open TradingView →".
 - [x] First-run "Get started" checklist pinned above the chat (shows the next step; analyze → ask about your chart with Send with Chart → auto-detect trades). First analysis and first chart question are free, enforced server-side.
-- [x] (was) "Get started" checklist in the chat (sign in → analyze → auto-detect trades → ask the coach); chat auto-opens on first visit / `?snapchart=start`. Consent modal replaced by one line.
 - [x] Bugs: `/auth/login` 404 removed; hard-coded admin links → `PLASMO_PUBLIC_API_URL`; `/auth/callback` keeps the query string.
 - [~] Funnel events: onboarding_completed, opened_tradingview, first_analysis, autodetect_enabled, checklist_completed (pre-signup steps come from Chrome Web Store installs). Still to do: a funnel view/query.
 - [ ] Chrome Web Store listing: screenshots + short video of the verdict card and Today strip. *(you)*
