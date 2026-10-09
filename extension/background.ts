@@ -63,9 +63,14 @@ async function authRequest(path: string, body: unknown, accessToken?: string) {
   return data
 }
 
+// Sessions this script created (from a one-time token) are marked so we only
+// ever renew our own. A session copied from the website (older builds did
+// that) shares the website's single-use refresh token; renewing it would sign
+// the website out.
 function withExpiry(session: any) {
   return {
     ...session,
+    owner: "extension",
     expires_at: session.expires_at ?? Math.floor(Date.now() / 1000) + (session.expires_in ?? 3600)
   }
 }
@@ -102,7 +107,7 @@ function refreshSessionIfNeeded(force = false): Promise<void> {
   if (refreshing) return refreshing
   refreshing = (async () => {
     const { supabase_session: session } = await chrome.storage.local.get("supabase_session")
-    if (!session?.refresh_token) return
+    if (!session?.refresh_token || session.owner !== "extension") return
     const secondsLeft = (session.expires_at ?? 0) - Date.now() / 1000
     if (!force && secondsLeft > REFRESH_MARGIN_SECONDS) return
 

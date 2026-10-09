@@ -27,21 +27,41 @@ export type TradingLimits = {
   timezone: string | null
 }
 
-// Fetch helper for dashboard pages: adds the session token, sends to / if signed out
+// Fetch helper for dashboard pages: adds the session token. If the server
+// rejects the token, renew the session once; if that fails the login is dead
+// (expired or revoked), so sign out and go to the sign-in page.
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    window.location.href = "/"
-    throw new Error("Signed out")
-  }
-  const response = await fetch(path, {
+  if (!session) return signedOut()
+
+  const send = (token: string) => fetch(path, {
     ...init,
-    headers: { ...(init.headers || {}), Authorization: `Bearer ${session.access_token}`, ...(init.body ? { "Content-Type": "application/json" } : {}) }
+    headers: { ...(init.headers || {}), Authorization: `Bearer ${token}`, ...(init.body ? { "Content-Type": "application/json" } : {}) }
   })
+
+  let response = await send(session.access_token)
+  if (response.status === 401) {
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    if (!refreshed.session) {
+      await supabase.auth.signOut().catch(() => {})
+      return signedOut()
+    }
+    response = await send(refreshed.session.access_token)
+    if (response.status === 401) {
+      await supabase.auth.signOut().catch(() => {})
+      return signedOut()
+    }
+  }
+
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`)
   return data as T
+}
+
+function signedOut(): never {
+  window.location.href = "/"
+  throw new Error("Signed out")
 }
 
 export function startOfLocalDay(daysAgo = 0) {
