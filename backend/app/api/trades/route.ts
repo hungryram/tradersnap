@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/trades?since=<ISO> — trades closed since the trader's local start of day
+// GET /api/trades?since=<ISO>&limit=<n> — trades closed since a time (the extension sends local midnight), newest first
 export async function GET(request: NextRequest) {
   const origin = request.headers.get("origin")
 
@@ -114,6 +114,8 @@ export async function GET(request: NextRequest) {
     const since = sinceParam && !isNaN(Date.parse(sinceParam))
       ? new Date(sinceParam)
       : new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const limitParam = Number(request.nextUrl.searchParams.get("limit"))
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 1000) : 200
 
     const { data, error } = await supabase
       .from("trades")
@@ -121,7 +123,7 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id)
       .gte("closed_at", since.toISOString())
       .order("closed_at", { ascending: false })
-      .limit(200)
+      .limit(limit)
 
     if (error) {
       console.error("[Trades] Fetch error:", error)

@@ -15,5 +15,5 @@ export async function finishLogin(session: Session): Promise<string> {
   } catch {
     // If the profile can't be loaded, the dashboard still works
   }
-  return "/dashboard/rules"
+  return "/dashboard"
 }

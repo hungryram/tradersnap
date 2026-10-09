@@ -57,7 +57,7 @@ export default function OnboardingPage() {
       const response = await fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
       if (response.ok) {
         const { user, ruleset } = await response.json()
-        if (user?.onboarded && ruleset) router.replace("/dashboard/rules")
+        if (user?.onboarded && ruleset) router.replace("/dashboard")
       }
     })
     detectExtension().then(setExtensionVersion)
@@ -266,7 +266,7 @@ export default function OnboardingPage() {
               <a key={p.id} href={p.url} className={primary}>Open {p.label} →</a>
             ))}
           </div>
-          <a href="/dashboard/rules" className="inline-block text-sm text-ink-text hover:text-ink-body">Go to my dashboard instead</a>
+          <a href="/dashboard" className="inline-block text-sm text-ink-text hover:text-ink-body">Go to my dashboard instead</a>
         </div>
       )}
     </AuthShell>

@@ -30,8 +30,8 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 - [ ] Question for you: where does the marketing site / "Add to Chrome" button live (separate repo?).
 
 **Phase 2: retention**
-- [ ] Dashboard redesign: dark warm theme matching the extension; sidebar Today · Journal · Rules · Saved · Account; home = Today (trades, rule adherence) instead of the rules text box.
-- [ ] Journal page from `trades` (filter by day/symbol, per-trade detail).
+- [x] Dashboard redesign: dark warm theme, sidebar (Today · Journal · Rules · Saved · Account + Guide/FAQ/Discord), shared `components/ui.tsx`. Sign-in lands on Today.
+- [x] Today page (trades, net, W/L, losing streak, limits progress, trading-hours window, usage) and Journal (7/30/90d: win rate, avg win/loss, profit factor, P&L by day/hour/symbol, "trades within 15 min of a loss" insight, trade table). Rules page edits daily limits.
 - [ ] Guardrails using the onboarding limits (see section 3 trade tracking).
 - [ ] End-of-day recap in the chat (trades, rules broken, one lesson).
 - [ ] Weekly email report (biggest leak, best/worst time of day, rules broken). Needs an email provider (e.g. Resend).

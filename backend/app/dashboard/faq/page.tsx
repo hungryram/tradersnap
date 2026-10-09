@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
-import DashboardNav from "../components/DashboardNav"
 
 export default function FAQPage() {
   const router = useRouter()
@@ -35,7 +34,7 @@ export default function FAQPage() {
                 href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 underline font-medium"
+                className="text-blue-400 hover:text-blue-300 underline font-medium"
               >
                 Install the extension from the Chrome Web Store
               </a>
@@ -132,7 +131,7 @@ export default function FAQPage() {
                 href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 underline"
+                className="text-blue-400 hover:text-blue-300 underline"
               >
                 reinstalling the extension
               </a>
@@ -179,28 +178,26 @@ export default function FAQPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <DashboardNav />
+      <div>
         <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-          <div className="text-gray-900 text-xl">Loading...</div>
+          <div className="text-ink-body text-xl">Loading...</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardNav />
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <div>
+      <div className="max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Frequently Asked Questions</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Frequently Asked Questions</h1>
+          <p className="text-ink-text">
             Find answers to common questions about Snapchart. Can't find what you're looking for?{" "}
             <a 
               href="https://snapchart.canny.io/bugs-and-issues" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 underline"
+              className="text-blue-400 hover:text-blue-300 underline"
             >
               Contact support
             </a>
@@ -209,13 +206,13 @@ export default function FAQPage() {
 
         <div className="space-y-8">
           {faqSections.map((section, sectionIdx) => (
-            <div key={sectionIdx} className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">{section.title}</h2>
+            <div key={sectionIdx} className="bg-ink-surface rounded-lg border border-ink-border p-6">
+              <h2 className="text-xl font-semibold text-ink-body mb-4">{section.title}</h2>
               <div className="space-y-4">
                 {section.questions.map((item, itemIdx) => (
-                  <div key={itemIdx} className="border-b border-gray-200 last:border-b-0 pb-4 last:pb-0">
-                    <h3 className="text-base font-medium text-blue-600 mb-2">{item.q}</h3>
-                    <div className="text-gray-700 text-sm leading-relaxed">{item.a}</div>
+                  <div key={itemIdx} className="border-b border-ink-border last:border-b-0 pb-4 last:pb-0">
+                    <h3 className="text-base font-medium text-blue-400 mb-2">{item.q}</h3>
+                    <div className="text-ink-text text-sm leading-relaxed">{item.a}</div>
                   </div>
                 ))}
               </div>
@@ -223,9 +220,9 @@ export default function FAQPage() {
           ))}
         </div>
 
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Still have questions?</h2>
-          <p className="text-gray-700 mb-4">
+        <div className="mt-8 bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-ink-body mb-2">Still have questions?</h2>
+          <p className="text-ink-text mb-4">
             We're here to help! Reach out through any of these channels:
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -241,7 +238,7 @@ export default function FAQPage() {
               href="mailto:help@snapchartapp.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-colors border border-gray-300"
+              className="inline-flex items-center justify-center px-4 py-2 bg-ink-surface hover:bg-ink-elevated text-ink-text rounded-lg transition-colors border border-ink-border"
             >
               Request a Feature
             </a>

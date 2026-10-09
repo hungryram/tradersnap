@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase-client"
-import DashboardNav from "../components/DashboardNav"
+import { api } from "@/lib/dashboard-data"
+import { Card, Loading, Notice, PageHeader, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
 interface UserData {
   user: {
@@ -12,533 +11,236 @@ interface UserData {
     last_name: string | null
     plan: string
     subscription_status: string
-    onboarded: boolean
     created_at: string
   }
   usage: {
-    messages: {
-      used: number
-      limit: number
-    }
-    screenshots: {
-      used: number
-      limit: number
-    }
-    favorites: {
-      used: number
-      limit: number
-    }
-    resetDate: string
+    messages: { used: number; limit: number }
+    screenshots: { used: number; limit: number }
+    favorites: { used: number; limit: number }
   }
 }
 
+const PLANS = {
+  free: ["15 coach messages a day", "5 chart checks a day", "Trade tracking and journal", "Coach remembers 3 saved messages", "3 rulesets"],
+  pro: ["200 coach messages a day", "50 chart checks a day", "Trade tracking and journal", "Coach remembers 20 saved messages", "20 rulesets", "Longer, more detailed answers"],
+}
+
 export default function AccountPage() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [isLoading, setIsLoading] = useState(true)
   const [userData, setUserData] = useState<UserData | null>(null)
-  const [isLoadingPortal, setIsLoadingPortal] = useState(false)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [profileMessage, setProfileMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
 
-  useEffect(() => {
-    loadAccountData()
-  }, [])
+  useEffect(() => { load() }, [])
 
-  async function loadAccountData() {
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      router.push("/")
-      return
-    }
-
-    // Save session to localStorage for extension to detect
+  async function load() {
     try {
-      localStorage.setItem('trading_buddy_session', JSON.stringify(session))
-    } catch (e) {
-      console.error('Failed to save session to localStorage:', e)
-    }
-
-    try {
-      const origin = window.location.origin
-      const response = await fetch(`${origin}/api/me`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
-
-      if (!response.ok) throw new Error("Failed to load account data")
-
-      const data = await response.json()
+      const data = await api<UserData>("/api/me")
       setUserData(data)
       setFirstName(data.user.first_name || "")
       setLastName(data.user.last_name || "")
       setEmail(data.user.email)
-      setIsLoading(false)
     } catch (err) {
-      console.error("Load error:", err)
-      setIsLoading(false)
-    }
-  }
-
-  async function openBillingPortal() {
-    setIsLoadingPortal(true)
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push("/")
-        return
-      }
-
-      const origin = window.location.origin
-      const response = await fetch(
-        `${origin}/api/billing/portal`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        }
-      )
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create portal session")
-      }
-
-      window.open(data.url, '_blank')
-      setIsLoadingPortal(false)
-      
-    } catch (err) {
-      console.error("Portal error:", err)
-      setIsLoadingPortal(false)
-      alert("Failed to open billing portal. Please try again.")
+      setError(err instanceof Error ? err.message : "Failed to load account")
     }
   }
 
   async function saveProfile() {
-    setIsSavingProfile(true)
+    setBusy(true)
     setProfileMessage(null)
-
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push("/")
-        return
-      }
-
-      const origin = window.location.origin
-      const response = await fetch(`${origin}/api/profile`, {
+      const data = await api("/api/profile", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`
-        },
         body: JSON.stringify({
-          first_name: firstName.trim() || null,
-          last_name: lastName.trim() || null,
-          email: email !== userData?.user.email ? email : undefined
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim() !== userData?.user.email ? email.trim() : undefined
         })
       })
-
-      if (!response.ok) throw new Error("Failed to update profile")
-
-      const data = await response.json()
-      setProfileMessage({ type: 'success', text: data.message })
-      setIsEditingProfile(false)
-      
-      // Reload account data to refresh
-      await loadAccountData()
-      
-    } catch (err) {
-      console.error("Profile update error:", err)
-      setProfileMessage({ type: 'error', text: "Failed to update profile" })
+      setProfileMessage({ tone: "good", text: data.message || "Profile saved." })
+      setEditing(false)
+      await load()
+    } catch {
+      setProfileMessage({ tone: "bad", text: "Couldn't save your profile." })
     } finally {
-      setIsSavingProfile(false)
+      setBusy(false)
     }
   }
 
-  async function upgradeToProPlan() {
-    setIsLoadingPortal(true)
-    
+  async function openBillingPortal() {
+    setBusy(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push("/")
-        return
-      }
-
-      const origin = window.location.origin
-      const response = await fetch(`${origin}/api/checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO,
-          plan: "pro"
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        // If already subscribed, open billing portal instead
-        if (data.redirectToPortal) {
-          await openBillingPortal()
-          return
-        }
-        throw new Error(data.error || "Failed to create checkout session")
-      }
-
-      window.location.href = data.url
-      
-    } catch (err) {
-      console.error("Checkout error:", err)
-      alert("Failed to start checkout")
+      const data = await api("/api/billing/portal", { method: "POST" })
+      window.open(data.url, "_blank")
+    } catch {
+      alert("Couldn't open the billing portal. Please try again.")
     } finally {
-      setIsLoadingPortal(false)
+      setBusy(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600">Loading...</div>
-      </div>
-    )
+  async function upgrade() {
+    setBusy(true)
+    try {
+      const data = await api("/api/checkout", { method: "POST", body: JSON.stringify({ plan: "pro" }) })
+      window.location.href = data.url
+    } catch (err) {
+      // Already subscribed: manage it instead
+      if (err instanceof Error && /already/i.test(err.message)) await openBillingPortal()
+      else alert("Couldn't start checkout. Please try again.")
+      setBusy(false)
+    }
   }
 
-  const messagePercent = userData ? (userData.usage.messages.used / userData.usage.messages.limit) * 100 : 0
-  const screenshotPercent = userData ? (userData.usage.screenshots.used / userData.usage.screenshots.limit) * 100 : 0
+  if (error) return <Notice tone="bad">{error}</Notice>
+  if (!userData) return <Loading />
+
+  const { user, usage } = userData
+  const isPro = user.plan === "pro" || user.plan === "admin"
+  const name = `${user.first_name || ""} ${user.last_name || ""}`.trim()
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <DashboardNav />
+    <>
+      <PageHeader title="Account" subtitle={`Member since ${new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`} />
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="space-y-6">
-          {/* Profile Info */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-900">Profile</h2>
-              {!isEditingProfile && (
-                <button
-                  onClick={() => setIsEditingProfile(true)}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-
-            {profileMessage && (
-              <div className={`mb-4 p-3 rounded-lg ${profileMessage.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                <p className="text-sm">{profileMessage.text}</p>
-              </div>
-            )}
-
-            {isEditingProfile ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-1">
-                      First Name
-                    </label>
-                    <input
-                      id="firstName"
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="John"
-                      maxLength={50}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-1">
-                      Last Name
-                    </label>
-                    <input
-                      id="lastName"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Doe"
-                      maxLength={50}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Changing your email requires verification</p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={saveProfile}
-                    disabled={isSavingProfile}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2 rounded-lg"
-                  >
-                    {isSavingProfile ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsEditingProfile(false)
-                      setFirstName(userData?.user.first_name || "")
-                      setLastName(userData?.user.last_name || "")
-                      setEmail(userData?.user.email || "")
-                      setProfileMessage(null)
-                    }}
-                    disabled={isSavingProfile}
-                    className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-6 py-2 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <span className="text-sm text-slate-600">Name</span>
-                  <p className="font-medium text-slate-900">
-                    {userData?.user.first_name || userData?.user.last_name 
-                      ? `${userData?.user.first_name || ''} ${userData?.user.last_name || ''}`.trim()
-                      : <span className="text-slate-400 italic">Not set</span>
-                    }
-                  </p>
-                </div>
-                <div>
-                  <span className="text-sm text-slate-600">Email</span>
-                  <p className="font-medium text-slate-900">{userData?.user.email}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-slate-600">Plan</span>
-                  <p className="font-medium text-slate-900 capitalize">
-                    {userData?.user.plan === "pro" ? "Pro" : "Free"}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Usage Today */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Usage Today</h2>
+      <div className="space-y-6">
+        <Card title="Profile" action={!editing && <button onClick={() => setEditing(true)} className="text-sm text-blue-400 hover:text-blue-300">Edit</button>}>
+          {profileMessage && <div className="mb-4"><Notice tone={profileMessage.tone}>{profileMessage.text}</Notice></div>}
+          {editing ? (
             <div className="space-y-4">
-              {/* Messages */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600">Messages</span>
-                  <span className="font-medium text-slate-900">
-                    {userData?.usage.messages.used} / {userData?.usage.messages.limit}
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(messagePercent, 100)}%` }}
-                  />
-                </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs text-ink-text">First name</span>
+                  <input value={firstName} onChange={e => setFirstName(e.target.value)} maxLength={50} className={inputClass} />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs text-ink-text">Last name</span>
+                  <input value={lastName} onChange={e => setLastName(e.target.value)} maxLength={50} className={inputClass} />
+                </label>
               </div>
-
-              {/* Screenshots */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600">Chart Screenshots</span>
-                  <span className="font-medium text-slate-900">
-                    {userData?.usage.screenshots.used} / {userData?.usage.screenshots.limit}
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(screenshotPercent, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Reset info */}
-              <p className="text-xs text-slate-500 mt-3">
-                Usage resets daily at midnight UTC
-              </p>
-
-              {(messagePercent >= 80 || screenshotPercent >= 80) && userData?.user.plan === "free" && (
-                <p className="text-xs text-amber-600">
-                  ⚠️ You're running low on usage. Upgrade to Pro for 200 messages and 50 screenshots per day.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Favorites */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Favorites</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">AI Context Limit</span>
-                <span className="font-medium text-slate-900">
-                  {userData?.usage.favorites.limit} favorites sent to AI
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                {userData?.user.plan === "free" 
-                  ? "Upgrade to Pro to send 20 favorites to the AI instead of 3"
-                  : "The AI sees your 20 most recent favorites for better context"}
-              </p>
-            </div>
-          </div>
-
-          {/* Billing */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Billing</h2>
-
-            <p className="text-sm text-slate-600 mb-4">
-              Start free and upgrade when you need more.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className={`rounded-xl border p-5 ${userData?.user.plan === "free" ? "border-blue-300 bg-blue-50" : "border-slate-200"}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold text-slate-900">Free</h3>
-                  {userData?.user.plan === "free" && (
-                    <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                      Current plan
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-3xl font-bold text-slate-900">$0<span className="text-base font-medium text-slate-600">/month</span></p>
-
-                <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                  <li>15 messages/day</li>
-                  <li>5 screenshots/day</li>
-                  <li>GPT-5 Mini model</li>
-                  <li>Lower quality screenshots</li>
-                  <li>3 favorited messages</li>
-                  <li>3 rulesets</li>
-                </ul>
-
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-ink-text">Email</span>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+                <span className="mt-1 block text-xs text-ink-muted">Changing your email sends a confirmation link to the new address.</span>
+              </label>
+              <div className="flex gap-2">
+                <button onClick={saveProfile} disabled={busy} className={buttonPrimary}>{busy ? "Saving..." : "Save"}</button>
                 <button
-                  disabled
-                  className="mt-5 w-full border border-slate-300 text-slate-500 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
+                  onClick={() => { setEditing(false); setFirstName(user.first_name || ""); setLastName(user.last_name || ""); setEmail(user.email); setProfileMessage(null) }}
+                  disabled={busy}
+                  className={buttonSecondary}
                 >
-                  {userData?.user.plan === "free" ? "Current Plan" : "Free Plan"}
+                  Cancel
                 </button>
               </div>
-
-              <div className={`rounded-xl border p-5 ${userData?.user.plan === "pro" ? "border-blue-500 bg-blue-50" : "border-blue-300"}`}>
-                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                  <h3 className="text-lg font-semibold text-slate-900">Pro</h3>
-                  <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
-                    Limited-time launch discount - 61% OFF
-                  </span>
-                </div>
-
-                <div className="mb-1 text-sm text-slate-500 line-through">$49/month</div>
-                <p className="text-3xl font-bold text-slate-900">$19<span className="text-base font-medium text-slate-600">/month</span></p>
-                <p className="text-sm font-medium text-green-700 mt-1">You save $30 every month</p>
-
-                <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                  <li>200 messages/day</li>
-                  <li>50 screenshots/day</li>
-                  <li>Latest GPT-5.1 model</li>
-                  <li>High quality screenshots for better accuracy</li>
-                  <li>More detailed analysis</li>
-                  <li>20 favorited messages</li>
-                  <li>20 rulesets</li>
-                </ul>
-
-                {userData?.user.plan === "free" ? (
-                  <button
-                    onClick={upgradeToProPlan}
-                    disabled={isLoadingPortal}
-                    className="mt-5 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                  >
-                    {isLoadingPortal ? "Loading..." : "Upgrade to Pro ($19/mo)"}
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="mt-5 w-full border border-slate-300 text-slate-500 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
-                  >
-                    Current Plan
-                  </button>
-                )}
-              </div>
             </div>
+          ) : (
+            <dl className="grid gap-4 text-sm sm:grid-cols-3">
+              <div><dt className="text-xs text-ink-muted">Name</dt><dd className="mt-0.5">{name || <span className="text-ink-muted">Not set</span>}</dd></div>
+              <div><dt className="text-xs text-ink-muted">Email</dt><dd className="mt-0.5 break-all">{user.email}</dd></div>
+              <div><dt className="text-xs text-ink-muted">Plan</dt><dd className="mt-0.5">{user.plan === "admin" ? "Admin" : isPro ? "Pro" : "Free"}</dd></div>
+            </dl>
+          )}
+        </Card>
 
-            {userData?.user.plan === "pro" && (
-              <div className="mt-5">
-                <p className="text-sm text-slate-600 mb-3">
-                  Manage your subscription, payment methods, and billing history.
-                </p>
-                <button
-                  onClick={openBillingPortal}
-                  disabled={isLoadingPortal}
-                  className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg text-sm font-medium"
-                >
-                  {isLoadingPortal ? "Loading..." : "Manage Billing"}
-                </button>
+        <Card title="Usage today">
+          <div className="grid gap-5 sm:grid-cols-3">
+            <UsageBar label="Coach messages" used={usage.messages.used} max={usage.messages.limit} />
+            <UsageBar label="Chart checks" used={usage.screenshots.used} max={usage.screenshots.limit} />
+            <UsageBar label="Saved messages your coach remembers" used={usage.favorites.used} max={usage.favorites.limit} />
+          </div>
+          <p className="mt-4 text-xs text-ink-muted">Daily limits reset at midnight UTC.</p>
+        </Card>
+
+        <div id="plans" className="scroll-mt-8">
+          <Card title="Plan">
+            <div className="grid gap-4 md:grid-cols-2">
+              <PlanCard name="Free" price="$0" features={PLANS.free} current={!isPro} />
+              <PlanCard
+                name="Pro"
+                price="$19"
+                was="$49"
+                badge="Launch price"
+                features={PLANS.pro}
+                current={isPro}
+                highlight
+                action={!isPro && <button onClick={upgrade} disabled={busy} className={`${buttonPrimary} w-full`}>{busy ? "Loading..." : "Upgrade to Pro"}</button>}
+              />
+            </div>
+            {isPro && user.plan !== "admin" && (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-border pt-5">
+                <p className="text-sm text-ink-text">Payment method, invoices and cancellation are in the billing portal.</p>
+                <button onClick={openBillingPortal} disabled={busy} className={buttonSecondary}>{busy ? "Loading..." : "Manage billing"}</button>
               </div>
             )}
-
-            <p className="text-xs text-slate-500 mt-4">
-              Daily usage limits reset at midnight UTC. Pricing may change after beta based on feedback.
-            </p>
-          </div>
-
-          {/* Extension */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Chrome Extension</h2>
-            <p className="text-sm text-slate-600 mb-4">
-              Install the Snapchart extension to analyze your charts.
-            </p>
-            <a
-              href="https://chromewebstore.google.com/detail/snapchart-trading-psychol/bppbpeodpbepcmjifjjihejcnofdnibe"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
-              target="_blank"
-            >
-              Open Extensions Page
-            </a>
-          </div>
+          </Card>
         </div>
+
+        <Card title="Chrome extension">
+          <p className="mb-4 text-sm text-ink-text">Snapchart lives on your charts. If you use a new browser or computer, install it there and sign in.</p>
+          <a
+            href={process.env.NEXT_PUBLIC_CHROME_STORE_URL || "https://chromewebstore.google.com/detail/snapchart-trading-psychol/bppbpeodpbepcmjifjjihejcnofdnibe"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonSecondary}
+          >
+            Chrome Web Store ↗
+          </a>
+        </Card>
+
+        <p className="text-center text-xs text-ink-muted">
+          <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Privacy Policy</a>
+          {" · "}
+          <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Terms of Service</a>
+        </p>
       </div>
+    </>
+  )
+}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 py-6 mt-12">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          <div className="flex justify-center gap-6 text-sm text-slate-600">
-            <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
-              Privacy Policy
-            </a>
-            <span className="text-slate-400">|</span>
-            <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
-              Terms of Service
-            </a>
-          </div>
-        </div>
-      </footer>
+function UsageBar({ label, used, max }: { label: string; used: number; max: number }) {
+  const ratio = max > 0 ? Math.min(used / max, 1) : 0
+  return (
+    <div>
+      <div className="mb-1.5 flex justify-between gap-2 text-sm">
+        <span className="text-ink-text">{label}</span>
+        <span className="tabular-nums">{used} / {max}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-ink-elevated">
+        <div className={`h-1.5 rounded-full ${ratio >= 0.8 ? "bg-amber-500" : "bg-blue-500"}`} style={{ width: `${ratio * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function PlanCard({ name, price, was, badge, features, current, highlight = false, action }: {
+  name: string; price: string; was?: string; badge?: string; features: string[]; current: boolean; highlight?: boolean; action?: React.ReactNode
+}) {
+  return (
+    <div className={`flex flex-col rounded-xl border p-5 ${current ? "border-blue-500 bg-blue-500/5" : highlight ? "border-ink-muted" : "border-ink-border"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">{name}</h3>
+        {current ? (
+          <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs text-blue-300">Current plan</span>
+        ) : badge ? (
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs text-amber-200">{badge}</span>
+        ) : null}
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-3xl font-semibold">{price}</span>
+        <span className="text-sm text-ink-text">/month</span>
+        {was && <span className="text-sm text-ink-muted line-through">{was}</span>}
+      </div>
+      <ul className="mt-4 flex-1 space-y-2 text-sm text-ink-text">
+        {features.map(f => (
+          <li key={f} className="flex gap-2"><span className="text-green-400">✓</span>{f}</li>
+        ))}
+      </ul>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   )
 }

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
-import DashboardNav from "../components/DashboardNav"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
 
@@ -172,9 +171,9 @@ export default function SavedMessagesPage() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Setup Status:</span>
           <span className={`px-2 py-1 rounded text-sm font-medium ${
-            analysis.setup_status === 'valid' ? 'bg-green-100 text-green-700' :
-            analysis.setup_status === 'potentially_valid' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-red-100 text-red-700'
+            analysis.setup_status === 'valid' ? 'bg-green-500/15 text-green-300' :
+            analysis.setup_status === 'potentially_valid' ? 'bg-yellow-500/15 text-yellow-300' :
+            'bg-red-500/15 text-red-300'
           }`}>
             {analysis.setup_status}
           </span>
@@ -184,11 +183,11 @@ export default function SavedMessagesPage() {
         {analysis.validity_estimate && (
           <div>
             <p className="text-sm font-medium mb-1">Validity Estimate:</p>
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-ink-text">
               {analysis.validity_estimate.percent_range?.[0]}-{analysis.validity_estimate.percent_range?.[1]}% 
               ({analysis.validity_estimate.confidence} confidence)
             </p>
-            <p className="text-sm text-slate-600 mt-1">{analysis.validity_estimate.reason}</p>
+            <p className="text-sm text-ink-text mt-1">{analysis.validity_estimate.reason}</p>
           </div>
         )}
 
@@ -196,7 +195,7 @@ export default function SavedMessagesPage() {
         {analysis.summary && (
           <div>
             <p className="text-sm font-medium mb-1">Summary:</p>
-            <p className="text-sm text-slate-700">{analysis.summary}</p>
+            <p className="text-sm text-ink-text">{analysis.summary}</p>
           </div>
         )}
 
@@ -204,7 +203,7 @@ export default function SavedMessagesPage() {
         {analysis.bullets && analysis.bullets.length > 0 && (
           <div>
             <p className="text-sm font-medium mb-2">Key Points:</p>
-            <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+            <ul className="list-disc list-inside space-y-1 text-sm text-ink-text">
               {analysis.bullets.map((bullet: string, i: number) => (
                 <li key={i}>{bullet}</li>
               ))}
@@ -218,9 +217,9 @@ export default function SavedMessagesPage() {
             <p className="text-sm font-medium mb-2">Levels to Watch:</p>
             <div className="space-y-2">
               {analysis.levels_to_watch.map((level: any, i: number) => (
-                <div key={i} className="text-sm border-l-2 border-slate-300 pl-3">
+                <div key={i} className="text-sm border-l-2 border-ink-border pl-3">
                   <p className="font-medium">{level.label} ({level.type})</p>
-                  <p className="text-slate-600 text-xs">{level.why_it_matters}</p>
+                  <p className="text-ink-text text-xs">{level.why_it_matters}</p>
                 </div>
               ))}
             </div>
@@ -229,9 +228,9 @@ export default function SavedMessagesPage() {
 
         {/* Behavioral Nudge */}
         {analysis.behavioral_nudge && (
-          <div className="bg-blue-50 border border-blue-200 rounded p-3">
-            <p className="text-sm font-medium text-blue-900 mb-1">💡 Trading Tip:</p>
-            <p className="text-sm text-blue-800">{analysis.behavioral_nudge}</p>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+            <p className="text-sm font-medium text-blue-200 mb-1">💡 Trading Tip:</p>
+            <p className="text-sm text-blue-200">{analysis.behavioral_nudge}</p>
           </div>
         )}
       </div>
@@ -239,23 +238,22 @@ export default function SavedMessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <DashboardNav />
+    <div>
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Saved Messages</h1>
-            <p className="text-slate-600 text-sm">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Saved Messages</h1>
+            <p className="text-ink-text text-sm">
               Messages you've favorited from your chats with Snapchart. Save important insights for easy access.
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-2xl font-bold text-ink-body">
               {messages.length}/{favoritesLimit}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-ink-muted">
               {userPlan === 'pro' ? 'Pro Plan' : 'Free Plan'}
             </div>
           </div>
@@ -268,7 +266,7 @@ export default function SavedMessagesPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search saved messages..."
-            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-ink-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
@@ -276,15 +274,15 @@ export default function SavedMessagesPage() {
         {isLoading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-slate-600 mt-4">Loading saved messages...</p>
+            <p className="text-ink-text mt-4">Loading saved messages...</p>
           </div>
         ) : filteredMessages.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+          <div className="text-center py-12 bg-ink-surface rounded-lg border border-ink-border">
             <div className="text-4xl mb-4">⭐</div>
-            <p className="text-slate-600 mb-2">
+            <p className="text-ink-text mb-2">
               {searchTerm ? "No messages match your search" : "No saved messages yet"}
             </p>
-            <p className="text-slate-500 text-sm">
+            <p className="text-ink-muted text-sm">
               {!searchTerm && "Star messages in the chat to save them here"}
             </p>
           </div>
@@ -297,22 +295,22 @@ export default function SavedMessagesPage() {
               return (
               <div
                 key={msg.id}
-                className={`bg-white rounded-lg border p-6 shadow-sm transition-all ${
+                className={`bg-ink-surface rounded-lg border p-6 shadow-sm transition-all ${
                   isActiveInAI 
-                    ? 'border-slate-200 hover:shadow-md' 
-                    : 'border-slate-100 opacity-50'
+                    ? 'border-ink-border' 
+                    : 'border-ink-border opacity-50'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       msg.role === 'user' 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-green-100 text-green-700'
+                        ? 'bg-blue-500/15 text-blue-300' 
+                        : 'bg-green-500/15 text-green-300'
                     }`}>
                       {msg.role === 'user' ? 'You' : 'Coach'}
                     </span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-ink-muted">
                       {new Date(msg.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -322,20 +320,20 @@ export default function SavedMessagesPage() {
                       })}
                     </span>
                     {!isActiveInAI && (
-                      <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600">
+                      <span className="px-2 py-0.5 rounded text-xs bg-ink-elevated text-ink-text">
                         Not sent to AI
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => unfavoriteMessage(msg.id)}
-                    className="text-slate-400 hover:text-red-600 transition-colors"
+                    className="text-ink-muted hover:text-red-600 transition-colors"
                     title="Unfavorite"
                   >
                     ⭐
                   </button>
                 </div>
-                <div className="text-slate-900">
+                <div className="text-ink-body">
                   {typeof msg.content === 'string' ? (
                     <div 
                       className="text-sm leading-relaxed"
@@ -345,7 +343,7 @@ export default function SavedMessagesPage() {
                       }}
                     >
                       <div 
-                        className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1"
+                        className="prose prose-invert prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                       />
                     </div>
@@ -359,21 +357,6 @@ export default function SavedMessagesPage() {
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 py-6 mt-12">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          <div className="flex justify-center gap-6 text-sm text-slate-600">
-            <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
-              Privacy Policy
-            </a>
-            <span className="text-slate-400">|</span>
-            <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">
-              Terms of Service
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
