@@ -57,7 +57,8 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 - [~] Auto-detect trades from the page (no broker API). Opt-in menu toggle "Auto-detect trades"; reads the trading panel once a second, a position that goes flat is a closed trade, win/loss = change in the platform's Realized PnL (falls back to last unrealized PnL). Saved to `trades` (`/api/trades`, dedup across tabs); header shows today's trades, W/L, net, losses in a row.
   - [x] TradingView (Paper + brokers via `data-name="<Broker>.positions-table"`). Tested against live DOM samples.
   - [ ] Run `backend/supabase/migrations/20261009_trades.sql` in Supabase.
-  - [ ] Confirm TradingView behavior with the panel collapsed and with a real broker connected.
+  - [x] Panel collapsed: falls back to the watchlist's "Long 1 @ price" tags (symbol must be in a visible watchlist; PnL estimated from price × point value).
+  - [ ] Confirm TradingView with a real broker connected (table name prefix, watchlist tags).
   - [ ] Tradovate adapter (needs DOM samples).
   - [ ] TopstepX adapter (needs DOM samples).
   - [ ] Guardrails: stop-for-the-day pause when ruleset max trades / max losses / daily loss is hit.

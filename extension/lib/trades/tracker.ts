@@ -32,7 +32,9 @@ export class TradeTracker {
       const prev = this.prev
       this.prev = snapshot
 
-      if (!prev || prev.account !== snapshot.account) {
+      // An unknown account (null) is not a switch: the watchlist fallback can't see the account name
+      const accountSwitched = prev && prev.account !== null && snapshot.account !== null && prev.account !== snapshot.account
+      if (!prev || accountSwitched) {
         // First look or a different account: positions already open have unknown open times
         this.openedAt = new Map(Array.from(snapshot.positions.keys(), symbol => [symbol, null]))
         this.pending = []
@@ -45,6 +47,11 @@ export class TradeTracker {
 
       for (const [symbol, before] of prev.positions) {
         const after = snapshot.positions.get(symbol)
+        if (!after && snapshot.coverage && !snapshot.coverage.has(symbol)) {
+          // Out of view, not closed: carry it forward unchanged
+          snapshot.positions.set(symbol, before)
+          continue
+        }
         let closedQty = 0
         if (!after || after.side !== before.side) closedQty = before.qty
         else if (after.qty < before.qty) closedQty = before.qty - after.qty

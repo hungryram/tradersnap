@@ -13,6 +13,10 @@ export type Snapshot = {
   account: string | null
   realizedPnl: number | null
   positions: Map<string, Position>
+  // Symbols whose state the reader could actually see. Undefined means the
+  // reader sees everything, so a missing symbol is flat. A partial view (the
+  // watchlist only renders rows scrolled into view) leaves unseen symbols as they were.
+  coverage?: Set<string>
 }
 
 export type ClosedTrade = {

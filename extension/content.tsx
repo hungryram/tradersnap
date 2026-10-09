@@ -4,7 +4,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import { analytics } from "~lib/analytics"
-import { readTradingView } from "~lib/trades/tradingview"
+import { createTradingViewReader } from "~lib/trades/tradingview"
 import { startTradeTracking } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
 import { marked } from "marked"
@@ -397,7 +397,7 @@ const TradingBuddyWidget = () => {
 
     const stopTracking = startTradeTracking({
       platform: 'tradingview',
-      read: () => readTradingView(),
+      read: createTradingViewReader(),
       onTrade: (trade) => {
         unsent.push(trade)
         sendTrades()
@@ -1812,7 +1812,7 @@ const TradingBuddyWidget = () => {
                     chrome.storage.local.set({ auto_detect_trades: next })
                     if (!next) setTradeStats(null)
                   }}
-                  title="Logs your trades and wins/losses by reading TradingView's trading panel. Keep the panel open while you trade."
+                  title="Logs your trades and wins/losses by reading TradingView's trading panel, or the watchlist when the panel is collapsed."
                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   <span>Auto-detect trades</span>
@@ -1931,7 +1931,7 @@ const TradingBuddyWidget = () => {
                 )}
               </>
             ) : (
-              <span>No trades yet{window.location.hostname.endsWith('tradingview.com') ? ' \u00b7 keep the trading panel open' : ''}</span>
+              <span>No trades yet{window.location.hostname.endsWith('tradingview.com') ? ' \u00b7 keep the trading panel or watchlist open' : ''}</span>
             )}
           </div>
         )}
