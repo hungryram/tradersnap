@@ -3,102 +3,68 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
+import { finishLogin } from '@/lib/after-login'
+import AuthShell from '../../components/AuthShell'
 
+// Landing page for Google sign-in and email links
 export default function AuthSuccessPage() {
   const router = useRouter()
-  const [status, setStatus] = useState('Checking authentication...')
-  
+  const [failed, setFailed] = useState(false)
+
   useEffect(() => {
     handleAuthSuccess()
   }, [])
-  
+
   async function handleAuthSuccess() {
+    const supabase = createClient()
     try {
-      const supabase = createClient()
-      
-      // Check if we have tokens in the URL hash (magic link flow)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const accessToken = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
-      
-      if (accessToken && refreshToken) {
-        console.log('[Auth Success] Found tokens in hash, setting session...')
-        setStatus('Setting up your session...')
-        
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        })
-        
-        if (error) {
-          console.error('[Auth Success] Failed to set session:', error)
-          setStatus('Authentication failed. Redirecting...')
-          setTimeout(() => router.push('/auth/login'), 1500)
-          return
+      let { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        const params = new URLSearchParams(window.location.search)
+        const hash = new URLSearchParams(window.location.hash.substring(1))
+        const code = params.get('code')
+        const accessToken = hash.get('access_token')
+        const refreshToken = hash.get('refresh_token')
+
+        if (code) {
+          // Google sign-in (PKCE)
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          if (!error) session = data.session
+        } else if (accessToken && refreshToken) {
+          // Older email links put the tokens in the URL hash
+          const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          if (!error) session = data.session
         }
       }
-      
-      // Get the session
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error || !session) {
-        console.error('[Auth Success] No session found:', error)
-        setStatus('Authentication failed. Redirecting...')
-        setTimeout(() => router.push('/'), 1500)
+
+      if (!session) {
+        setFailed(true)
         return
       }
-      
-      console.log('[Auth Success] Session found, saving to localStorage...')
-      
-      // Save session to localStorage for extension to detect
-      try {
-        localStorage.setItem('trading_buddy_session', JSON.stringify(session))
-        console.log('[Auth Success] Session saved to localStorage')
-        
-        // Notify extension that user has logged in
-        window.postMessage({
-          type: 'TRADING_BUDDY_LOGIN',
-          session: session
-        }, window.location.origin)
-        console.log('[Auth Success] Posted login message to extension')
-        
-        // Also try to save directly to chrome.storage if extension is available
-        // @ts-ignore - chrome API only available when extension is installed
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-          try {
-            // @ts-ignore
-            await chrome.storage.local.set({ supabase_session: session })
-            console.log('[Auth Success] Saved session to chrome.storage')
-          } catch (e) {
-            console.log('[Auth Success] Could not save to chrome.storage (extension may not be installed):', e)
-          }
-        }
-      } catch (e) {
-        console.error('[Auth Success] Failed to save to localStorage:', e)
-      }
-      
-      console.log('[Auth Success] Redirecting to dashboard...')
-      setStatus('Redirecting to dashboard...')
-      
-      // Skip onboarding, go straight to dashboard
-      router.push('/dashboard/rules')
-      
+      router.replace(await finishLogin(session))
     } catch (error) {
       console.error('[Auth Success] Error:', error)
-      setStatus('Something went wrong. Redirecting...')
-      setTimeout(() => router.push('/'), 1500)
+      setFailed(true)
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full text-center space-y-4">
-        <div className="text-6xl mb-4">🔐</div>
-        <h1 className="text-3xl font-bold">Success!</h1>
-        <p className="text-slate-400">
-          {status}
-        </p>
+    <AuthShell>
+      <div className="text-center">
+        {failed ? (
+          <>
+            <h1 className="text-2xl font-semibold mb-2">That sign-in link didn't work</h1>
+            <p className="text-sm text-ink-text mb-6">It may have expired or already been used. Try signing in again.</p>
+            <a href="/" className="inline-block rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 transition-colors">Back to sign in</a>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-ink-border border-t-blue-500" />
+            <p className="text-ink-text">Signing you in...</p>
+          </>
+        )}
       </div>
-    </div>
+    </AuthShell>
   )
 }

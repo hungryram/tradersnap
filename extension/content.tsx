@@ -97,7 +97,8 @@ const TradingBuddyWidget = () => {
   const [timeoutReason, setTimeoutReason] = useState<string>('')
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+  // First-run checklist; null until loaded from storage
+  const [gettingStarted, setGettingStarted] = useState<{ analyzed?: boolean, chatted?: boolean, dismissed?: boolean, autoOpened?: boolean, completed?: boolean } | null>(null)
   const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -413,16 +414,60 @@ const TradingBuddyWidget = () => {
     }
   }, [autoDetectTrades, isSignedIn, fetchTradeStats])
 
-  // Check if this is first launch
+  // First run: open the chat with the getting-started checklist. Onboarding links
+  // to the trading platform with ?snapchart=start; otherwise it opens once on the
+  // first visit to a trading site.
   useEffect(() => {
-    const checkFirstLaunch = async () => {
-      const result = await chrome.storage.local.get(['has_seen_welcome'])
-      if (!result.has_seen_welcome) {
-        setShowWelcomeModal(true)
+    const initGettingStarted = async () => {
+      const { getting_started, has_seen_welcome } = await chrome.storage.local.get(['getting_started', 'has_seen_welcome'])
+      // People who used Snapchart before the checklist existed don't need it
+      let state = getting_started ?? (has_seen_welcome ? { dismissed: true } : {})
+
+      const params = new URLSearchParams(window.location.search)
+      const fromOnboarding = params.get('snapchart') === 'start'
+      const onTradingSite = window.location.origin !== new URL(process.env.PLASMO_PUBLIC_API_URL!).origin
+      if (fromOnboarding || (onTradingSite && !state.dismissed && !state.autoOpened)) {
+        setIsOpen(true)
+        state = { ...state, autoOpened: true }
+        chrome.storage.local.set({ getting_started: state })
       }
+      if (fromOnboarding) {
+        analytics.track('opened_tradingview', { host: window.location.hostname })
+        params.delete('snapchart')
+        const query = params.toString()
+        window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash)
+      }
+      setGettingStarted(state)
     }
-    checkFirstLaunch()
+    initGettingStarted()
   }, [])
+
+  const updateGettingStarted = useCallback(async (patch: Record<string, boolean>, event?: string) => {
+    const { getting_started = {} } = await chrome.storage.local.get('getting_started')
+    if (Object.entries(patch).every(([key, value]) => getting_started[key] === value)) return
+    const next = { ...getting_started, ...patch }
+    await chrome.storage.local.set({ getting_started: next })
+    setGettingStarted(next)
+    if (event) analytics.track(event)
+  }, [])
+
+  const setAutoDetect = (next: boolean) => {
+    setAutoDetectTrades(next)
+    chrome.storage.local.set({ auto_detect_trades: next })
+    if (next) analytics.track('autodetect_enabled')
+    else setTradeStats(null)
+  }
+
+  const isTradingView = window.location.hostname.endsWith('tradingview.com')
+
+  // All checklist items done: record it once
+  useEffect(() => {
+    const g = gettingStarted
+    if (!g || g.dismissed || g.completed || !session) return
+    if (g.analyzed && g.chatted && (autoDetectTrades || !isTradingView)) {
+      updateGettingStarted({ completed: true }, 'checklist_completed')
+    }
+  }, [gettingStarted, autoDetectTrades, session])
 
   // Timeout countdown timer
   useEffect(() => {
@@ -447,134 +492,17 @@ const TradingBuddyWidget = () => {
     return () => clearInterval(interval)
   }, [isTimedOut, timeoutEndTime])
 
-  // Listen for login messages from backend (no polling!)
+  // Logins arrive through the background script (website -> externally_connectable),
+  // which also keeps the session renewed. Coming back to the tab (e.g. after the
+  // laptop slept) is a good moment to make sure it's still fresh.
   useEffect(() => {
-    // Only run on admin domain
-    if (window.location.origin !== process.env.PLASMO_PUBLIC_API_URL) {
-      return
-    }
-
-    const checkLocalStorage = () => {
-      try {
-        const stored = localStorage.getItem('trading_buddy_session')
-        
-        if (stored) {
-          const session = JSON.parse(stored)
-          
-          // Check if session is expired or about to expire (within 5 minutes)
-          const expiresAt = session.expires_at
-          const now = Date.now() / 1000
-          const fiveMinutes = 5 * 60
-          
-          if (expiresAt && expiresAt > now) {
-            setSession(session)
-            try {
-              chrome.storage.local.set({ supabase_session: session })
-            } catch (err) {
-              if (err instanceof Error && err.message.includes('Extension context invalidated')) {
-                return
-              }
-              throw err
-            }
-            
-            // If expiring soon, log a warning
-            if (expiresAt - now < fiveMinutes) {
-              console.warn('[Content] Session expiring soon! Please refresh the page.')
-            }
-          } else {
-            localStorage.removeItem('trading_buddy_session')
-            try {
-              chrome.storage.local.remove('supabase_session')
-            } catch (err) {
-              if (err instanceof Error && err.message.includes('Extension context invalidated')) {
-                return
-              }
-              throw err
-            }
-            setSession(null)
-          }
-        } else {
-          // No session in localStorage (signed out) - clear chrome.storage too
-          try {
-            chrome.storage.local.remove('supabase_session')
-          } catch (err) {
-            if (err instanceof Error && err.message.includes('Extension context invalidated')) {
-              return
-            }
-            throw err
-          }
-          setSession(null)
-        }
-      } catch (e) {
-        // Extension context invalidated (extension reloaded) - silently ignore in production
-        if (e instanceof Error && e.message.includes('Extension context invalidated')) {
-          // User needs to reload the page after extension update
-          return
-        }
-        console.error('[Content] Failed to parse localStorage session:', e)
+    const ensureSession = () => {
+      if (document.visibilityState === 'visible') {
+        chrome.runtime.sendMessage({ type: 'ENSURE_SESSION' }).catch(() => {})
       }
     }
-    
-    // Check once on mount
-    checkLocalStorage()
-    
-    // Limited fallback polling (5 checks over 10 seconds, then stop)
-    // This ensures session syncs during login since storage events don't fire in same tab
-    let checksRemaining = 5
-    const fallbackIntervalId = setInterval(() => {
-      checksRemaining--
-      checkLocalStorage()
-      if (checksRemaining === 0) {
-        clearInterval(fallbackIntervalId)
-      }
-    }, 2000)
-    
-    // Listen for storage events (cross-tab session sync)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'trading_buddy_session' && e.newValue) {
-        try {
-          const session = JSON.parse(e.newValue)
-          setSession(session)
-          try {
-            chrome.storage.local.set({ supabase_session: session })
-          } catch (err) {
-            if (err instanceof Error && err.message.includes('Extension context invalidated')) {
-              return
-            }
-            throw err
-          }
-        } catch (err) {
-          console.error('[Content] Failed to parse storage session:', err)
-        }
-      }
-    }
-    
-    // Listen for login messages from the website
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      
-      if (event.data.type === 'TRADING_BUDDY_LOGIN' && event.data.session) {
-        const session = event.data.session
-        setSession(session)
-        try {
-          chrome.storage.local.set({ supabase_session: session })
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('Extension context invalidated')) {
-            return
-          }
-          throw err
-        }
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    window.addEventListener('message', handleMessage)
-    
-    return () => {
-      clearInterval(fallbackIntervalId)
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('message', handleMessage)
-    }
+    document.addEventListener('visibilitychange', ensureSession)
+    return () => document.removeEventListener('visibilitychange', ensureSession)
   }, [])
 
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
@@ -761,7 +689,7 @@ const TradingBuddyWidget = () => {
       if (!rulesetResponse.ok) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'No active ruleset found. Please [set one in the dashboard](https://admin.snapchartapp.com/dashboard/rules).',
+          content: `No active ruleset found. Please [set one in the dashboard](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules).`,
           timestamp: new Date()
         }])
         return
@@ -785,7 +713,7 @@ const TradingBuddyWidget = () => {
             type: 'error',
             content: userData.user.plan === 'pro' 
               ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-              : "You've used all 5 free chart analyses today. [Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account) for 50 charts/day.",
+              : `You've used all 5 free chart analyses today. [Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account) for 50 charts/day.`,
             timestamp: new Date()
           }])
           return
@@ -857,6 +785,7 @@ const TradingBuddyWidget = () => {
       const analysis = await analyzeResponse.json()
       setLastChartToken(analysis.chartToken || null)
       analytics.analysisFinished(analysis.setup_status || 'unknown', { sessionId: session?.id })
+      updateGettingStarted({ analyzed: true }, 'first_analysis')
 
       // Update user message with database ID
       if (analysis.userMessageId) {
@@ -1051,7 +980,7 @@ const TradingBuddyWidget = () => {
         if (errorMessage.includes('Upgrade to Pro')) {
           errorMessage = errorMessage.replace(
             'Upgrade to Pro',
-            '[Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account)'
+            `[Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account)`
           )
         }
         setMessages(prev => [...prev, {
@@ -1127,7 +1056,7 @@ const TradingBuddyWidget = () => {
               const errorMsg = {
                 type: 'error',
                 content: userData.user.plan === 'free' 
-                  ? `You've used all 5 chart screenshots for today. [Upgrade to Pro](https://admin.snapchartapp.com/dashboard/account) for 50 screenshots per day.`
+                  ? `You've used all 5 chart screenshots for today. [Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account) for 50 screenshots per day.`
                   : `You've used all 50 chart screenshots for today. Limit resets at midnight UTC.`,
                 timestamp: new Date(),
                 requiresUpgrade: userData.user.plan === 'free'
@@ -1308,6 +1237,7 @@ const TradingBuddyWidget = () => {
 
       const chatResult = await apiResponse.json()
       analytics.chatMessageSent(includeChart, { sessionId: session?.id })
+      updateGettingStarted({ chatted: true })
       
       // Update usage tracking
       if (chatResult.usage) {
@@ -1654,47 +1584,6 @@ const TradingBuddyWidget = () => {
         />
       )}
       
-      {/* Welcome Modal */}
-      {showWelcomeModal && (
-        <div data-snapchart-widget className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
-          <div className={`max-w-md w-full rounded-xl shadow-2xl p-6 ${theme === 'dark' ? 'bg-dark-surface text-slate-100' : 'bg-white text-slate-900'}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-12 h-12" onError={(e) => e.currentTarget.style.display = 'none'} />
-              <h2 className="text-2xl font-bold">Welcome to Snapchart!</h2>
-            </div>
-            <p className={`mb-4 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              This extension captures screenshots for chart analysis and stores your chat history (which you can clear anytime) to help improve your trading psychology.
-            </p>
-            <p className={`mb-6 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              By continuing, you agree to our Terms of Service and Privacy Policy.
-            </p>
-            <div className="flex gap-3 mb-4">
-              <button
-                onClick={() => window.open('https://www.snapchartapp.com/terms', '_blank')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-dark-border text-slate-300 hover:bg-dark-elevated' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
-              >
-                View Terms
-              </button>
-              <button
-                onClick={() => window.open('https://www.snapchartapp.com/privacy', '_blank')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${theme === 'dark' ? 'border-dark-border text-slate-300 hover:bg-dark-elevated' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
-              >
-                View Privacy
-              </button>
-            </div>
-            <button
-              onClick={() => {
-                chrome.storage.local.set({ has_seen_welcome: true })
-                setShowWelcomeModal(false)
-              }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
-            >
-              Get Started
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Widget */}
       <div
       ref={widgetRef}
@@ -1808,12 +1697,7 @@ const TradingBuddyWidget = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    const next = !autoDetectTrades
-                    setAutoDetectTrades(next)
-                    chrome.storage.local.set({ auto_detect_trades: next })
-                    if (!next) setTradeStats(null)
-                  }}
+                  onClick={() => setAutoDetect(!autoDetectTrades)}
                   title="Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."
                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
@@ -1970,6 +1854,21 @@ const TradingBuddyWidget = () => {
             </div>
           )}
 
+          {gettingStarted && !gettingStarted.dismissed && (
+            <GettingStarted
+              dark={theme === 'dark'}
+              signedIn={!!session}
+              analyzed={!!gettingStarted.analyzed}
+              chatted={!!gettingStarted.chatted}
+              showTradeTracking={isTradingView}
+              tradeTrackingOn={autoDetectTrades}
+              onSignIn={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/welcome`, '_blank')}
+              onAnalyze={handleAnalyze}
+              onEnableTradeTracking={() => setAutoDetect(true)}
+              onDismiss={() => updateGettingStarted({ dismissed: true })}
+            />
+          )}
+
           {messages.length === 0 && (
             <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
               <div className="text-4xl mb-2">👋</div>
@@ -2023,7 +1922,7 @@ const TradingBuddyWidget = () => {
                           <p className={`text-[10px] mt-1 italic ${theme === 'dark' ? 'text-blue-200' : 'text-slate-700'}`}>
                             Lower resolution on Free plan may affect analysis accuracy.{' '}
                             <a 
-                              href="https://admin.snapchartapp.com/dashboard/account" 
+                              href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className={`underline font-medium ${theme === 'dark' ? 'text-blue-300 hover:text-white' : 'text-blue-800 hover:text-blue-950'}`}
@@ -2562,3 +2461,63 @@ const TradingBuddyWidget = () => {
 }
 
 export default TradingBuddyWidget
+
+// First-run checklist shown at the top of the chat until done or hidden
+function GettingStarted(props: {
+  dark: boolean
+  signedIn: boolean
+  analyzed: boolean
+  chatted: boolean
+  showTradeTracking: boolean
+  tradeTrackingOn: boolean
+  onSignIn: () => void
+  onAnalyze: () => void
+  onEnableTradeTracking: () => void
+  onDismiss: () => void
+}) {
+  const { dark } = props
+  const muted = dark ? 'text-dark-text' : 'text-slate-500'
+  const items = [
+    !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds with Google.', action: 'Sign in', onClick: props.onSignIn },
+    { done: props.analyzed, title: 'Check this chart against your rules', detail: 'You get a verdict in about 15 seconds.', action: props.signedIn ? 'Analyze this chart' : null, onClick: props.onAnalyze },
+    props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking },
+    { done: props.chatted, title: 'Ask your coach anything', detail: 'Try: "What should I wait for here?"', action: null, onClick: () => {} }
+  ].filter(Boolean) as { done: boolean, title: string, detail: string, action: string | null, onClick: () => void }[]
+  const doneCount = items.filter(item => item.done).length
+  const allDone = doneCount === items.length
+
+  return (
+    <div className={`rounded-xl border p-4 text-left ${dark ? 'bg-dark-elevated border-dark-border' : 'bg-white border-slate-200'}`}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <div className={`font-semibold text-sm ${dark ? 'text-dark-body' : 'text-slate-900'}`}>{allDone ? "You're all set" : 'Get started'}</div>
+          <div className={`text-xs ${muted}`}>{doneCount} of {items.length} done</div>
+        </div>
+        <button onClick={props.onDismiss} className={`text-xs ${muted} hover:underline`}>{allDone ? 'Close' : 'Hide'}</button>
+      </div>
+      <ol className="space-y-3">
+        {items.map(item => (
+          <li key={item.title} className="flex gap-3">
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${item.done ? 'bg-green-500 border-green-500 text-white' : dark ? 'border-dark-border' : 'border-slate-300'}`}>
+              {item.done ? '\u2713' : ''}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-sm ${item.done ? `line-through ${muted}` : dark ? 'text-dark-body' : 'text-slate-900'}`}>{item.title}</div>
+              {!item.done && <div className={`text-xs ${muted}`}>{item.detail}</div>}
+              {!item.done && item.action && (
+                <button onClick={item.onClick} className="mt-2 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-medium text-white">
+                  {item.action}
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className={`mt-4 text-[11px] leading-snug ${muted}`}>
+        Snapchart captures your chart only when you ask, and saves your chat so you can pick up later (clear it anytime). By using it you agree to the{' '}
+        <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{' '}
+        <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
+      </p>
+    </div>
+  )
+}

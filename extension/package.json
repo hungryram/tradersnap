@@ -39,7 +39,8 @@
       "activeTab",
       "storage",
       "scripting",
-      "tabs"
+      "tabs",
+      "alarms"
     ],
     "web_accessible_resources": [
       {
@@ -88,6 +89,12 @@
           "https://*.speedtrader.com/*"
         ]
       }
-    ]
+    ],
+    "externally_connectable": {
+      "matches": [
+        "https://admin.snapchartapp.com/*",
+        "http://localhost/*"
+      ]
+    }
   }
 }

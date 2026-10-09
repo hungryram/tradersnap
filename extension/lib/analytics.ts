@@ -111,5 +111,12 @@ export const analytics = {
    */
   sessionCleared: () => {
     logEvent('session_cleared')
+  },
+
+  /**
+   * Signup funnel steps (opened_tradingview, first_analysis, autodetect_enabled, checklist_completed)
+   */
+  track: (eventType: string, metadata?: Record<string, any>) => {
+    logEvent(eventType, metadata)
   }
 }

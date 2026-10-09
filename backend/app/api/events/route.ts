@@ -31,7 +31,14 @@ const eventSchema = z.object({
     'analysis_finished',
     'user_reported_trade_taken',
     'chat_message_sent',
-    'session_cleared'
+    'session_cleared',
+    // Signup funnel
+    'signed_up',
+    'onboarding_completed',
+    'opened_tradingview',
+    'first_analysis',
+    'autodetect_enabled',
+    'checklist_completed'
   ]),
   session_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.any()).optional()

@@ -3,372 +3,47 @@
 import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import { finishLogin } from "@/lib/after-login"
+import { signOutExtension } from "@/lib/extension-bridge"
+import AuthShell from "./components/AuthShell"
+import AuthPanel from "./components/AuthPanel"
 
 function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [useMagicLink, setUseMagicLink] = useState(false)
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    // Check if signout query parameter is present
-    const shouldSignOut = searchParams.get('signout')
-    
-    if (shouldSignOut === 'true') {
-      console.log('[Home] Sign out requested via query param')
-      supabase.auth.signOut().then(() => {
-        console.log('[Home] Signed out, clearing localStorage')
-        localStorage.removeItem('trading_buddy_session')
-        // Remove the query param
-        window.history.replaceState({}, '', '/')
+    // The extension's sign-out sends people here with ?signout=true
+    if (searchParams.get("signout") === "true") {
+      Promise.all([supabase.auth.signOut(), signOutExtension()]).finally(() => {
+        window.history.replaceState({}, "", "/")
+        setChecking(false)
       })
       return
     }
-    
-    // Check if already signed in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        checkOnboardingStatus(session.access_token)
-      }
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) router.replace(await finishLogin(session))
+      else setChecking(false)
     })
   }, [searchParams])
 
-  async function checkOnboardingStatus(token: string) {
-    // Skip onboarding, go straight to dashboard
-    router.push("/dashboard/rules")
-  }
-
-  async function handlePasswordReset(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`
-      })
-
-      if (error) throw error
-      setSuccess(true)
-    } catch (err) {
-      console.error("Password reset error:", err)
-      setError(err instanceof Error ? err.message : "Failed to send reset email")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleSignIn(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
-
-    try {
-      if (useMagicLink) {
-        // Magic link flow
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/success`
-          }
-        })
-
-        if (error) throw error
-        setSuccess(true)
-      } else {
-        // Email/password flow
-        if (isSignUp) {
-          // Sign up new user
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth/success`
-            }
-          })
-
-          if (error) {
-            // Check if email already exists
-            if (error.message.includes('already registered') || error.message.includes('already exists')) {
-              throw new Error('This email is already registered. Please sign in instead.')
-            }
-            throw error
-          }
-          
-          // Check if user already exists (Supabase returns user but no session for existing emails)
-          if (data.user && !data.session && data.user.identities?.length === 0) {
-            throw new Error('This email is already registered. Please sign in instead.')
-          }
-          
-          if (data.session) {
-            // Signed up and logged in - save to localStorage and notify extension
-            try {
-              localStorage.setItem('trading_buddy_session', JSON.stringify(data.session))
-              window.postMessage({
-                type: 'TRADING_BUDDY_LOGIN',
-                session: data.session
-              }, window.location.origin)
-              
-              // Also save to chrome.storage if extension is available
-              // @ts-ignore - chrome API only available when extension is installed
-              if (typeof chrome !== 'undefined' && chrome.storage) {
-                // @ts-ignore
-                await chrome.storage.local.set({ supabase_session: data.session })
-                console.log('Saved session to chrome.storage')
-              }
-            } catch (e) {
-              console.error('Failed to save session:', e)
-            }
-            
-            await checkOnboardingStatus(data.session.access_token)
-          } else {
-            // Email confirmation required
-            setSuccess(true)
-          }
-        } else {
-          // Sign in existing user
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          })
-
-          if (error) throw error
-          
-          if (data.session) {
-            // Save to localStorage and notify extension
-            try {
-              localStorage.setItem('trading_buddy_session', JSON.stringify(data.session))
-              window.postMessage({
-                type: 'TRADING_BUDDY_LOGIN',
-                session: data.session
-              }, window.location.origin)
-              
-              // Also save to chrome.storage if extension is available
-              // @ts-ignore - chrome API only available when extension is installed
-              if (typeof chrome !== 'undefined' && chrome.storage) {
-                // @ts-ignore
-                await chrome.storage.local.set({ supabase_session: data.session })
-                console.log('Saved session to chrome.storage')
-              }
-            } catch (e) {
-              console.error('Failed to save session:', e)
-            }
-            
-            await checkOnboardingStatus(data.session.access_token)
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Sign in error:", err)
-      setError(err instanceof Error ? err.message : "Authentication failed")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  if (checking) return <AuthShell><div /></AuthShell>
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <img src="/icon.png" alt="Snapchart" className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Snapchart</h1>
-            <p className="text-slate-600">AI Trading Psychology Coach</p>
-          </div>
-
-          {success ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-              <div className="text-4xl mb-3">📧</div>
-              <h3 className="font-bold text-green-900 mb-2">Check Your Email!</h3>
-              <p className="text-sm text-green-800">
-                {showForgotPassword
-                  ? "We've sent you a password reset link. Click the link in your email to set a new password."
-                  : useMagicLink 
-                    ? "We've sent you a magic link to sign in. Click the link in your email to continue."
-                    : "We've sent you a confirmation email. Click the link to verify your account."
-                }
-              </p>
-            </div>
-          ) : showForgotPassword ? (
-            <>
-              <form onSubmit={handlePasswordReset} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
-                    required
-                  />
-                </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">{error}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                >
-                  {isLoading ? "Sending..." : "Send Reset Link"}
-                </button>
-              </form>
-
-              <button
-                onClick={() => {
-                  setShowForgotPassword(false)
-                  setError(null)
-                }}
-                className="w-full text-sm text-slate-600 hover:text-slate-900 mt-4"
-              >
-                ← Back to sign in
-              </button>
-            </>
-          ) : (
-            <>
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
-                    required
-                  />
-                </div>
-
-                {useMagicLink && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>Magic link sign-in:</strong> We'll email you a secure link to sign in instantly. No password needed!
-                    </p>
-                  </div>
-                )}
-
-                {!useMagicLink && (
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-                      Password
-                    </label>
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
-                      required
-                      minLength={6}
-                    />
-                    <div className="flex items-center justify-between mt-1">
-                      <p className="text-xs text-slate-500">
-                        Minimum 6 characters
-                      </p>
-                      {!isSignUp && (
-                        <button
-                          type="button"
-                          onClick={() => setShowForgotPassword(true)}
-                          className="text-xs text-blue-600 hover:text-blue-700"
-                        >
-                          Forgot password?
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">{error}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                >
-                  {isLoading 
-                    ? "Loading..." 
-                    : useMagicLink 
-                      ? "Send Magic Link" 
-                      : isSignUp 
-                        ? "Create Account" 
-                        : "Sign In"
-                  }
-                </button>
-              </form>
-
-              {!useMagicLink && (
-                <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsSignUp(!isSignUp)}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-                  </button>
-                </div>
-              )}
-
-              <div className="mt-6 relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-slate-500">or</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setUseMagicLink(!useMagicLink)
-                  setError(null)
-                }}
-                className="mt-4 w-full text-sm text-slate-600 hover:text-slate-900 font-medium py-2"
-              >
-                {useMagicLink ? "← Back to password sign in" : "Sign in with magic link →"}
-              </button>
-            </>
-          )}
-
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <div className="text-center space-y-2 text-sm text-slate-600">
-              <p>✓ Never break your trading rules again</p>
-              <p>✓ Make smarter trading decisions</p>
-              <p>✓ Trade with confidence and discipline</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthShell>
+      <h1 className="text-2xl font-semibold tracking-tight mb-1">Sign in to Snapchart</h1>
+      <p className="text-sm text-ink-text mb-8">New here? Any option below creates your free account.</p>
+      <AuthPanel />
+    </AuthShell>
   )
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">Loading...</div>}>
+    <Suspense fallback={<AuthShell><div /></AuthShell>}>
       <HomeContent />
     </Suspense>
   )

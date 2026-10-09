@@ -52,42 +52,7 @@ function IndexPopup() {
           }
         }
         
-        // If no session in chrome.storage, try to fetch from dashboard tab
-        console.log('[Popup] No session in chrome.storage, checking dashboard tab...')
-        try {
-          const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
-          if (tabs.length > 0 && tabs[0].id) {
-            console.log('[Popup] Found dashboard tab, checking localStorage...')
-            const results = await chrome.scripting.executeScript({
-              target: { tabId: tabs[0].id },
-              func: () => localStorage.getItem('trading_buddy_session')
-            })
-            
-            if (results?.[0]?.result) {
-              const webSession = JSON.parse(results[0].result)
-              console.log('[Popup] Found session in dashboard localStorage:', webSession.user?.email)
-              
-              // Verify not expired
-              if (webSession.expires_at && webSession.expires_at > Date.now() / 1000) {
-                console.log('[Popup] Session valid, saving to chrome.storage')
-                await chrome.storage.local.set({ supabase_session: webSession })
-                setIsLoggedIn(true)
-                setUser(webSession.user)
-                setIsLoading(false)
-                return
-              } else {
-                console.log('[Popup] Dashboard session expired')
-              }
-            } else {
-              console.log('[Popup] No session in dashboard localStorage')
-            }
-          } else {
-            console.log('[Popup] No dashboard tab found')
-          }
-        } catch (e) {
-          console.error('[Popup] Error fetching from dashboard:', e)
-        }
-        
+        // Signing in on the website hands the extension its own login (see background.ts)
         console.log('[Popup] No valid session found')
         setIsLoggedIn(false)
         setUser(null)
@@ -168,7 +133,7 @@ function IndexPopup() {
       {!isLoggedIn ? (
         <div className="space-y-4">
           <p className="text-sm text-slate-300">
-            Sign in to start analyzing your trades
+            Sign in or create a free account to start checking your charts against your rules.
           </p>
           <button 
             className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
@@ -178,7 +143,7 @@ function IndexPopup() {
               })
             }}
           >
-            Sign In
+            Sign in / Create account
           </button>
         </div>
       ) : (

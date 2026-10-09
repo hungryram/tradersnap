@@ -16,15 +16,16 @@ Goal: "Add to Chrome" → first analysis of their own chart in under 3 minutes, 
 Today: nothing happens after install, sign-in is the default form, email confirmation loses people, onboarding is switched off, users land on an empty rules box, and nothing points them to TradingView.
 
 **Phase 1: signups**
-- [ ] Open a welcome page on install (`chrome.runtime.onInstalled`) with "pin the extension" animation + sign-up; `setUninstallURL` → one-question "why are you leaving?" page.
-- [ ] Google sign-in (Supabase provider) as the main button; email one-time code as fallback; drop passwords + magic-link toggle. *You:* create Google OAuth client, add it in Supabase → Auth → Providers.
+- [x] Welcome page on install (`/welcome`: pin instructions + sign-up); uninstall opens `/goodbye` (one question → `uninstall_feedback`).
+- [~] Google sign-in as the main button, email 6-digit code second, password only for existing accounts (`AuthPanel`). Dark sign-in page. *You:* Google OAuth client + Supabase provider; add `{{ .Token }}` to the Magic Link and Confirm signup email templates.
 - [ ] Supabase redirect URLs: only `admin.snapchartapp.com` (+ localhost for dev), no wildcards.
-- [ ] Instant login handoff: website → extension via `externally_connectable` (`chrome.runtime.sendMessage`), replacing localStorage polling; delete dead `auth-bridge.ts`.
-- [ ] Refresh Supabase tokens in the extension (no more "session expired" after ~1h). *(moved from section 3)*
-- [ ] Turn onboarding back on as 3 screens: (1) what you trade + platform (TradingView / Tradovate / TopstepX) + prop firm? (2) rules from a template card + **limits as numbers** (max trades/day, max daily loss, stop after N losses, trading hours) (3) "Open TradingView →".
-- [ ] First-run tour in the chat widget: Analyze this chart → turn on auto-detect trades → ask the coach. Consent becomes one line in the tour instead of a blocking modal.
-- [ ] Bugs: `/auth/success` failure redirects to `/auth/login` (404); hard-coded `admin.snapchartapp.com` links in `content.tsx` (no-ruleset message, etc.) → `PLASMO_PUBLIC_API_URL`.
-- [ ] Funnel events in `usage_events`: installed, welcome_viewed, signed_up, onboarding_done, opened_tradingview, first_analysis, autodetect_on, returned_day2, returned_week1.
+- [ ] Run `20261011_onboarding.sql` (profile trading_profile / trading_limits, uninstall_feedback). *(you)*
+- [x] Instant login handoff via `externally_connectable`. The extension gets its **own** session (`/api/extension-session` one-time token) so site and extension never fight over single-use refresh tokens. Old localStorage path kept for old builds. *You:* set `NEXT_PUBLIC_EXTENSION_IDS` on Vercel.
+- [x] Extension renews its session in the background (alarm every minute, 10 min before expiry; also when the tab regains focus).
+- [x] Onboarding back on as 3 screens (existing users with rules skip it): (1) what you trade + platform (TradingView / Tradovate / TopstepX) + prop firm? (2) rules from a template card + **limits as numbers** (max trades/day, max daily loss, stop after N losses, trading hours) (3) "Open TradingView →".
+- [x] First-run "Get started" checklist in the chat (sign in → analyze → auto-detect trades → ask the coach); chat auto-opens on first visit / `?snapchart=start`. Consent modal replaced by one line.
+- [x] Bugs: `/auth/login` 404 removed; hard-coded admin links → `PLASMO_PUBLIC_API_URL`; `/auth/callback` keeps the query string.
+- [~] Funnel events: onboarding_completed, opened_tradingview, first_analysis, autodetect_enabled, checklist_completed (pre-signup steps come from Chrome Web Store installs). Still to do: a funnel view/query.
 - [ ] Chrome Web Store listing: screenshots + short video of the verdict card and Today strip. *(you)*
 - [ ] Question for you: where does the marketing site / "Add to Chrome" button live (separate repo?).
 

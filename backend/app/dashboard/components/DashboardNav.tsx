@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
+import { signOutExtension } from '@/lib/extension-bridge'
 
 export default function DashboardNav() {
   const router = useRouter()
@@ -13,7 +14,7 @@ export default function DashboardNav() {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      localStorage.removeItem('trading_buddy_session')
+      await signOutExtension()
       window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)

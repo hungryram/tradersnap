@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { getLimits } from "@/lib/usage"
 
@@ -149,6 +150,8 @@ export async function GET(request: NextRequest) {
         first_name: profile.first_name || null,
         last_name: profile.last_name || null,
         onboarded: profile.onboarded,
+        trading_profile: profile.trading_profile ?? null,
+        trading_limits: profile.trading_limits ?? null,
         plan: profile.plan,
         subscription_status: profile.subscription_status,
         created_at: profile.created_at
@@ -188,6 +191,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/)
+const profilePatchSchema = z.object({
+  onboarded: z.boolean().optional(),
+  first_name: z.string().max(80).optional(),
+  trading_profile: z.object({
+    markets: z.array(z.enum(["futures", "stocks", "options", "forex", "crypto"])).max(5),
+    platforms: z.array(z.enum(["tradingview", "tradovate", "topstepx", "ninjatrader", "other"])).max(5),
+    prop_firm: z.boolean(),
+    experience: z.enum(["new", "1-3", "3+"]).optional()
+  }).optional(),
+  trading_limits: z.object({
+    max_trades_per_day: z.number().int().min(1).max(100).nullable(),
+    max_daily_loss: z.number().positive().max(1_000_000).nullable(),
+    stop_after_losses: z.number().int().min(1).max(20).nullable(),
+    session_start: hhmm.nullable(),
+    session_end: hhmm.nullable(),
+    timezone: z.string().max(60).nullable()
+  }).optional()
+})
+
 export async function PATCH(request: NextRequest) {
   const origin = request.headers.get('origin')
   
@@ -207,14 +230,31 @@ export async function PATCH(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    const body = await request.json()
-    const { onboarded } = body
+    const parsed = profilePatchSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      const response = NextResponse.json({ error: "Invalid profile update" }, { status: 400 })
+      return addCorsHeaders(response, origin)
+    }
+    // Only the fields that were sent
+    const updates = Object.fromEntries(Object.entries(parsed.data).filter(([, value]) => value !== undefined))
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ success: true }, { headers: getCorsHeaders(origin) })
+    }
 
     // Update profile
-    const { error: updateError } = await supabase
+    let { error: updateError } = await supabase
       .from("profiles")
-      .update({ onboarded })
+      .update(updates)
       .eq("id", user.id)
+
+    // Until 20261011_onboarding.sql has run, the trading_* columns don't exist; don't block onboarding on them
+    if (updateError && /trading_(profile|limits)/.test(updateError.message ?? "")) {
+      console.warn("[API /me] trading_* columns missing; run 20261011_onboarding.sql")
+      const { trading_profile, trading_limits, ...rest } = updates as Record<string, unknown>
+      updateError = Object.keys(rest).length
+        ? (await supabase.from("profiles").update(rest).eq("id", user.id)).error
+        : null
+    }
 
     if (updateError) throw updateError
 

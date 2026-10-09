@@ -1,235 +1,292 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import type { Session } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase-client"
-import { RULE_TEMPLATES, type RuleTemplate } from "@/lib/rule-templates"
+import { RULE_TEMPLATES } from "@/lib/rule-templates"
+import { detectExtension } from "@/lib/extension-bridge"
+import AuthShell from "../components/AuthShell"
+
+type Market = "futures" | "stocks" | "options" | "forex" | "crypto"
+type Platform = "tradingview" | "tradovate" | "topstepx" | "ninjatrader" | "other"
+
+const MARKETS: { id: Market; label: string }[] = [
+  { id: "futures", label: "Futures" }, { id: "stocks", label: "Stocks" }, { id: "options", label: "Options" },
+  { id: "forex", label: "Forex" }, { id: "crypto", label: "Crypto" }
+]
+const PLATFORMS: { id: Platform; label: string; url?: string }[] = [
+  { id: "tradingview", label: "TradingView", url: "https://www.tradingview.com/chart/?snapchart=start" },
+  { id: "tradovate", label: "Tradovate", url: "https://trader.tradovate.com/?snapchart=start" },
+  { id: "topstepx", label: "TopstepX", url: "https://topstepx.com/?snapchart=start" },
+  { id: "ninjatrader", label: "NinjaTrader" },
+  { id: "other", label: "Something else" }
+]
 
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [rulesetName, setRulesetName] = useState("My Trading Rules")
-  const [rulesText, setRulesText] = useState("")
+  const [session, setSession] = useState<Session | null>(null)
+  const [step, setStep] = useState(1)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showTemplates, setShowTemplates] = useState(false)
+  const [extensionVersion, setExtensionVersion] = useState<string | null | undefined>(undefined)
+
+  // Step 1
+  const [markets, setMarkets] = useState<Market[]>(["futures"])
+  const [platforms, setPlatforms] = useState<Platform[]>(["tradingview"])
+  const [propFirm, setPropFirm] = useState<boolean | null>(null)
+  const [experience, setExperience] = useState<"new" | "1-3" | "3+" | null>(null)
+
+  // Step 2
+  const [templateIndex, setTemplateIndex] = useState<number | null>(null)
+  const [rulesText, setRulesText] = useState("")
+  const [editingRules, setEditingRules] = useState(false)
+  const [maxTrades, setMaxTrades] = useState("3")
+  const [stopAfterLosses, setStopAfterLosses] = useState("2")
+  const [maxDailyLoss, setMaxDailyLoss] = useState("")
+  const [sessionStart, setSessionStart] = useState("")
+  const [sessionEnd, setSessionEnd] = useState("")
+  const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
+  const tzLabel = useMemo(() => new Date().toLocaleTimeString("en-US", { timeZoneName: "short" }).split(" ").pop(), [])
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  function applyTemplate(template: RuleTemplate) {
-    setRulesText(template.rules)
-    setRulesetName(template.name)
-  }
-
-  async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      router.push("/")
-      return
-    }
-
-    // Check if already onboarded
-    const origin = window.location.origin
-    const response = await fetch(`${origin}/api/me`, {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return router.replace("/")
+      setSession(session)
+      const response = await fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
+      if (response.ok) {
+        const { user, ruleset } = await response.json()
+        if (user?.onboarded && ruleset) router.replace("/dashboard/rules")
       }
     })
+    detectExtension().then(setExtensionVersion)
+  }, [])
 
-    if (response.ok) {
-      const data = await response.json()
-      // Temporarily disabled to test templates
-      if (data.user.onboarded) {
-        router.push("/dashboard/rules")
-        return
-      }
+  // Beginners start from the discipline pack, everyone else from the most popular setup
+  const chooseTemplate = (index: number) => {
+    setTemplateIndex(index)
+    setRulesText(RULE_TEMPLATES[index].rules)
+  }
+  useEffect(() => {
+    if (step === 2 && templateIndex === null) {
+      const starter = RULE_TEMPLATES.findIndex(t => t.category === (experience === "new" ? "beginner" : "trend"))
+      chooseTemplate(starter >= 0 ? starter : 0)
     }
+  }, [step])
 
-    setIsLoading(false)
+  const toggle = <T,>(list: T[], value: T) => list.includes(value) ? list.filter(v => v !== value) : [...list, value]
+  const numberOrNull = (value: string) => value.trim() === "" ? null : Number(value)
+
+  const limitsText = () => {
+    const lines = [
+      maxTrades && `- Max ${maxTrades} trades per day`,
+      stopAfterLosses && `- Stop for the day after ${stopAfterLosses} losses in a row`,
+      maxDailyLoss && `- Stop for the day if down $${maxDailyLoss}`,
+      sessionStart && sessionEnd && `- Only trade between ${sessionStart} and ${sessionEnd} (${tzLabel})`
+    ].filter(Boolean)
+    return lines.length ? `\n\nDAILY LIMITS:\n${lines.join("\n")}` : ""
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function finish() {
+    if (!session) return
     setError(null)
-    setIsSaving(true)
-
+    setSaving(true)
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push("/")
-        return
-      }
-
-      // Create first ruleset
-      const origin = window.location.origin
-      const rulesetResponse = await fetch(`${origin}/api/rulesets`, {
+      const template = templateIndex !== null ? RULE_TEMPLATES[templateIndex] : null
+      const rulesetResponse = await fetch("/api/rulesets", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`
-        },
+        headers,
         body: JSON.stringify({
-          name: rulesetName,
-          rules_text: rulesText,
+          name: template?.name ?? "My Trading Rules",
+          rules_text: (rulesText.trim() || "Follow my plan.") + limitsText(),
           is_primary: true
         })
       })
+      if (!rulesetResponse.ok) throw new Error((await rulesetResponse.json()).error || "Couldn't save your rules")
 
-      if (!rulesetResponse.ok) {
-        const error = await rulesetResponse.json()
-        throw new Error(error.error || "Failed to create ruleset")
-      }
-
-      // Mark user as onboarded - call API endpoint to update profile
-      const updateResponse = await fetch(`${origin}/api/me`, {
+      const profileResponse = await fetch("/api/me", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ onboarded: true })
+        headers,
+        body: JSON.stringify({
+          onboarded: true,
+          trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}) },
+          trading_limits: {
+            max_trades_per_day: numberOrNull(maxTrades),
+            max_daily_loss: numberOrNull(maxDailyLoss),
+            stop_after_losses: numberOrNull(stopAfterLosses),
+            session_start: sessionStart || null,
+            session_end: sessionEnd || null,
+            timezone
+          }
+        })
       })
+      if (!profileResponse.ok) throw new Error("Couldn't save your profile")
 
-      if (!updateResponse.ok) {
-        throw new Error("Failed to mark as onboarded")
-      }
-
-      // Redirect to dashboard
-      router.push("/dashboard/rules")
-      
+      fetch("/api/events", { method: "POST", headers, body: JSON.stringify({ event_type: "onboarding_completed", metadata: { platforms, prop_firm: !!propFirm } }) }).catch(() => {})
+      setStep(3)
     } catch (err) {
-      console.error("Onboarding error:", err)
-      setError(err instanceof Error ? err.message : "Failed to save. Please try again.")
-      setIsSaving(false)
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setSaving(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600">Loading...</div>
-      </div>
-    )
-  }
+  const chip = (active: boolean) =>
+    `rounded-full border px-4 py-2 text-sm transition-colors ${active ? "border-blue-500 bg-blue-500/15 text-ink-body" : "border-ink-border bg-ink-surface text-ink-text hover:border-ink-muted"}`
+  const primary = "rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium px-6 py-3 transition-colors"
+  const input = "w-full rounded-lg bg-ink-bg border border-ink-border px-3 py-2.5 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+  const tradingPlatforms = PLATFORMS.filter(p => p.url && platforms.includes(p.id))
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
-              Welcome to Snapchart! 👋
-            </h1>
-            <p className="text-slate-600">
-              Before you start using the extension, let's set up your trading rules.
-              The AI will analyze your charts against these rules to help you stay disciplined.
+    <AuthShell wide>
+      <div className="mb-8 flex items-center gap-2" aria-label={`Step ${step} of 3`}>
+        {[1, 2, 3].map(n => (
+          <div key={n} className={`h-1 flex-1 rounded-full ${n <= step ? "bg-blue-500" : "bg-ink-border"}`} />
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Tell us how you trade</h1>
+            <p className="text-ink-text">So your coach talks about the right things.</p>
+          </div>
+
+          <Question title="What do you trade?">
+            {MARKETS.map(m => <button key={m.id} onClick={() => setMarkets(toggle(markets, m.id))} className={chip(markets.includes(m.id))}>{m.label}</button>)}
+          </Question>
+
+          <Question title="Where do you place trades?">
+            {PLATFORMS.map(p => <button key={p.id} onClick={() => setPlatforms(toggle(platforms, p.id))} className={chip(platforms.includes(p.id))}>{p.label}</button>)}
+          </Question>
+
+          <Question title="Trading a prop firm account?">
+            <button onClick={() => setPropFirm(true)} className={chip(propFirm === true)}>Yes</button>
+            <button onClick={() => setPropFirm(false)} className={chip(propFirm === false)}>No</button>
+          </Question>
+
+          <Question title="How long have you been trading?">
+            <button onClick={() => setExperience("new")} className={chip(experience === "new")}>Less than a year</button>
+            <button onClick={() => setExperience("1-3")} className={chip(experience === "1-3")}>1–3 years</button>
+            <button onClick={() => setExperience("3+")} className={chip(experience === "3+")}>3+ years</button>
+          </Question>
+
+          <div className="flex justify-end">
+            <button onClick={() => setStep(2)} disabled={markets.length === 0 || platforms.length === 0} className={primary}>Continue</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Your rules</h1>
+            <p className="text-ink-text">Your coach checks every chart against these. Pick the closest setup; you can edit it any time.</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {RULE_TEMPLATES.map((template, index) => (
+              <button
+                key={template.name}
+                onClick={() => chooseTemplate(index)}
+                className={`text-left rounded-xl border p-4 transition-colors ${templateIndex === index ? "border-blue-500 bg-blue-500/10" : "border-ink-border bg-ink-surface hover:border-ink-muted"}`}
+              >
+                <div className="font-medium text-sm mb-1">{template.name}</div>
+                <div className="text-xs text-ink-text">{template.description.replace(/ - .*$/, "")}</div>
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <button onClick={() => setEditingRules(!editingRules)} className="text-sm text-blue-400 hover:text-blue-300">
+              {editingRules ? "Hide rules" : "View or edit these rules"}
+            </button>
+            {editingRules && (
+              <textarea value={rulesText} onChange={e => setRulesText(e.target.value)} rows={12} className={`${input} mt-3 font-mono text-sm`} />
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-ink-border bg-ink-surface p-6">
+            <h2 className="font-semibold mb-1">Your daily limits</h2>
+            <p className="text-sm text-ink-text mb-5">Snapchart warns you when you hit these. Leave any blank to skip it.</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Max trades per day">
+                <input inputMode="numeric" value={maxTrades} onChange={e => setMaxTrades(e.target.value.replace(/\D/g, ""))} className={input} placeholder="3" />
+              </Field>
+              <Field label="Stop after losses in a row">
+                <input inputMode="numeric" value={stopAfterLosses} onChange={e => setStopAfterLosses(e.target.value.replace(/\D/g, ""))} className={input} placeholder="2" />
+              </Field>
+              <Field label="Max daily loss ($)">
+                <input inputMode="decimal" value={maxDailyLoss} onChange={e => setMaxDailyLoss(e.target.value.replace(/[^\d.]/g, ""))} className={input} placeholder="e.g. 500" />
+              </Field>
+            </div>
+            <div className="mt-4">
+              <Field label={`Trading hours (${tzLabel}, optional)`}>
+                <div className="flex items-center gap-3">
+                  <input type="time" value={sessionStart} onChange={e => setSessionStart(e.target.value)} className={input} />
+                  <span className="text-ink-muted">to</span>
+                  <input type="time" value={sessionEnd} onChange={e => setSessionEnd(e.target.value)} className={input} />
+                </div>
+              </Field>
+            </div>
+          </div>
+
+          {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+
+          <div className="flex justify-between">
+            <button onClick={() => setStep(1)} className="text-sm text-ink-text hover:text-ink-body">← Back</button>
+            <button onClick={finish} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="text-center space-y-8">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">You're all set</h1>
+            <p className="text-ink-text max-w-md mx-auto">
+              Open your chart and click the <span className="text-ink-body font-medium">Snapchart</span> button at the bottom right. Your first check takes about 15 seconds.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
-                Ruleset Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={rulesetName}
-                onChange={(e) => setRulesetName(e.target.value)}
-                placeholder="e.g., Scalping Strategy, Swing Trading Rules"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
+          {extensionVersion === null && (
+            <p className="mx-auto max-w-md rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              We couldn't find the Snapchart extension in this browser.{" "}
+              {process.env.NEXT_PUBLIC_CHROME_STORE_URL
+                ? <a href={process.env.NEXT_PUBLIC_CHROME_STORE_URL} className="underline">Add it to Chrome</a>
+                : "Add it from the Chrome Web Store"}
+              {" "}first, then come back.
+            </p>
+          )}
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="rules" className="block text-sm font-medium text-slate-700">
-                  Your Trading Rules
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowTemplates(!showTemplates)}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  {showTemplates ? "Hide Templates" : "📋 Use Template"}
-                </button>
-              </div>
-
-              {showTemplates && (
-                <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  {RULE_TEMPLATES.map((template, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => applyTemplate(template)}
-                      className="text-left p-3 bg-white border border-slate-300 hover:border-blue-500 hover:shadow-sm rounded-lg transition-all"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-slate-900 text-sm">
-                          {template.name}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          template.category === 'beginner' ? 'bg-green-100 text-green-700' :
-                          template.category === 'trend' ? 'bg-blue-100 text-blue-700' :
-                          template.category === 'structure' ? 'bg-purple-100 text-purple-700' :
-                          template.category === 'mean-reversion' ? 'bg-orange-100 text-orange-700' :
-                          'bg-pink-100 text-pink-700'
-                        }`}>
-                          {template.category === 'mean-reversion' ? 'mean reversion' : template.category}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-600">
-                        {template.description}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <textarea
-                id="rules"
-                value={rulesText}
-                onChange={(e) => setRulesText(e.target.value)}
-                placeholder="Click 'Use Template' above to get started, or enter your own trading rules here.
-
-Example:
-- Only trade with the trend on higher timeframe
-- Wait for pullback to key support/resistance
-- Enter only after bullish/bearish confirmation candle
-- Stop loss below/above swing low/high
-- Risk max 1% per trade"
-                rows={12}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                required
-                minLength={10}
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                💡 Be specific! The AI will check your charts against these exact rules.
-              </p>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              {isSaving ? "Saving..." : "Continue to Dashboard"}
-            </button>
-          </form>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {(tradingPlatforms.length ? tradingPlatforms : PLATFORMS.slice(0, 1)).map(p => (
+              <a key={p.id} href={p.url} className={primary}>Open {p.label} →</a>
+            ))}
+          </div>
+          <a href="/dashboard/rules" className="inline-block text-sm text-ink-text hover:text-ink-body">Go to my dashboard instead</a>
         </div>
-      </div>
+      )}
+    </AuthShell>
+  )
+}
+
+function Question({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-sm font-medium mb-3">{title}</h2>
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-xs text-ink-text mb-1.5">{label}</span>
+      {children}
+    </label>
   )
 }
