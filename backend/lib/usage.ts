@@ -46,6 +46,23 @@ export async function consumeUsage(
   }
 }
 
+export type WelcomeCredit = "welcome_analysis_used" | "welcome_chart_chat_used"
+
+// The getting-started checklist's first analysis and first "send with chart"
+// question are free. Called after a successful response: flips the profile flag
+// only if it was still false, so exactly one request per account wins. Returns
+// false (no credit) until 20261012_welcome_credits.sql has run.
+export async function claimWelcomeCredit(supabase: SupabaseClient, userId: string, credit: WelcomeCredit): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ [credit]: true })
+    .eq("id", userId)
+    .eq(credit, false)
+    .select("id")
+  if (error) return false
+  return (data?.length ?? 0) > 0
+}
+
 // Gives back usage reserved by consumeUsage when the request fails afterwards.
 export async function refundUsage(supabase: SupabaseClient, userId: string, cost: UsageCost) {
   if (cost.messages === 0 && cost.screenshots === 0) return

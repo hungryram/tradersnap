@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
 import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
 import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
-import { consumeUsage, getLimits, refundUsage } from "@/lib/usage"
+import { claimWelcomeCredit, consumeUsage, getLimits, refundUsage } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
 const supabase = createClient(
@@ -211,6 +211,10 @@ export async function POST(request: NextRequest) {
     }
     refundUserId = null
 
+    // The first analysis while getting started is on us
+    const welcomeFree = !chartUnreadable && await claimWelcomeCredit(supabase, user.id, "welcome_analysis_used")
+    if (welcomeFree) await refundUsage(supabase, user.id, screenshotCost)
+
     // Include ruleset name and message IDs in response
     const responseWithRuleset = {
       ...validatedResponse,
@@ -218,6 +222,7 @@ export async function POST(request: NextRequest) {
       userMessageId: userMsg.id,
       assistantMessageId: assistantMsg.id,
       chartUnreadable: chartUnreadable || undefined,
+      welcomeFree: welcomeFree || undefined,
       // Lets the extension re-send this exact image as follow-up context without being charged again
       chartToken: signChartToken(user.id, validatedRequest.image)
     }

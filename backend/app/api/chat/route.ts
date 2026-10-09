@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
-import { consumeUsage, getLimits, refundUsage, type UsageCost } from "@/lib/usage"
+import { claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 
@@ -567,15 +567,21 @@ Use for time-based coaching when they ask about the next candle or how long they
     }
     reserved = null
 
+    // The first question sent with a chart while getting started is on us
+    const welcomeFree = !responseFailed && isNewScreenshot && await claimWelcomeCredit(supabase, user.id, "welcome_chart_chat_used")
+    if (welcomeFree) await refundUsage(supabase, user.id, cost)
+    const refunded = responseFailed || welcomeFree
+
     // 12. Return response with message IDs and action
     const response = NextResponse.json({ 
       message: aiResponse,
       userMessageId,
       assistantMessageId,
       action,
+      welcomeFree: welcomeFree || undefined,
       usage: {
-        messages: responseFailed ? quota.messages - cost.messages : quota.messages,
-        screenshots: responseFailed ? quota.screenshots - cost.screenshots : quota.screenshots,
+        messages: refunded ? quota.messages - cost.messages : quota.messages,
+        screenshots: refunded ? quota.screenshots - cost.screenshots : quota.screenshots,
         limits: limits
       }
     })

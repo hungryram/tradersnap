@@ -98,7 +98,7 @@ const TradingBuddyWidget = () => {
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
   const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
   // First-run checklist; null until loaded from storage
-  const [gettingStarted, setGettingStarted] = useState<{ analyzed?: boolean, chatted?: boolean, dismissed?: boolean, autoOpened?: boolean, completed?: boolean } | null>(null)
+  const [gettingStarted, setGettingStarted] = useState<{ analyzed?: boolean, chatted?: boolean, chartChatted?: boolean, dismissed?: boolean, autoOpened?: boolean, completed?: boolean } | null>(null)
   const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -464,7 +464,7 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     const g = gettingStarted
     if (!g || g.dismissed || g.completed || !session) return
-    if (g.analyzed && g.chatted && (autoDetectTrades || !isTradingView)) {
+    if (g.analyzed && g.chartChatted && (autoDetectTrades || !isTradingView)) {
       updateGettingStarted({ completed: true }, 'checklist_completed')
     }
   }, [gettingStarted, autoDetectTrades, session])
@@ -1237,7 +1237,7 @@ const TradingBuddyWidget = () => {
 
       const chatResult = await apiResponse.json()
       analytics.chatMessageSent(includeChart, { sessionId: session?.id })
-      updateGettingStarted({ chatted: true })
+      updateGettingStarted(includeChart ? { chatted: true, chartChatted: true } : { chatted: true })
       
       // Update usage tracking
       if (chatResult.usage) {
@@ -1831,6 +1831,26 @@ const TradingBuddyWidget = () => {
           </div>
         )}
 
+        {/* Getting started (pinned above the messages so it never scrolls away) */}
+        {gettingStarted && !gettingStarted.dismissed && (
+          <GettingStarted
+            dark={theme === 'dark'}
+            signedIn={!!session}
+            analyzed={!!gettingStarted.analyzed}
+            chartChatted={!!gettingStarted.chartChatted}
+            showTradeTracking={isTradingView}
+            tradeTrackingOn={autoDetectTrades}
+            onSignIn={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/welcome`, '_blank')}
+            onAnalyze={handleAnalyze}
+            onTryChartQuestion={() => {
+              setInputText('What should I wait for on this chart?')
+              setTimeout(() => inputRef.current?.focus(), 50)
+            }}
+            onEnableTradeTracking={() => setAutoDetect(true)}
+            onDismiss={() => updateGettingStarted({ dismissed: true })}
+          />
+        )}
+
         {/* Messages */}
         <div 
           ref={messagesContainerRef}
@@ -1852,21 +1872,6 @@ const TradingBuddyWidget = () => {
                 {isLoadingMore ? '↻ Loading...' : '↑ Load older messages'}
               </button>
             </div>
-          )}
-
-          {gettingStarted && !gettingStarted.dismissed && (
-            <GettingStarted
-              dark={theme === 'dark'}
-              signedIn={!!session}
-              analyzed={!!gettingStarted.analyzed}
-              chatted={!!gettingStarted.chatted}
-              showTradeTracking={isTradingView}
-              tradeTrackingOn={autoDetectTrades}
-              onSignIn={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/welcome`, '_blank')}
-              onAnalyze={handleAnalyze}
-              onEnableTradeTracking={() => setAutoDetect(true)}
-              onDismiss={() => updateGettingStarted({ dismissed: true })}
-            />
           )}
 
           {messages.length === 0 && (
@@ -2462,62 +2467,83 @@ const TradingBuddyWidget = () => {
 
 export default TradingBuddyWidget
 
-// First-run checklist shown at the top of the chat until done or hidden
+// First-run checklist, pinned above the chat. Collapsed it shows only the next
+// step; expanded it shows every step.
 function GettingStarted(props: {
   dark: boolean
   signedIn: boolean
   analyzed: boolean
-  chatted: boolean
+  chartChatted: boolean
   showTradeTracking: boolean
   tradeTrackingOn: boolean
   onSignIn: () => void
   onAnalyze: () => void
+  onTryChartQuestion: () => void
   onEnableTradeTracking: () => void
   onDismiss: () => void
 }) {
   const { dark } = props
+  const [expanded, setExpanded] = useState(false)
   const muted = dark ? 'text-dark-text' : 'text-slate-500'
+  const strong = dark ? 'text-dark-body' : 'text-slate-900'
+
   const items = [
-    !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds with Google.', action: 'Sign in', onClick: props.onSignIn },
-    { done: props.analyzed, title: 'Check this chart against your rules', detail: 'You get a verdict in about 15 seconds.', action: props.signedIn ? 'Analyze this chart' : null, onClick: props.onAnalyze },
-    props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking },
-    { done: props.chatted, title: 'Ask your coach anything', detail: 'Try: "What should I wait for here?"', action: null, onClick: () => {} }
+    !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds.', action: 'Sign in', onClick: props.onSignIn },
+    { done: props.analyzed, title: 'Check this chart against your rules', detail: 'A verdict in about 15 seconds. Free, doesn\'t count toward your daily limit.', action: props.signedIn ? 'Analyze this chart' : null, onClick: props.onAnalyze },
+    { done: props.chartChatted, title: 'Ask about your chart', detail: 'Type a question and click Send with Chart. Your first one is free too.', action: props.signedIn ? 'Try a question' : null, onClick: props.onTryChartQuestion },
+    props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking }
   ].filter(Boolean) as { done: boolean, title: string, detail: string, action: string | null, onClick: () => void }[]
+
   const doneCount = items.filter(item => item.done).length
   const allDone = doneCount === items.length
+  const next = items.find(item => !item.done)
+  const shown = expanded ? items : next ? [next] : []
 
   return (
-    <div className={`rounded-xl border p-4 text-left ${dark ? 'bg-dark-elevated border-dark-border' : 'bg-white border-slate-200'}`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className={`font-semibold text-sm ${dark ? 'text-dark-body' : 'text-slate-900'}`}>{allDone ? "You're all set" : 'Get started'}</div>
-          <div className={`text-xs ${muted}`}>{doneCount} of {items.length} done</div>
-        </div>
-        <button onClick={props.onDismiss} className={`text-xs ${muted} hover:underline`}>{allDone ? 'Close' : 'Hide'}</button>
+    <div className={`px-3 py-2.5 border-b ${dark ? 'bg-dark-bg border-dark-border' : 'bg-white border-slate-200'}`}>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setExpanded(!expanded)} className="flex-1 flex items-center gap-2 text-left">
+          <span className={`text-xs font-semibold ${strong}`}>{allDone ? "You're all set" : 'Get started'}</span>
+          <span className="flex gap-1" aria-label={`${doneCount} of ${items.length} done`}>
+            {items.map(item => (
+              <span key={item.title} className={`h-1.5 w-4 rounded-full ${item.done ? 'bg-green-500' : dark ? 'bg-dark-border' : 'bg-slate-200'}`} />
+            ))}
+          </span>
+          <span className={`text-[11px] ${muted}`}>{expanded ? 'Hide steps' : `${doneCount}/${items.length}`}</span>
+        </button>
+        <button onClick={props.onDismiss} className={`text-[11px] ${muted} hover:underline`} title="Hide the checklist">
+          {allDone ? 'Close' : 'Skip'}
+        </button>
       </div>
-      <ol className="space-y-3">
-        {items.map(item => (
-          <li key={item.title} className="flex gap-3">
-            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${item.done ? 'bg-green-500 border-green-500 text-white' : dark ? 'border-dark-border' : 'border-slate-300'}`}>
-              {item.done ? '\u2713' : ''}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className={`text-sm ${item.done ? `line-through ${muted}` : dark ? 'text-dark-body' : 'text-slate-900'}`}>{item.title}</div>
-              {!item.done && <div className={`text-xs ${muted}`}>{item.detail}</div>}
-              {!item.done && item.action && (
-                <button onClick={item.onClick} className="mt-2 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-medium text-white">
-                  {item.action}
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-      <p className={`mt-4 text-[11px] leading-snug ${muted}`}>
-        Snapchart captures your chart only when you ask, and saves your chat so you can pick up later (clear it anytime). By using it you agree to the{' '}
-        <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{' '}
-        <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
-      </p>
+
+      {shown.length > 0 && (
+        <ol className="mt-2 space-y-2.5">
+          {shown.map(item => (
+            <li key={item.title} className="flex gap-2.5">
+              <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${item.done ? 'bg-green-500 border-green-500 text-white' : dark ? 'border-dark-border' : 'border-slate-300'}`}>
+                {item.done ? '\u2713' : ''}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm leading-tight ${item.done ? `line-through ${muted}` : strong}`}>{item.title}</div>
+                {!item.done && <div className={`text-xs mt-0.5 ${muted}`}>{item.detail}</div>}
+                {!item.done && item.action && (
+                  <button onClick={item.onClick} className="mt-1.5 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1 text-xs font-medium text-white">
+                    {item.action}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {expanded && (
+        <p className={`mt-3 text-[11px] leading-snug ${muted}`}>
+          Snapchart captures your chart only when you ask, and saves your chat so you can pick up later (clear it anytime). By using it you agree to the{' '}
+          <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{' '}
+          <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
+        </p>
+      )}
     </div>
   )
 }
