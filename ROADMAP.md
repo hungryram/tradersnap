@@ -56,6 +56,7 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 - [ ] Trade loop: "Did you take it? Outcome?" → end-of-day review → weekly rule-break report.
 - [~] Auto-detect trades from the page (no broker API). Opt-in menu toggle "Auto-detect trades".
   - [x] TradingView: rebuilds trades from the panel's **Order history** (exact fills, order IDs, scale in/out, reversals, stop/target fills, commission). The extension opens that tab once per panel load (it only populates after a first open, then updates in the background). Columns found by header code names, so any language / column order works. Watchlist fallback removed (wrong sizes, symbol often not listed).
+  - [x] Chat coach sees today's trades (count, W/L, net, losing streak, each trade) via `lib/trades-context.ts`.
   - [x] Status dot in the Today strip: green tracking / amber loading history / red "open TradingView's trading panel".
   - [ ] Run `20261009_trades.sql` and `20261010_trades_fills.sql` in Supabase.
   - [ ] Confirm with a real broker connected through TradingView (table names, commission column).

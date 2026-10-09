@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
 import { consumeUsage, getLimits, refundUsage, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
+import { buildTradesContext } from "@/lib/trades-context"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -252,7 +253,8 @@ const chatRequestSchema = z.object({
     content: z.string().max(8000)
   })).max(50).optional(),
   timestamp: z.string().optional(), // ISO timestamp from client
-  timezone: z.string().optional() // IANA timezone (e.g., "America/New_York")
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/New_York")
+  dayStart: z.string().optional() // ISO time of the trader's local midnight
 })
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
@@ -433,6 +435,12 @@ export async function POST(request: NextRequest) {
 Use for time-based coaching when they ask about the next candle or how long they've been trading.`
     }
 
+    // Today's auto-detected trades, from the trader's local midnight
+    const dayStart = validatedRequest.dayStart && !isNaN(Date.parse(validatedRequest.dayStart))
+      ? new Date(validatedRequest.dayStart)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const tradesContext = await buildTradesContext(supabase, user.id, dayStart, validatedRequest.timezone)
+
     // Favorited messages (AI's persistent memory)
     const favoritedContext = favoritedMessages && favoritedMessages.length > 0
       ? `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
@@ -454,7 +462,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     const result = await llmChat({
       system: coachingPrompt,
       memory: favoritedContext,
-      volatileContext: timeContext,
+      volatileContext: [timeContext, tradesContext].filter(Boolean).join("\n\n") || null,
       history,
       message: userMessage,
       image: validatedRequest.image,

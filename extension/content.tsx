@@ -1255,7 +1255,8 @@ const TradingBuddyWidget = () => {
         includeChart,
         conversationHistory,
         timestamp: new Date().toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
       }
       
       // Include chart image if captured or use last analyzed chart
