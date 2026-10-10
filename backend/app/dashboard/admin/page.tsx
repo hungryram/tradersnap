@@ -8,11 +8,16 @@ type Step = { label: string; count: number }
 type UserRow = {
   email: string; name: string | null; plan: string; subscription_status: string | null
   created_at: string; last_active: string | null; checks: number; checks7d: number; trades: number; has_rules: boolean
+  active_days_30d: number; group: Group; platforms: string[]; markets: string[]; prop_firm: boolean | null; experience: string | null
 }
+type Group = "power" | "casual" | "fading" | "gone" | "never"
+type SegmentRow = { value: string; users: number; active: number; paying: number }
 type Stats = {
   generatedAt: string
   headline: { users: number; signups7d: number; signups30d: number; activeThisWeek: number; activeLastWeek: number; paying: number; mrr: number }
   funnel: { last30d: Step[]; allTime: Step[] }
+  groups: Record<Group, number>
+  segments: { answered: number; platforms: SegmentRow[]; markets: SegmentRow[]; propFirm: SegmentRow[]; experience: SegmentRow[] }
   weekly: { week: string; active: number }[]
   retention: { offsets: number[]; rows: { week: string; size: number; cells: (number | null)[] }[] }
   revenue: { active: number; pastDue: number; canceled: number; mrr: number }
@@ -26,7 +31,22 @@ const REASON_LABELS: Record<string, string> = {
   bugs: "Something broken", too_expensive: "Too expensive", privacy: "Privacy", other: "Other"
 }
 
-type SortKey = "created_at" | "last_active" | "checks" | "checks7d" | "trades"
+const GROUPS: { id: Group; label: string; hint: string; tone: string }[] = [
+  { id: "power", label: "Power", hint: "Used 3+ days this week", tone: "text-green-400" },
+  { id: "casual", label: "Casual", hint: "Used this week", tone: "text-ink-body" },
+  { id: "fading", label: "Fading", hint: "Quiet 7 to 29 days", tone: "text-amber-300" },
+  { id: "gone", label: "Gone", hint: "Quiet 30+ days", tone: "text-red-400" },
+  { id: "never", label: "Never used", hint: "No activity yet", tone: "text-ink-muted" },
+]
+
+const ANSWER_LABELS: Record<string, string> = {
+  tradingview: "TradingView", tradovate: "Tradovate", topstepx: "TopstepX", ninjatrader: "NinjaTrader", other: "Other",
+  futures: "Futures", stocks: "Stocks", options: "Options", forex: "Forex", crypto: "Crypto",
+  new: "Under 1 year", "1-3": "1 to 3 years", "3+": "3+ years"
+}
+const answer = (value: string) => ANSWER_LABELS[value] ?? value
+
+type SortKey = "created_at" | "last_active" | "checks" | "checks7d" | "trades" | "active_days_30d"
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -34,6 +54,7 @@ export default function AdminPage() {
   const [funnelRange, setFunnelRange] = useState<"last30d" | "allTime">("last30d")
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<SortKey>("last_active")
+  const [groupFilter, setGroupFilter] = useState<Group | null>(null)
 
   useEffect(() => {
     api<Stats>("/api/admin/stats").then(setStats).catch(() => setNotFound(true))
@@ -44,9 +65,10 @@ export default function AdminPage() {
     const q = query.trim().toLowerCase()
     const value = (u: UserRow) => sort === "created_at" || sort === "last_active" ? Date.parse(u[sort] ?? "") || 0 : u[sort]
     return stats.users
-      .filter(u => !q || u.email.toLowerCase().includes(q) || (u.name ?? "").toLowerCase().includes(q) || u.plan.includes(q))
+      .filter(u => !groupFilter || u.group === groupFilter)
+      .filter(u => !q || [u.email, u.name ?? "", u.plan, ...u.platforms, ...u.markets].some(field => field.toLowerCase().includes(q)))
       .sort((a, b) => value(b) - value(a))
-  }, [stats, query, sort])
+  }, [stats, query, sort, groupFilter])
 
   if (notFound) return <div className="py-24 text-center text-ink-muted">Page not found.</div>
   if (!stats) return <Loading />
@@ -110,6 +132,39 @@ export default function AdminPage() {
             })}
           </ul>
           <p className="mt-4 text-xs text-ink-muted">Installs before sign-up aren't tracked here; see the Chrome Web Store developer dashboard.</p>
+        </Card>
+
+        <Card title="How often they use it">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {GROUPS.map(g => (
+              <button
+                key={g.id}
+                onClick={() => setGroupFilter(groupFilter === g.id ? null : g.id)}
+                className={`rounded-xl border p-3 text-left transition-colors ${groupFilter === g.id ? "border-blue-500 bg-blue-500/10" : "border-ink-border hover:border-ink-muted"}`}
+              >
+                <div className={`text-2xl font-semibold tabular-nums ${g.tone}`}>{stats.groups[g.id] ?? 0}</div>
+                <div className="text-sm">{g.label}</div>
+                <div className="text-xs text-ink-muted">{g.hint}</div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-ink-muted">Click a group to filter the user list below. Fading users are the ones to email this week.</p>
+        </Card>
+
+        <Card title="Who your users are">
+          {stats.segments.answered === 0 ? (
+            <p className="text-sm text-ink-muted">No onboarding answers yet. They start with users who sign up through the new onboarding.</p>
+          ) : (
+            <>
+              <p className="-mt-2 mb-4 text-xs text-ink-muted">{stats.segments.answered} of {headline.users} users answered onboarding. "Active" = used Snapchart in the last 14 days.</p>
+              <div className="grid gap-6 md:grid-cols-2">
+                <SegmentTable title="Trades on" rows={stats.segments.platforms} />
+                <SegmentTable title="Markets" rows={stats.segments.markets} />
+                <SegmentTable title="Account" rows={stats.segments.propFirm} />
+                <SegmentTable title="Experience" rows={stats.segments.experience} />
+              </div>
+            </>
+          )}
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -209,28 +264,31 @@ export default function AdminPage() {
         </Card>
 
         <Card
-          title={`Users (${users.length})`}
+          title={`Users (${users.length})${groupFilter ? ` · ${GROUPS.find(g => g.id === groupFilter)?.label}` : ""}`}
           action={
             <div className="flex gap-2">
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search email or plan" className={`${inputClass} w-48 py-1.5`} />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search email, plan, platform" className={`${inputClass} w-48 py-1.5`} />
               <select value={sort} onChange={e => setSort(e.target.value as SortKey)} className={`${inputClass} w-auto py-1.5`}>
                 <option value="last_active">Last active</option>
                 <option value="created_at">Newest</option>
                 <option value="checks">Most checks</option>
                 <option value="checks7d">Checks this week</option>
+                <option value="active_days_30d">Most active days</option>
                 <option value="trades">Most trades</option>
               </select>
             </div>
           }
         >
           <div className="-mx-5 overflow-x-auto sm:-mx-6">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[920px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-ink-muted">
                   <th className="px-5 pb-2 font-normal sm:px-6">User</th>
+                  <th className="pb-2 font-normal">Trades on</th>
                   <th className="pb-2 font-normal">Plan</th>
                   <th className="pb-2 font-normal">Signed up</th>
                   <th className="pb-2 font-normal">Last active</th>
+                  <th className="pb-2 font-normal text-right" title="Days with any activity in the last 30">Days (30d)</th>
                   <th className="pb-2 font-normal text-right">Checks</th>
                   <th className="pb-2 font-normal text-right">This week</th>
                   <th className="px-5 pb-2 font-normal text-right sm:px-6">Trades</th>
@@ -243,12 +301,22 @@ export default function AdminPage() {
                       <a href={`mailto:${u.email}`} className="hover:text-blue-300">{u.email}</a>
                       {u.name && <span className="text-ink-muted"> · {u.name}</span>}
                       {!u.has_rules && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">no rules</span>}
+                      <GroupBadge group={u.group} />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {u.platforms.map(pl => <span key={pl} className="rounded bg-ink-elevated px-1.5 py-0.5 text-[11px] text-ink-text">{answer(pl)}</span>)}
+                        {u.prop_firm && <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[11px] text-blue-300">Prop</span>}
+                        {u.experience && <span className="rounded bg-ink-elevated px-1.5 py-0.5 text-[11px] text-ink-muted">{answer(u.experience)}</span>}
+                        {u.platforms.length === 0 && !u.experience && <span className="text-ink-muted">—</span>}
+                      </div>
                     </td>
                     <td className="py-2 capitalize">
                       {u.plan}{u.subscription_status && u.plan === "pro" && u.subscription_status !== "active" && <span className="text-amber-300"> ({u.subscription_status})</span>}
                     </td>
                     <td className="py-2 text-ink-text">{shortDate(u.created_at)}</td>
                     <td className="py-2 text-ink-text">{u.last_active ? relative(u.last_active) : <span className="text-ink-muted">never</span>}</td>
+                    <td className="py-2 text-right tabular-nums">{u.active_days_30d}</td>
                     <td className="py-2 text-right tabular-nums">{u.checks}</td>
                     <td className="py-2 text-right tabular-nums">{u.checks7d}</td>
                     <td className="px-5 py-2 text-right tabular-nums sm:px-6">{u.trades}</td>
@@ -261,6 +329,47 @@ export default function AdminPage() {
       </div>
     </>
   )
+}
+
+function SegmentTable({ title, rows }: { title: string; rows: SegmentRow[] }) {
+  if (rows.length === 0) return null
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-medium">{title}</h3>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-ink-muted">
+            <th className="pb-1 font-normal" />
+            <th className="pb-1 font-normal text-right">Users</th>
+            <th className="pb-1 font-normal text-right">Active</th>
+            <th className="pb-1 font-normal text-right">Paying</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.value} className="border-t border-ink-border/70">
+              <td className="py-1.5 text-ink-text">{answer(row.value)}</td>
+              <td className="py-1.5 text-right tabular-nums">{row.users}</td>
+              <td className="py-1.5 text-right tabular-nums">{row.active} <span className="text-xs text-ink-muted">({Math.round((row.active / row.users) * 100)}%)</span></td>
+              <td className="py-1.5 text-right tabular-nums">{row.paying}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function GroupBadge({ group }: { group: Group }) {
+  const styles: Record<Group, string> = {
+    power: "bg-green-500/15 text-green-300",
+    casual: "bg-ink-elevated text-ink-text",
+    fading: "bg-amber-500/15 text-amber-200",
+    gone: "bg-red-500/15 text-red-300",
+    never: "bg-ink-elevated text-ink-muted",
+  }
+  const label = GROUPS.find(g => g.id === group)?.label ?? group
+  return <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] ${styles[group]}`}>{label}</span>
 }
 
 function shortDate(iso: string) {

@@ -39,7 +39,7 @@ function weekStart(time: number) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day)
 }
 
-type Profile = { id: string; email: string; first_name: string | null; plan: string | null; subscription_status: string | null; created_at: string; onboarded: boolean | null }
+type Profile = { id: string; email: string; first_name: string | null; plan: string | null; subscription_status: string | null; created_at: string; onboarded: boolean | null; trading_profile?: { markets?: string[]; platforms?: string[]; prop_firm?: boolean; experience?: string } | null }
 type Event = { user_id: string; event_type: string; created_at: string }
 type TradeRow = { user_id: string; closed_at: string }
 type Rating = { user_id: string; rating: number; snapshot: any; created_at: string }
@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
     const since = new Date(now - 120 * DAY).toISOString()
 
     const [profiles, rulesetRows, events, trades, ratings, feedback] = await Promise.all([
-      fetchAll<Profile>((from, to) => supabase.from("profiles").select("id, email, first_name, plan, subscription_status, created_at, onboarded").order("created_at", { ascending: false }).range(from, to)),
+      fetchAll<Profile>((from, to) => supabase.from("profiles").select("id, email, first_name, plan, subscription_status, created_at, onboarded, trading_profile").order("created_at", { ascending: false }).range(from, to))
+        .catch(() => fetchAll<Profile>((from, to) => supabase.from("profiles").select("id, email, first_name, plan, subscription_status, created_at, onboarded").order("created_at", { ascending: false }).range(from, to))),
       fetchAll<{ user_id: string }>((from, to) => supabase.from("rulesets").select("user_id").range(from, to)),
       fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
       fetchOptional<TradeRow>((from, to) => supabase.from("trades").select("user_id, closed_at").range(from, to)),
@@ -68,16 +69,17 @@ export async function GET(request: NextRequest) {
     const isPaid = (p: Profile) => p.plan === "pro" && p.subscription_status !== "canceled"
 
     // Per-user activity
-    type Activity = { checks: number; checks7d: number; checkTimes: number[]; lastActive: number; trades: number }
+    type Activity = { checks: number; checks7d: number; checkTimes: number[]; lastActive: number; trades: number; activeDays: Set<string> }
     const activity = new Map<string, Activity>()
     const get = (id: string) => {
-      if (!activity.has(id)) activity.set(id, { checks: 0, checks7d: 0, checkTimes: [], lastActive: 0, trades: 0 })
+      if (!activity.has(id)) activity.set(id, { checks: 0, checks7d: 0, checkTimes: [], lastActive: 0, trades: 0, activeDays: new Set() })
       return activity.get(id)!
     }
     for (const e of events) {
       const a = get(e.user_id)
       const t = Date.parse(e.created_at)
       a.lastActive = Math.max(a.lastActive, t)
+      if (now - t <= 30 * DAY) a.activeDays.add(e.created_at.slice(0, 10))
       if (e.event_type === "analysis_finished") {
         a.checks++
         a.checkTimes.push(t)
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
       const a = get(t.user_id)
       a.trades++
       a.lastActive = Math.max(a.lastActive, Date.parse(t.closed_at))
+      if (now - Date.parse(t.closed_at) <= 30 * DAY) a.activeDays.add(t.closed_at.slice(0, 10))
     }
 
     // Funnel: sign-ups in the last 30 days and all time
@@ -137,6 +140,43 @@ export async function GET(request: NextRequest) {
     const recentRatings = ratings.filter(r => now - Date.parse(r.created_at) <= 30 * DAY)
     const downs = recentRatings.filter(r => r.rating < 0)
 
+    // Usage groups: power = used on 3+ days this week; fading = active before, quiet 7-29 days; gone = quiet 30+ days or never
+    const groupOf = (p: Profile) => {
+      const a = activity.get(p.id)
+      if (!a?.lastActive) return "never"
+      const quietDays = (now - a.lastActive) / DAY
+      if (quietDays >= 30) return "gone"
+      if (quietDays >= 7) return "fading"
+      const daysThisWeek = [...a.activeDays].filter(d => now - Date.parse(`${d}T12:00:00Z`) <= 7 * DAY).length
+      return daysThisWeek >= 3 ? "power" : "casual"
+    }
+    const groups = { power: 0, casual: 0, fading: 0, gone: 0, never: 0 } as Record<string, number>
+    for (const p of profiles) groups[groupOf(p)]++
+
+    // Onboarding answers: how many users, still active (14 days), paying, per answer
+    const activeRecently = (p: Profile) => (now - (activity.get(p.id)?.lastActive ?? 0)) <= 14 * DAY
+    const segment = (valuesOf: (p: Profile) => string[]) => {
+      const rows = new Map<string, { users: number; active: number; paying: number }>()
+      for (const p of profiles) {
+        for (const value of valuesOf(p)) {
+          const row = rows.get(value) ?? { users: 0, active: 0, paying: 0 }
+          row.users++
+          if (activeRecently(p)) row.active++
+          if (isPaid(p)) row.paying++
+          rows.set(value, row)
+        }
+      }
+      return [...rows.entries()].map(([value, row]) => ({ value, ...row })).sort((a, b) => b.users - a.users)
+    }
+    const answered = (p: Profile) => !!p.trading_profile
+    const segments = {
+      answered: profiles.filter(answered).length,
+      platforms: segment(p => answered(p) ? (p.trading_profile!.platforms?.length ? p.trading_profile!.platforms! : ["none picked"]) : []),
+      markets: segment(p => answered(p) ? (p.trading_profile!.markets ?? []) : []),
+      propFirm: segment(p => answered(p) ? [p.trading_profile!.prop_firm ? "Prop firm" : "Own account"] : []),
+      experience: segment(p => answered(p) && p.trading_profile!.experience ? [p.trading_profile!.experience] : [])
+    }
+
     const reasons = new Map<string, number>()
     for (const f of feedback) reasons.set(f.reason, (reasons.get(f.reason) ?? 0) + 1)
 
@@ -152,6 +192,8 @@ export async function GET(request: NextRequest) {
         mrr: proActive * PRO_PRICE
       },
       funnel: { last30d: funnelFor(recent), allTime: funnelFor(profiles) },
+      groups,
+      segments,
       weekly,
       retention: { offsets, rows: retention },
       revenue: { active: proActive, pastDue: proPastDue, canceled, mrr: proActive * PRO_PRICE },
@@ -177,7 +219,13 @@ export async function GET(request: NextRequest) {
           checks: a?.checks ?? 0,
           checks7d: a?.checks7d ?? 0,
           trades: a?.trades ?? 0,
-          has_rules: hasRules.has(p.id)
+          active_days_30d: a?.activeDays.size ?? 0,
+          group: groupOf(p),
+          has_rules: hasRules.has(p.id),
+          platforms: p.trading_profile?.platforms ?? [],
+          markets: p.trading_profile?.markets ?? [],
+          prop_firm: p.trading_profile?.prop_firm ?? null,
+          experience: p.trading_profile?.experience ?? null
         }
       })
     }, { headers: { "Cache-Control": "no-store" } })
