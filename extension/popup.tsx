@@ -128,7 +128,7 @@ function IndexPopup() {
 
   return (
     <div className="w-80 h-96 p-4 bg-slate-900 text-white">
-      <h1 className="text-xl font-bold mb-4">Snapchart</h1>
+      <h1 className="text-xl font-bold mb-4">Pip</h1>
       
       {!isLoggedIn ? (
         <div className="space-y-4">

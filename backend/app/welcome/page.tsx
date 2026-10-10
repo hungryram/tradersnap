@@ -37,7 +37,7 @@ export default function WelcomePage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className="rounded-2xl border border-ink-border bg-ink-surface p-6">
-          <StepLabel n={1} title="Pin Snapchart to your toolbar" />
+          <StepLabel n={1} title="Pin Pip to your toolbar" />
           <p className="text-sm text-ink-text mb-5">So it's one click away on your charts.</p>
           <ol className="space-y-3 text-sm">
             <li className="flex items-center gap-3">
@@ -46,7 +46,7 @@ export default function WelcomePage() {
             </li>
             <li className="flex items-center gap-3">
               <Kbd><PinIcon /></Kbd>
-              <span>Click the <span className="text-ink-body font-medium">pin</span> next to Snapchart</span>
+              <span>Click the <span className="text-ink-body font-medium">pin</span> next to Pip</span>
             </li>
           </ol>
         </section>

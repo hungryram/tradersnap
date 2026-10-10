@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       // Old links and shortcuts
       { source: "/quick-start", destination: "/guide", permanent: true },
-      { source: "/login", destination: "https://admin.snapchartapp.com/", permanent: false },
+      { source: "/login", destination: "https://app.tradewithpip.ai/", permanent: false },
       { source: "/install", destination: "https://chromewebstore.google.com/detail/snapchart-trading-psychol/bppbpeodpbepcmjifjjihejcnofdnibe", permanent: false },
     ]
   },

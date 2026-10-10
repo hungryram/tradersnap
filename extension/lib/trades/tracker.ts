@@ -141,7 +141,7 @@ export function startTradeTracking(options: {
       fresh.forEach(trade => reported.add(trade.client_trade_id))
       options.onTrades(fresh)
     } catch (error) {
-      console.warn("[Snapchart] Trade reader failed:", error)
+      console.warn("[Pip] Trade reader failed:", error)
     }
   }, options.intervalMs ?? 1000)
 

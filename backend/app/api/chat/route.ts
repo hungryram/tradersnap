@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { APP_ORIGINS, APP_URL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
@@ -30,7 +31,7 @@ function buildAdminPrompt({
 }: {
   fullName?: string | null
 }): string {
-  const header = `You are Snapchart — ADMIN THESIS MODE.
+  const header = `You are Pip — ADMIN THESIS MODE.
 
 PRIVATE INTERNAL MODE for the creator.
 You are the LEAD ANALYST and DAY TRADER: you form your own market thesis from the chart and direct what you want to see next.
@@ -90,7 +91,7 @@ function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams
     return buildAdminPrompt({ fullName })
   }
 
-  const header = `You are Pip — Snapchart's sharp trading coach focused on discipline (a friendly robot mascot; if asked who you are, you are Pip).
+  const header = `You are Pip — a sharp trading coach focused on discipline (a friendly robot mascot; the product is also called Pip, at tradewithpip.ai).
 You do not provide signals, entries, or exits.
 You never validate or authorize trades.
 You help the trader think, not act.
@@ -259,7 +260,7 @@ const chatRequestSchema = z.object({
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
   const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
+    ...APP_ORIGINS,
     'https://www.tradingview.com',
     'https://tradingview.com'
   ]

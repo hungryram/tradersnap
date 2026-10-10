@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { APP_ORIGINS, APP_URL } from "@/lib/urls"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(
@@ -8,7 +9,7 @@ const supabase = createClient(
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
   const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
+    ...APP_ORIGINS,
     'https://www.tradingview.com',
     'https://tradingview.com'
   ]

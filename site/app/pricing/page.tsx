@@ -5,7 +5,7 @@ import { PageHeader } from "../components/Section"
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Snapchart is free to start. Pro gives you about 10 times more chart checks and coach messages every day for $19 a month.",
+  description: "Pip is free to start. Pro gives you about 10 times more chart checks and coach messages every day for $19 a month.",
 }
 
 export default function PricingPage() {

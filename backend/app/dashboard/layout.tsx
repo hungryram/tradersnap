@@ -58,7 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <nav className="flex h-full flex-col">
       <a href="/dashboard" className="flex items-center gap-2.5 px-3 py-2 mb-6">
         <Pip size={30} />
-        <span className="font-semibold tracking-tight text-ink-body">Snapchart</span>
+        <span className="font-semibold tracking-tight text-ink-body">Pip</span>
       </a>
 
       <ul className="space-y-0.5">
@@ -130,7 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-border bg-ink-bg px-4 py-3 md:hidden">
         <a href="/dashboard" className="flex items-center gap-2">
           <Pip size={26} />
-          <span className="font-semibold">Snapchart</span>
+          <span className="font-semibold">Pip</span>
         </a>
         <button onClick={() => setMenuOpen(true)} className="rounded-lg p-2 text-ink-text hover:bg-ink-elevated" aria-label="Open menu">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>

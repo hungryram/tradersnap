@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { APP_URL } from "@/lib/urls"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 import { TOPUP_UNITS } from "@/lib/usage"
@@ -92,8 +93,8 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
     }
 
-    // Use hardcoded base URL to avoid issues with auth redirects
-    const baseUrl = "https://admin.snapchartapp.com"
+    // Fixed public URL (not the request host) so Stripe always returns people to the live dashboard
+    const baseUrl = APP_URL
 
     // Create Checkout Session
     if (isTopup) {

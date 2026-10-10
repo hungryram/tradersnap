@@ -74,7 +74,7 @@ export default function TodayPage() {
               <div className="py-6 text-center">
                 <p className="text-sm text-ink-text">No trades recorded today.</p>
                 <p className="mt-1 text-xs text-ink-muted max-w-sm mx-auto">
-                  Turn on <span className="text-ink-text">Auto-detect trades</span> in the Snapchart chat (⋮ menu) and keep TradingView's trading panel open. Trades show up here as they close.
+                  Turn on <span className="text-ink-text">Auto-detect trades</span> in the Pip chat (⋮ menu) and keep TradingView's trading panel open. Trades show up here as they close.
                 </p>
               </div>
             ) : (
@@ -94,7 +94,7 @@ export default function TodayPage() {
               </div>
             ) : (
               <p className="text-sm text-ink-text">
-                No limits set. <a href="/dashboard/rules#limits" className="text-brand-300 hover:text-brand-200">Add a max trades or daily loss limit</a> and Snapchart will warn you when you hit it.
+                No limits set. <a href="/dashboard/rules#limits" className="text-brand-300 hover:text-brand-200">Add a max trades or daily loss limit</a> and Pip will warn you when you hit it.
               </p>
             )}
           </Card>

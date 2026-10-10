@@ -27,7 +27,7 @@ export default function FAQPage() {
       title: "Getting Started",
       questions: [
         {
-          q: "How do I install the Snapchart extension?",
+          q: "How do I install the Pip extension?",
           a: (
             <>
               <a 
@@ -44,11 +44,11 @@ export default function FAQPage() {
         },
         {
           q: "Why does the extension need certain permissions?",
-          a: "Snapchart needs permission to capture chart screenshots from trading platforms (like TradingView) and to communicate with our servers to provide AI-powered analysis. We only access content when you explicitly click 'Analyze Chart'."
+          a: "Pip needs permission to capture chart screenshots from trading platforms (like TradingView) and to communicate with our servers to provide AI-powered analysis. We only access content when you explicitly click 'Analyze Chart'."
         },
         {
           q: "What trading platforms are supported?",
-          a: "Snapchart works with TradingView and most web-based trading platforms that display charts in your browser."
+          a: "Pip works with TradingView and most web-based trading platforms that display charts in your browser."
         }
       ]
     },
@@ -89,7 +89,7 @@ export default function FAQPage() {
           a: "Yes! You can create multiple rulesets for different strategies (scalping, swing trading, etc.) but only one can be active at a time. Switch between them in the Rules page."
         },
         {
-          q: "Do I need to create rules to use Snapchart?",
+          q: "Do I need to create rules to use Pip?",
           a: "No, rules are optional. You'll still get comprehensive chart analysis without them. However, rules make the analysis more personalized and help enforce your trading discipline."
         },
         {
@@ -148,8 +148,8 @@ export default function FAQPage() {
           a: "AI analysis typically takes 5-10 seconds. If it's taking longer, check your internet connection. During high traffic times, there may be slight delays."
         },
         {
-          q: "Can I use Snapchart on mobile?",
-          a: "Currently, Snapchart is a desktop Chrome extension. Mobile support is on our roadmap—request this feature on our Feature Requests page!"
+          q: "Can I use Pip on mobile?",
+          a: "Currently, Pip is a desktop Chrome extension. Mobile support is on our roadmap—request this feature on our Feature Requests page!"
         }
       ]
     },
@@ -192,7 +192,7 @@ export default function FAQPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Frequently Asked Questions</h1>
           <p className="text-ink-text">
-            Find answers to common questions about Snapchart. Can't find what you're looking for?{" "}
+            Find answers to common questions about Pip. Can't find what you're looking for?{" "}
             <a 
               href="https://snapchart.canny.io/bugs-and-issues" 
               target="_blank" 

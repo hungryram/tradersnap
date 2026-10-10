@@ -27,6 +27,7 @@ const supabase = createBrowserClient(
 export const config: PlasmoCSConfig = {
   matches: [
     // Admin dashboard (for session testing)
+    "https://app.tradewithpip.ai/*",
     "https://admin.snapchartapp.com/*",
     // Trading platforms
     "*://*.tradingview.com/*",
@@ -490,7 +491,7 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     const initGettingStarted = async () => {
       const { getting_started, has_seen_welcome } = await chrome.storage.local.get(['getting_started', 'has_seen_welcome'])
-      // People who used Snapchart before the checklist existed don't need it
+      // People who used Pip before the checklist existed don't need it
       let state = getting_started ?? (has_seen_welcome ? { dismissed: true } : {})
 
       const params = new URLSearchParams(window.location.search)
@@ -1815,7 +1816,7 @@ const TradingBuddyWidget = () => {
     const losingStreak = !!(autoDetectTrades && tradeStats && tradeStats.lossStreak >= 2)
     const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' ? 'bg-red-400' : null
     const tip = [
-      'Open Snapchart (Alt+Shift+S). Drag to move.',
+      'Open Pip (Alt+Shift+S). Drag to move.',
       trackingStatus === 'no-panel' ? "Not tracking trades: open TradingView's trading panel." : null,
       losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null
     ].filter(Boolean).join('\n')
@@ -1834,7 +1835,7 @@ const TradingBuddyWidget = () => {
         <button
           onMouseDown={handleLauncherMouseDown}
           title={tip}
-          aria-label="Open Pip, your Snapchart coach"
+          aria-label="Open Pip, your trading coach"
           className="relative block select-none rounded-full text-white shadow-xl shadow-black/40 transition-transform hover:scale-105 cursor-grab active:cursor-grabbing"
         >
           <Pip mood={launcherMood} size={56} />
@@ -2132,7 +2133,7 @@ const TradingBuddyWidget = () => {
                 </button>
                 <button
                   onClick={() => {
-                    window.open('https://www.snapchartapp.com/privacy', '_blank')
+                    window.open('https://tradewithpip.ai/privacy', '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
@@ -2141,7 +2142,7 @@ const TradingBuddyWidget = () => {
                 </button>
                 <button
                   onClick={() => {
-                    window.open('https://www.snapchartapp.com/terms', '_blank')
+                    window.open('https://tradewithpip.ai/terms', '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
@@ -2903,9 +2904,9 @@ function GettingStarted(props: {
 
       {expanded && (
         <p className={`mt-3 text-[11px] leading-snug ${muted}`}>
-          Snapchart captures your chart only when you ask, and saves your chat so you can pick up later (clear it anytime). By using it you agree to the{' '}
-          <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{' '}
-          <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
+          Pip captures your chart only when you ask, and saves your chat so you can pick up later (clear it anytime). By using it you agree to the{' '}
+          <a href="https://tradewithpip.ai/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{' '}
+          <a href="https://tradewithpip.ai/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
         </p>
       )}
     </div>

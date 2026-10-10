@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { SITE_URL } from "@/lib/urls"
 import { api } from "@/lib/dashboard-data"
 import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
@@ -217,7 +218,7 @@ export default function AccountPage() {
         </div>
 
         <Card title="Chrome extension">
-          <p className="mb-4 text-sm text-ink-text">Snapchart lives on your charts. If you use a new browser or computer, install it there and sign in.</p>
+          <p className="mb-4 text-sm text-ink-text">Pip lives on your charts. If you use a new browser or computer, install it there and sign in.</p>
           <a
             href={process.env.NEXT_PUBLIC_CHROME_STORE_URL || "https://chromewebstore.google.com/detail/snapchart-trading-psychol/bppbpeodpbepcmjifjjihejcnofdnibe"}
             target="_blank"
@@ -266,7 +267,7 @@ export default function AccountPage() {
                     <input value={deleteDetails} onChange={e => setDeleteDetails(e.target.value)} maxLength={500} className={inputClass} />
                   </label>
                 </div>
-                <p className="text-xs text-ink-muted">Your answer is kept without your name or email, so we can improve Snapchart.</p>
+                <p className="text-xs text-ink-muted">Your answer is kept without your name or email, so we can improve Pip.</p>
                 <label className="block max-w-xs">
                   <span className="mb-1.5 block text-xs text-ink-text">Type DELETE to confirm</span>
                   <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className={inputClass} autoComplete="off" />
@@ -284,9 +285,9 @@ export default function AccountPage() {
         )}
 
         <p className="text-center text-xs text-ink-muted">
-          <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Privacy Policy</a>
+          <a href={`${SITE_URL}/privacy`} target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Privacy Policy</a>
           {" · "}
-          <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Terms of Service</a>
+          <a href={`${SITE_URL}/terms`} target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Terms of Service</a>
         </p>
       </div>
     </>

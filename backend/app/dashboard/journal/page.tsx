@@ -25,7 +25,7 @@ export default function JournalPage() {
     <>
       <PageHeader
         title="Journal"
-        subtitle="Every trade Snapchart detected, and what the numbers say about your habits."
+        subtitle="Every trade Pip detected, and what the numbers say about your habits."
         actions={
           <div className="inline-flex rounded-lg border border-ink-border p-1">
             {RANGES.map(range => (
@@ -49,7 +49,7 @@ export default function JournalPage() {
           <div className="py-10 text-center">
             <p className="text-ink-body">No trades in the last {days} days.</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-ink-text">
-              In the Snapchart chat on TradingView, open the ⋮ menu and turn on <span className="text-ink-body">Auto-detect trades</span>. Keep the trading panel open while you trade (it can be small), and your trades land here automatically.
+              In the Pip chat on TradingView, open the ⋮ menu and turn on <span className="text-ink-body">Auto-detect trades</span>. Keep the trading panel open while you trade (it can be small), and your trades land here automatically.
             </p>
           </div>
         </Card>

@@ -1,9 +1,9 @@
 {
   "name": "trading-buddy-extension",
-  "displayName": "Snapchart - Trading Psychology AI Coach",
+  "displayName": "Pip: AI Trading Coach",
   "version": "1.0.2",
   "description": "AI trading psychology coach. Analyze charts against your rules and build disciplined trading habits with real-time feedback.",
-  "author": "Snapchart",
+  "author": "Pip",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
@@ -52,7 +52,9 @@
           "assets/icon128.png"
         ],
         "matches": [
-          "https://admin.snapchartapp.com/*",
+          "https://app.tradewithpip.ai/*",
+          "https://app.tradewithpip.ai/*",
+        "https://admin.snapchartapp.com/*",
           "https://www.tradingview.com/*",
           "https://tradingview.com/*",
           "https://*.tradingview.com/*",
@@ -101,7 +103,7 @@
         "suggested_key": {
           "default": "Alt+Shift+S"
         },
-        "description": "Open or close the Snapchart chat"
+        "description": "Open or close the Pip chat"
       }
     }
   }

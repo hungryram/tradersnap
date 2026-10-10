@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { APP_URL } from "@/lib/urls"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://admin.snapchartapp.com"
+    const baseUrl = APP_URL
 
     // Create Stripe Customer Portal session
     const session = await stripe.billingPortal.sessions.create({

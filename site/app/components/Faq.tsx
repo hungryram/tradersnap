@@ -7,7 +7,7 @@ export const FAQ: FaqGroup[] = [
   {
     title: "The honest questions",
     items: [
-      { q: "Is this another signal service?", a: "No, and it never will be. Pip never tells you to buy or sell, never predicts price and never gives you entries, stops or targets. He holds you to the rules you wrote yourself. If you're looking for someone to tell you what to trade, Snapchart isn't it." },
+      { q: "Is this another signal service?", a: "No, and it never will be. Pip never tells you to buy or sell, never predicts price and never gives you entries, stops or targets. He holds you to the rules you wrote yourself. If you're looking for someone to tell you what to trade, Pip isn't it." },
       { q: "Will this make me profitable?", a: "We can't promise that, and you should be wary of anyone who does. Your results depend on your strategy and the market. What Pip does is help you trade the plan you already have, especially in the moments you usually don't: after a loss, when something's running without you, or when you're past your limits." },
       { q: "Can Pip stop me from placing a trade?", a: "No. Pip can't touch your orders, and you're always in control. What he does is speak up at the right moment, check your setup against your rules and, if you ask, put you on a short cooldown timer. Most bad trades happen in a few impulsive seconds. Pip puts a pause in those seconds." },
       { q: "Won't it get annoying?", a: "Pip only speaks up when something actually happens: a losing streak, a quick re-entry after a loss, a limit, or your plan for the day. You can switch check-ins to warnings only, or off, any time." },
@@ -25,7 +25,7 @@ export const FAQ: FaqGroup[] = [
   {
     title: "Privacy",
     items: [
-      { q: "Can Snapchart access my broker account?", a: "No. Pip only reads what's on your screen in your browser. He can't place, change or close orders, and never sees your broker password." },
+      { q: "Can Pip access my broker account?", a: "No. Pip only reads what's on your screen in your browser. He can't place, change or close orders, and never sees your broker password." },
       { q: "What do you store?", a: "Your account, rules, chats and the trades Pip detects (symbol, size, prices and result) so your coach and journal can use them. Charts are only captured when you click Analyze or send a chart. You can delete your account and all your data from your account page, instantly." },
     ],
   },

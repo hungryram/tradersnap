@@ -3,12 +3,12 @@ import Legal from "../components/Legal"
 
 export const metadata: Metadata = { title: "Privacy Policy" }
 
-// Same wording as the previous site (last updated January 25, 2026); edit here going forward
+// Wording from the previous site (January 25, 2026), renamed from Snapchart to Pip on October 10, 2026
 export default function Page() {
   return (
-    <Legal title="Privacy Policy" updated="January 25, 2026">
+    <Legal title="Privacy Policy" updated="October 10, 2026">
 <h2>1. Introduction</h2>
-<p>Snapchart (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) operates the Snapchart Chrome extension and website (collectively, the &quot;Service&quot;). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service.</p>
+<p>Pip (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) operates the Pip Chrome extension and website (collectively, the &quot;Service&quot;). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our Service.</p>
 <h2>2. Information We Collect</h2>
 <p>We collect information to provide AI-powered chart analysis, remember your trading preferences, and continuously improve the Service. The data we collect includes:</p>
 <h3>2.1 Information You Provide</h3>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { SITE_URL } from "@/lib/urls"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { finishLogin } from "@/lib/after-login"
@@ -222,8 +223,8 @@ export default function AuthPanel({ intro }: { intro?: string }) {
 
       <p className="mt-6 text-xs text-ink-muted text-center">
         By continuing you agree to the{" "}
-        <a href="https://www.snapchartapp.com/terms" target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{" "}
-        <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
+        <a href={`${SITE_URL}/terms`} target="_blank" rel="noopener noreferrer" className="underline">Terms</a> and{" "}
+        <a href={`${SITE_URL}/privacy`} target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
       </p>
     </div>
   )

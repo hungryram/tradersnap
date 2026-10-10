@@ -40,7 +40,7 @@ export default function GuidePage() {
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">
-                        Getting Started with Snapchart
+                        Getting Started with Pip
                     </h1>
                     <p className="text-ink-text">
                         A complete guide to analyzing charts, creating trading rules, and
@@ -55,9 +55,9 @@ export default function GuidePage() {
                     </h2>
                     <ol className="space-y-2 text-ink-text">
                         {[
-                            <>Pin the Snapchart extension to your Chrome toolbar (puzzle icon → pin).</>,
+                            <>Pin the Pip extension to your Chrome toolbar (puzzle icon → pin).</>,
                             <>Set up your <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
-                            <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Snapchart</strong> button at the bottom right.</>,
+                            <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Pip</strong> button at the bottom right.</>,
                             <>Click <strong className="text-ink-body">Analyze this chart</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
                             <>On TradingView, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
                         ].map((step, i) => (
@@ -106,7 +106,7 @@ export default function GuidePage() {
                                     Grant Permissions
                                 </h3>
                                 <p className="text-ink-text mb-2">
-                                    When you first use Snapchart on a trading platform, Chrome
+                                    When you first use Pip on a trading platform, Chrome
                                     may ask for permission to access that site. This is required
                                     to capture chart screenshots and display the chat widget.
                                 </p>
@@ -122,7 +122,7 @@ export default function GuidePage() {
                                     Sign In
                                 </h3>
                                 <p className="text-ink-text">
-                                    Click the extension icon and sign in with your Snapchart
+                                    Click the extension icon and sign in with your Pip
                                     account. You'll be authenticated across all your browser tabs
                                     automatically.
                                 </p>
@@ -130,7 +130,7 @@ export default function GuidePage() {
                             <div className="mt-4">
                                 <img
                                     src="/image.png"
-                                    alt="Snapchart extension installation"
+                                    alt="Pip extension installation"
                                     className="w-full rounded-lg border border-ink-border"
                                 />
                             </div>
@@ -160,7 +160,7 @@ export default function GuidePage() {
                                     Activate the Chat Widget
                                 </h3>
                                 <p className="text-ink-text mb-2">
-                                    You'll see a small Snapchart widget appear on your chart
+                                    You'll see a small Pip widget appear on your chart
                                     (bottom right corner). Click it to open the chat interface.
                                 </p>
                                 <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-4 text-sm text-brand-200">
@@ -171,7 +171,7 @@ export default function GuidePage() {
                                 <div className="mt-4">
                                     <img
                                         src="/image2.png"
-                                        alt="Snapchart extension widget on trading chart"
+                                        alt="Pip extension widget on trading chart"
                                         className="w-full rounded-lg border border-ink-border"
                                     />
                                 </div>

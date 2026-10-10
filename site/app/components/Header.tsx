@@ -19,7 +19,7 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <a href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <Pip size={30} />
-          <span className="font-semibold tracking-tight">Snapchart</span>
+          <span className="font-semibold tracking-tight">Pip</span>
         </a>
 
         <nav className="hidden md:flex items-center gap-7 text-sm text-ink-text">

@@ -176,7 +176,7 @@ export default function AdminPage() {
             <p className="text-sm text-ink-muted">No onboarding answers yet. They start with users who sign up through the new onboarding.</p>
           ) : (
             <>
-              <p className="-mt-2 mb-4 text-xs text-ink-muted">{stats.segments.answered} of {headline.users} users answered onboarding. "Active" = used Snapchart in the last 14 days.</p>
+              <p className="-mt-2 mb-4 text-xs text-ink-muted">{stats.segments.answered} of {headline.users} users answered onboarding. "Active" = used Pip in the last 14 days.</p>
               <div className="grid gap-6 md:grid-cols-2">
                 <SegmentTable title="Trades on" rows={stats.segments.platforms} />
                 <SegmentTable title="Markets" rows={stats.segments.markets} />

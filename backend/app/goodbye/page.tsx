@@ -46,13 +46,13 @@ export default function GoodbyePage() {
       {sent ? (
         <div className="text-center">
           <h1 className="text-2xl font-semibold mb-2">Thank you</h1>
-          <p className="text-ink-text">This goes straight to the person building Snapchart. Good luck out there.</p>
+          <p className="text-ink-text">This goes straight to the person building Pip. Good luck out there.</p>
         </div>
       ) : (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight mb-2">Sorry to see you go</h1>
-            <p className="text-ink-text text-sm">One question, and it really helps: why did you remove Snapchart?</p>
+            <p className="text-ink-text text-sm">One question, and it really helps: why did you remove Pip?</p>
           </div>
           <div className="space-y-2">
             {REASONS.map(r => (

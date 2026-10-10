@@ -36,10 +36,10 @@ function HomeContent() {
     <AuthShell>
       {searchParams.get("deleted") === "1" && (
         <p className="mb-6 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
-          Your account and data have been deleted. Thanks for trying Snapchart.
+          Your account and data have been deleted. Thanks for trying Pip.
         </p>
       )}
-      <h1 className="text-2xl font-semibold tracking-tight mb-1">Sign in to Snapchart</h1>
+      <h1 className="text-2xl font-semibold tracking-tight mb-1">Sign in to Pip</h1>
       <p className="text-sm text-ink-text mb-8">New here? Any option below creates your free account.</p>
       <AuthPanel />
     </AuthShell>

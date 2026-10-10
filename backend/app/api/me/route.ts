@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { APP_ORIGINS, APP_URL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { creditStateFromProfile, getLimits, usagePayload } from "@/lib/usage"
@@ -12,7 +13,7 @@ const supabase = createClient(
 // CORS headers helper
 function getCorsHeaders(origin: string | null) {
   const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
+    ...APP_ORIGINS,
     'chrome-extension://',
     // Trading platforms
     'tradingview.com',
@@ -49,7 +50,7 @@ function getCorsHeaders(origin: string | null) {
   )
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : process.env.NEXT_PUBLIC_APP_URL || 'https://admin.snapchartapp.com',
+    'Access-Control-Allow-Origin': isAllowed ? origin : APP_URL,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Credentials': 'true'

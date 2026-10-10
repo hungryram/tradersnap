@@ -2,7 +2,7 @@
 
 import { useId } from "react"
 
-// Pip, the Snapchart coach. One SVG with four moods and light CSS animation
+// Pip, the trading coach. One SVG with four moods and light CSS animation
 // (blinking, antenna glow, thinking dots). The same file lives in the site,
 // the dashboard and the extension; keep them in sync.
 export type PipMood = "idle" | "thinking" | "happy" | "caution"

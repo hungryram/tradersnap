@@ -18,7 +18,7 @@ export default function Footer() {
         <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
           <a href="/" className="flex items-center gap-2.5">
             <Pip size={30} />
-            <span className="font-semibold tracking-tight">Snapchart</span>
+            <span className="font-semibold tracking-tight">Pip</span>
           </a>
           <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-ink-text">
             {LINKS.map((l) => (
@@ -30,11 +30,11 @@ export default function Footer() {
           </nav>
         </div>
         <p className="mt-10 text-xs leading-relaxed text-ink-muted max-w-4xl">
-          Snapchart is a discipline tool, not financial advice. It does not tell you when to enter or exit trades. It helps you reflect on your own
+          Pip is a discipline tool, not financial advice. It does not tell you when to enter or exit trades. It helps you reflect on your own
           decisions and trading rules. Feedback is AI-generated and may be inaccurate, incomplete or mistaken, and is for educational purposes only.
           Trading involves substantial risk. <strong className="text-ink-text">You are solely responsible for your trades and outcomes.</strong>
         </p>
-        <p className="mt-4 text-xs text-ink-muted">© {new Date().getFullYear()} Snapchart</p>
+        <p className="mt-4 text-xs text-ink-muted">© {new Date().getFullYear()} Pip · tradewithpip.ai</p>
       </div>
     </footer>
   )

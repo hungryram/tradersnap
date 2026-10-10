@@ -228,7 +228,7 @@ export default function RulesPage() {
 
       <div id="limits" className="mt-6 scroll-mt-8">
         <Card title="Daily limits">
-          <p className="-mt-2 mb-5 text-sm text-ink-text">Snapchart tracks these against your detected trades and warns you when you hit one. Leave any blank to skip it.</p>
+          <p className="-mt-2 mb-5 text-sm text-ink-text">Pip tracks these against your detected trades and warns you when you hit one. Leave any blank to skip it.</p>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block">
               <span className="mb-1.5 block text-xs text-ink-text">Max trades per day</span>

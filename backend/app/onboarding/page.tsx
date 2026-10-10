@@ -210,7 +210,7 @@ export default function OnboardingPage() {
 
           <div className="rounded-2xl border border-ink-border bg-ink-surface p-6">
             <h2 className="font-semibold mb-1">Your daily limits</h2>
-            <p className="text-sm text-ink-text mb-5">Snapchart warns you when you hit these. Leave any blank to skip it.</p>
+            <p className="text-sm text-ink-text mb-5">Pip warns you when you hit these. Leave any blank to skip it.</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Max trades per day">
                 <input inputMode="numeric" value={maxTrades} onChange={e => setMaxTrades(e.target.value.replace(/\D/g, ""))} className={input} placeholder="3" />
@@ -247,13 +247,13 @@ export default function OnboardingPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">You're all set</h1>
             <p className="text-ink-text max-w-md mx-auto">
-              Open your chart and click the <span className="text-ink-body font-medium">Snapchart</span> button at the bottom right. Your first check takes about 15 seconds.
+              Open your chart and click the <span className="text-ink-body font-medium">Pip</span> button at the bottom right. Your first check takes about 15 seconds.
             </p>
           </div>
 
           {extensionVersion === null && (
             <p className="mx-auto max-w-md rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              We couldn't find the Snapchart extension in this browser.{" "}
+              We couldn't find the Pip extension in this browser.{" "}
               {process.env.NEXT_PUBLIC_CHROME_STORE_URL
                 ? <a href={process.env.NEXT_PUBLIC_CHROME_STORE_URL} className="underline">Add it to Chrome</a>
                 : "Add it from the Chrome Web Store"}

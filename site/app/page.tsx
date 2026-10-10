@@ -135,7 +135,7 @@ export default function Home() {
       </section>
 
       {/* A session with Pip */}
-      <Section id="how-it-works" eyebrow="How it works" title="Pip is there from the open to the close" intro="Snapchart sits in the corner of your chart in Chrome. Here's what a session looks like.">
+      <Section id="how-it-works" eyebrow="How it works" title="Pip is there from the open to the close" intro="Pip sits in the corner of your chart in Chrome. Here's what a session looks like.">
         <ol className="relative mx-auto max-w-4xl">
           <div className="absolute bottom-6 left-[19px] top-6 w-px bg-ink-border md:left-1/2" aria-hidden />
           {SESSION.map((s, i) => (

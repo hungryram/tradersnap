@@ -1,4 +1,4 @@
-// Hands the signed-in session to the Snapchart extension.
+// Hands the signed-in session to the Pip extension.
 //
 // Preferred: chrome.runtime.sendMessage to the extension's ID (the extension
 // lists this site in externally_connectable, so only we can reach it). The

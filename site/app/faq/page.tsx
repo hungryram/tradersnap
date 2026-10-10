@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { FaqList } from "../components/Faq"
 import { PageHeader } from "../components/Section"
 
-export const metadata: Metadata = { title: "FAQ", description: "Answers about Snapchart: how it works, trade tracking, privacy, plans and usage." }
+export const metadata: Metadata = { title: "FAQ", description: "Answers about Pip: how it works, trade tracking, privacy, plans and usage." }
 
 export default function FaqPage() {
   return (
