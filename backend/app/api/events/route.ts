@@ -38,7 +38,12 @@ const eventSchema = z.object({
     'opened_tradingview',
     'first_analysis',
     'autodetect_enabled',
-    'checklist_completed'
+    'checklist_completed',
+    // Coach check-ins
+    'checkin_shown',
+    'checkin_replied',
+    'checkin_dismissed',
+    'checkins_mode'
   ]),
   session_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.any()).optional()

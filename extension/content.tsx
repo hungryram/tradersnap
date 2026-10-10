@@ -6,6 +6,7 @@ import { ChartLightbox } from "./ChartLightbox"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
+import { afterTrades, morningPlan, onPositionOpened, sessionRecap, type CheckIn, type CoachLimits, type CoachTrade } from "~lib/coach/checkins"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
 
@@ -106,6 +107,13 @@ const TradingBuddyWidget = () => {
   const [autoDetectTrades, setAutoDetectTrades] = useState(false)
   const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number } | null>(null)
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | null>(null)
+  // Coach check-ins: messages the coach starts when something happens in the trader's day
+  const [tradingLimits, setTradingLimits] = useState<CoachLimits | null>(null)
+  const [limitsLoaded, setLimitsLoaded] = useState(false)
+  const [tradesToday, setTradesToday] = useState<CoachTrade[]>([])
+  const [checkinsMode, setCheckinsMode] = useState<'on' | 'warnings' | 'off'>('on')
+  const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
+  const [bubble, setBubble] = useState<CheckIn | null>(null)
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -311,6 +319,8 @@ const TradingBuddyWidget = () => {
           })
           if (meResponse.ok) {
             const meData = await meResponse.json()
+            setTradingLimits(meData.user?.trading_limits ?? null)
+            setLimitsLoaded(true)
             if (meData.usage) {
               setCurrentUsage({
                 messages: meData.usage.messages.used,
@@ -375,7 +385,11 @@ const TradingBuddyWidget = () => {
         `${process.env.PLASMO_PUBLIC_API_URL}/api/trades?since=${encodeURIComponent(midnight.toISOString())}`,
         { headers: { Authorization: `Bearer ${supabase_session.access_token}` } }
       )
-      if (response.ok) setTradeStats((await response.json()).stats)
+      if (response.ok) {
+        const data = await response.json()
+        setTradeStats(data.stats)
+        setTradesToday(data.trades ?? [])
+      }
     } catch (error) {
       console.error('[Content] Failed to load trades:', error)
     }
@@ -430,7 +444,8 @@ const TradingBuddyWidget = () => {
         unsent.push(...trades)
         sendTrades()
       },
-      onStatus: setTrackingStatus
+      onStatus: setTrackingStatus,
+      onPositions: positions => onPositionsRef.current(positions)
     })
     const retryTimer = setInterval(sendTrades, 30000)
 
@@ -487,6 +502,128 @@ const TradingBuddyWidget = () => {
   }
 
   const isTradingView = window.location.hostname.endsWith('tradingview.com')
+
+  // ---- Coach check-ins ------------------------------------------------------
+  // Latest values for callbacks that outlive a render (tracker ticks, timers)
+  const isOpenRef = useRef(isOpen)
+  const checkinsModeRef = useRef(checkinsMode)
+  const tradesTodayRef = useRef(tradesToday)
+  const limitsRef = useRef(tradingLimits)
+  const lastInfoAtRef = useRef(0)
+  const openPositionsRef = useRef<Set<string> | null>(null)
+  const onPositionsRef = useRef<(positions: Map<string, number>) => void>(() => {})
+  useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
+  useEffect(() => { checkinsModeRef.current = checkinsMode }, [checkinsMode])
+  useEffect(() => { tradesTodayRef.current = tradesToday }, [tradesToday])
+  useEffect(() => { limitsRef.current = tradingLimits }, [tradingLimits])
+
+  useEffect(() => {
+    chrome.storage.local.get('checkins_mode').then(({ checkins_mode }) => {
+      if (checkins_mode === 'on' || checkins_mode === 'warnings' || checkins_mode === 'off') setCheckinsMode(checkins_mode)
+    }).catch(() => {})
+  }, [])
+
+  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current })
+
+  // One list of shown check-ins per day in storage, so another tab never repeats one
+  const claimCheckIn = async (id: string) => {
+    const now = new Date()
+    const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    const { checkins_fired } = await chrome.storage.local.get('checkins_fired')
+    const ids: string[] = checkins_fired?.day === day ? checkins_fired.ids : []
+    if (ids.includes(id)) return false
+    await chrome.storage.local.set({ checkins_fired: { day, ids: [...ids, id] } })
+    return true
+  }
+
+  const deliverCheckIns = async (candidates: (CheckIn | null)[]) => {
+    for (const checkIn of candidates) {
+      if (!checkIn) continue
+      const mode = checkinsModeRef.current
+      if (mode === 'off' || (mode === 'warnings' && checkIn.level !== 'warning')) continue
+      // Gentle messages at most every 5 minutes; warnings always get through
+      if (checkIn.level === 'info' && Date.now() - lastInfoAtRef.current < 5 * 60_000) continue
+      if (!(await claimCheckIn(checkIn.id))) continue
+      if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
+
+      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, timestamp: new Date() }])
+      analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
+      if (!isOpenRef.current) {
+        setUnreadCheckins(prev => [...prev, checkIn])
+        setBubble(checkIn)
+      }
+    }
+  }
+
+  // Morning plan: first visit of the day to a trading site, before the session is over
+  useEffect(() => {
+    if (!isSignedIn || !limitsLoaded) return
+    if (window.location.origin === new URL(process.env.PLASMO_PUBLIC_API_URL!).origin) return
+    const ctx = coachContext()
+    const end = ctx.limits?.session_end ? Number(ctx.limits.session_end.slice(0, 2)) * 60 + Number(ctx.limits.session_end.slice(3, 5)) : 16 * 60
+    if (ctx.now.getHours() * 60 + ctx.now.getMinutes() >= end) return
+    deliverCheckIns([morningPlan(ctx)])
+  }, [isSignedIn, limitsLoaded])
+
+  // A trade closed (today's trades reloaded)
+  useEffect(() => {
+    if (!isSignedIn || tradesToday.length === 0) return
+    deliverCheckIns(afterTrades(coachContext()))
+  }, [tradesToday])
+
+  // A position opened in the trading panel: revenge trade, over max, outside hours
+  onPositionsRef.current = (positions) => {
+    const open = new Set([...positions].filter(([, qty]) => qty !== 0).map(([symbol]) => symbol))
+    const previous = openPositionsRef.current
+    openPositionsRef.current = open
+    if (!previous) return // first look after page load: these were already open
+    const opened = [...open].filter(symbol => !previous.has(symbol))
+    if (opened.length > 0) deliverCheckIns(onPositionOpened(coachContext(), new Date()))
+  }
+
+  // End-of-session recap, checked every minute
+  useEffect(() => {
+    if (!isSignedIn) return
+    const timer = setInterval(() => {
+      if (tradesTodayRef.current.length === 0) return
+      deliverCheckIns([sessionRecap(coachContext(), (openPositionsRef.current?.size ?? 0) > 0)])
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [isSignedIn])
+
+  // Gentle bubbles tuck away after 10 seconds (the unread badge stays)
+  useEffect(() => {
+    if (!bubble || bubble.level === 'warning') return
+    const timer = setTimeout(() => setBubble(null), 10_000)
+    return () => clearTimeout(timer)
+  }, [bubble])
+
+  // Opening the chat reads them
+  useEffect(() => {
+    if (isOpen) {
+      setUnreadCheckins([])
+      setBubble(null)
+    }
+  }, [isOpen])
+
+  const replyToCheckIn = (checkIn: CheckIn) => {
+    analytics.track('checkin_replied', { kind: checkIn.kind })
+    setIsOpen(true)
+    setTimeout(() => inputRef.current?.focus(), 150)
+  }
+
+  const dismissCheckIn = (checkIn: CheckIn) => {
+    analytics.track('checkin_dismissed', { kind: checkIn.kind })
+    setBubble(null)
+    setUnreadCheckins(prev => prev.filter(c => c.id !== checkIn.id))
+  }
+
+  const cycleCheckinsMode = () => {
+    const next = checkinsMode === 'on' ? 'warnings' : checkinsMode === 'warnings' ? 'off' : 'on'
+    setCheckinsMode(next)
+    chrome.storage.local.set({ checkins_mode: next })
+    analytics.track('checkins_mode', { mode: next })
+  }
 
   const rateAnalysis = async (messageId: string, rating: 1 | -1) => {
     setRatings(prev => ({ ...prev, [messageId]: rating }))
@@ -1665,10 +1802,42 @@ const TradingBuddyWidget = () => {
             <span className="rounded-full bg-white/20 px-1.5 text-xs tabular-nums" title={`${tradeStats.count} trades today`}>{tradeStats.count}</span>
           )}
           {statusDot && <span className={`absolute -left-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white ${statusDot}`} />}
-          {losingStreak && (
+          {unreadCheckins.length > 0 ? (
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] animate-pulse items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold" title={`${unreadCheckins.length} new from your coach`}>
+              {unreadCheckins.length}
+            </span>
+          ) : losingStreak && (
             <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold">{tradeStats!.lossStreak}L</span>
           )}
         </button>
+
+        {bubble && (
+          <div
+            className={`absolute w-72 rounded-xl border p-3 text-sm shadow-2xl ${
+              launcherPos.bottom > window.innerHeight - 220 ? 'top-full mt-3' : 'bottom-full mb-3'
+            } ${window.innerWidth - launcherPos.right < 300 ? 'left-0' : 'right-0'} ${
+              theme === 'dark' ? 'border-dark-border bg-dark-surface text-dark-body' : 'border-slate-200 bg-white text-slate-900'
+            }`}
+            role="status"
+          >
+            <div className="flex items-start gap-2">
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${bubble.level === 'warning' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+              <p className="flex-1 leading-snug">{bubble.text}</p>
+              <button
+                onClick={() => dismissCheckIn(bubble)}
+                aria-label="Dismiss"
+                className={`-mr-1 -mt-1 rounded px-1.5 text-base leading-none ${theme === 'dark' ? 'text-dark-text hover:bg-dark-elevated' : 'text-slate-400 hover:bg-slate-100'}`}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="mt-2.5 flex justify-end">
+              <button onClick={() => replyToCheckIn(bubble)} className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                Reply
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -1844,6 +2013,16 @@ const TradingBuddyWidget = () => {
                   <span>Auto-detect trades</span>
                   <span className={`text-xs font-medium ${autoDetectTrades ? 'text-green-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
                     {autoDetectTrades ? 'On' : 'Off'}
+                  </span>
+                </button>
+                <button
+                  onClick={cycleCheckinsMode}
+                  title="The coach messages you when something happens: a losing streak, a quick re-entry after a loss, your limits, your plan for the day."
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                >
+                  <span>Coach check-ins</span>
+                  <span className={`text-xs font-medium ${checkinsMode === 'on' ? 'text-green-500' : checkinsMode === 'warnings' ? 'text-amber-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                    {checkinsMode === 'on' ? 'On' : checkinsMode === 'warnings' ? 'Warnings only' : 'Off'}
                   </span>
                 </button>
                 {messages.length > 0 && (
@@ -2122,6 +2301,17 @@ const TradingBuddyWidget = () => {
                   </div>
                 )}
                 
+                {msg.type === 'checkin' && (
+                  <div className={`max-w-[85%] rounded-2xl rounded-tl-sm border px-4 py-3 ${getTextSizeClass()} ${
+                    msg.level === 'warning'
+                      ? theme === 'dark' ? 'border-amber-500/40 bg-amber-500/10 text-amber-100' : 'border-amber-300 bg-amber-50 text-amber-900'
+                      : theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-200 bg-white text-slate-900'
+                  }`}>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Coach check-in</div>
+                    {msg.content}
+                  </div>
+                )}
+
                 {msg.type === 'info' && (
                   <div className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()} ${
                     theme === 'dark' 

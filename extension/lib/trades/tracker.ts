@@ -113,6 +113,8 @@ export type TrackingStatus = "tracking" | "loading" | "no-panel"
 export function startTradeTracking(options: {
   onTrades: (trades: ClosedTrade[]) => void
   onStatus: (status: TrackingStatus) => void
+  // Open positions each tick the panel is visible (symbol -> signed size)
+  onPositions?: (positions: Map<string, number>) => void
   intervalMs?: number
 }): () => void {
   const reported = new Set<string>()
@@ -126,6 +128,7 @@ export function startTradeTracking(options: {
     try {
       const panel = readTradingViewPanel()
       if (!panel) return setStatus("no-panel")
+      options.onPositions?.(panel.positions)
       if (!panel.fills) {
         ensureOrderHistoryLoaded()
         return setStatus("loading")

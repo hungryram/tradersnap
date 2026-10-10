@@ -42,6 +42,12 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 - [x] Who uninstalled: the extension's uninstall link carries a signed per-account code (`/api/uninstall-token`); `/goodbye` records `profiles.uninstalled_at` and links the answer. Cleared on the next extension sign-in. *You:* run `20261014_uninstalls.sql`; works for users on the new extension version.
 - [x] Thumbs up/down on analysis cards (`/api/ratings`, verdict snapshot kept for review). Ships with the next extension release.
 
+**Coach check-ins** (the coach messages first, only on real events)
+- [x] Rules engine `extension/lib/coach/checkins.ts` (tested): morning plan, losing streak vs limit, daily loss limit, quick re-entry after a loss (5 min), max trades reached, trade past the max, outside trading hours, big win, end-of-session recap.
+- [x] Delivery: bubble by the launcher (Reply / dismiss; warnings stay, info tucks away after 10s), unread badge, coach check-in messages in the chat (sent to the AI as context when replying). No repeats across tabs, info at most every 5 min. Setting in the menu: On / Warnings only / Off.
+- [x] Admin: shown / replied / dismissed per moment, and how many set warnings-only or off.
+- [ ] Let the chat AI see the trader's daily limits too (today it only sees trades).
+
 **Phase 3: revenue**
 - [ ] Upgrade prompts at the moment of value (limit hit right after a useful analysis) instead of a generic $19 button.
 - [ ] Referral ("give a week of Pro, get a week").

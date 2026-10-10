@@ -40,7 +40,7 @@ function weekStart(time: number) {
 }
 
 type Profile = { id: string; email: string; first_name: string | null; plan: string | null; subscription_status: string | null; created_at: string; onboarded: boolean | null; trading_profile?: { markets?: string[]; platforms?: string[]; prop_firm?: boolean; experience?: string } | null; uninstalled_at?: string | null }
-type Event = { user_id: string; event_type: string; created_at: string }
+type Event = { user_id: string; event_type: string; created_at: string; metadata?: Record<string, any> | null }
 type TradeRow = { user_id: string; closed_at: string }
 type Rating = { user_id: string; rating: number; snapshot: any; created_at: string }
 type Deleted = { signed_up_month: string | null; deleted_at: string; plan: string | null; checks: number; active_days: number; trades: number; platforms: string[] | null; prop_firm: boolean | null; reason: string | null; details: string | null }
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const [profiles, rulesetRows, events, trades, ratings, feedback, deleted] = await Promise.all([
       fetchProfiles(),
       fetchAll<{ user_id: string }>((from, to) => supabase.from("rulesets").select("user_id").range(from, to)),
-      fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
+      fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at, metadata").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
       fetchOptional<TradeRow>((from, to) => supabase.from("trades").select("user_id, closed_at").range(from, to)),
       fetchOptional<Rating>((from, to) => supabase.from("analysis_ratings").select("user_id, rating, snapshot, created_at").gte("created_at", since).order("created_at", { ascending: false }).range(from, to)),
       fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at, user_id").order("created_at", { ascending: false }).range(from, to))
@@ -196,6 +196,26 @@ export async function GET(request: NextRequest) {
       experience: segment(p => answered(p) && p.trading_profile!.experience ? [p.trading_profile!.experience] : [])
     }
 
+    // Coach check-ins (last 30 days): shown / replied / dismissed per kind, and each user's latest setting
+    const checkinKinds = new Map<string, { shown: number; replied: number; dismissed: number }>()
+    const latestMode = new Map<string, { mode: string; at: number }>()
+    for (const e of events) {
+      const t = Date.parse(e.created_at)
+      if (e.event_type === "checkins_mode" && e.metadata?.mode) {
+        const prev = latestMode.get(e.user_id)
+        if (!prev || t > prev.at) latestMode.set(e.user_id, { mode: e.metadata.mode, at: t })
+      }
+      if (now - t > 30 * DAY || !e.event_type.startsWith("checkin_")) continue
+      const kind = e.metadata?.kind ?? "unknown"
+      const row = checkinKinds.get(kind) ?? { shown: 0, replied: 0, dismissed: 0 }
+      if (e.event_type === "checkin_shown") row.shown++
+      if (e.event_type === "checkin_replied") row.replied++
+      if (e.event_type === "checkin_dismissed") row.dismissed++
+      checkinKinds.set(kind, row)
+    }
+    const modes = { warnings: 0, off: 0 }
+    for (const { mode } of latestMode.values()) if (mode === "warnings" || mode === "off") modes[mode]++
+
     const reasons = new Map<string, number>()
     for (const f of feedback) reasons.set(f.reason, (reasons.get(f.reason) ?? 0) + 1)
 
@@ -213,6 +233,10 @@ export async function GET(request: NextRequest) {
       funnel: { last30d: funnelFor(recent), allTime: funnelFor(profiles) },
       groups,
       segments,
+      checkins: {
+        kinds: [...checkinKinds.entries()].map(([kind, row]) => ({ kind, ...row })).sort((a, b) => b.shown - a.shown),
+        modes
+      },
       weekly,
       retention: { offsets, rows: retention },
       revenue: { active: proActive, pastDue: proPastDue, canceled, mrr: proActive * PRO_PRICE },

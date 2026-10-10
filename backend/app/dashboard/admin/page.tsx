@@ -17,6 +17,7 @@ type Stats = {
   headline: { users: number; signups7d: number; signups30d: number; activeThisWeek: number; activeLastWeek: number; paying: number; mrr: number }
   funnel: { last30d: Step[]; allTime: Step[] }
   groups: Record<Group, number>
+  checkins: { kinds: { kind: string; shown: number; replied: number; dismissed: number }[]; modes: { warnings: number; off: number } }
   segments: { answered: number; platforms: SegmentRow[]; markets: SegmentRow[]; propFirm: SegmentRow[]; experience: SegmentRow[] }
   weekly: { week: string; active: number }[]
   retention: { offsets: number[]; rows: { week: string; size: number; cells: (number | null)[] }[] }
@@ -56,6 +57,11 @@ const ANSWER_LABELS: Record<string, string> = {
   new: "Under 1 year", "1-3": "1 to 3 years", "3+": "3+ years"
 }
 const answer = (value: string) => ANSWER_LABELS[value] ?? value
+
+const CHECKIN_LABELS: Record<string, string> = {
+  morning_plan: "Morning plan", loss_streak: "Losing streak", daily_loss: "Daily loss limit", revenge: "Quick re-entry after a loss",
+  max_trades: "Max trades reached", over_max: "Trade past the max", outside_hours: "Outside trading hours", big_win: "Big win", session_recap: "End-of-session recap"
+}
 
 type SortKey = "created_at" | "last_active" | "checks" | "checks7d" | "trades" | "active_days_30d"
 
@@ -268,6 +274,36 @@ export default function AdminPage() {
             )}
           </Card>
         </div>
+
+        <Card title="Coach check-ins (last 30 days)">
+          {stats.checkins.kinds.length === 0 ? (
+            <p className="text-sm text-ink-muted">None shown yet. They start once the extension update with check-ins is published.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-muted">
+                  <th className="pb-2 font-normal">Moment</th>
+                  <th className="pb-2 font-normal text-right">Shown</th>
+                  <th className="pb-2 font-normal text-right">Replied</th>
+                  <th className="pb-2 font-normal text-right">Dismissed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.checkins.kinds.map(k => (
+                  <tr key={k.kind} className="border-t border-ink-border/70">
+                    <td className="py-1.5 text-ink-text">{CHECKIN_LABELS[k.kind] ?? k.kind}</td>
+                    <td className="py-1.5 text-right tabular-nums">{k.shown}</td>
+                    <td className="py-1.5 text-right tabular-nums">{k.replied} <span className="text-xs text-ink-muted">({k.shown ? Math.round((k.replied / k.shown) * 100) : 0}%)</span></td>
+                    <td className="py-1.5 text-right tabular-nums">{k.dismissed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="mt-3 text-xs text-ink-muted">
+            Set to warnings only: {stats.checkins.modes.warnings} · turned off: {stats.checkins.modes.off}. A high dismiss rate or many turning them off means the messages need work.
+          </p>
+        </Card>
 
         <Card title={`Deleted accounts (${stats.deleted.last30d} in the last 30 days, ${stats.deleted.total} total)`}>
           {stats.deleted.recent.length === 0 ? (
