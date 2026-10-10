@@ -61,6 +61,17 @@ export const config: PlasmoCSConfig = {
 // Instead of inline script injection, we'll check localStorage directly from content script
 // This runs in extension context but can still access the page's localStorage via chrome APIs
 
+// Shown under "Analyze this chart" while an analysis runs
+const ANALYZE_STAGES = ["Capturing your chart...", "Reading price action...", "Checking your rules...", "Writing your verdict..."]
+
+// Tap-to-ask starters for an empty chat (chart ones turn on the Chart toggle)
+const SUGGESTIONS = [
+  { text: "What should I wait for here?", chart: true },
+  { text: "Is this a good entry by my rules?", chart: true },
+  { text: "I just took a loss. Help me reset.", chart: false },
+  { text: "Am I overtrading today?", chart: false },
+]
+
 const TradingBuddyWidget = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -69,6 +80,10 @@ const TradingBuddyWidget = () => {
   const [messages, setMessages] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState("")
+  // Composer: include a screenshot of the chart with the next message
+  const [attachChart, setAttachChart] = useState(false)
+  // Step shown while an analysis runs (~15s)
+  const [analyzeStage, setAnalyzeStage] = useState(0)
   const [isSending, setIsSending] = useState(false)
   const [lastChartImage, setLastChartImage] = useState<string | null>(null)
   const [lastChartToken, setLastChartToken] = useState<string | null>(null)
@@ -103,11 +118,13 @@ const TradingBuddyWidget = () => {
   const [gettingStarted, setGettingStarted] = useState<{ analyzed?: boolean, chatted?: boolean, chartChatted?: boolean, dismissed?: boolean, autoOpened?: boolean, completed?: boolean } | null>(null)
   const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // Follow new messages / typing only while the reader is at the bottom
+  const stickToBottomRef = useRef(true)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
   const skipNextScrollRef = useRef(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const typingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -180,11 +197,14 @@ const TradingBuddyWidget = () => {
   const handleScroll = () => {
     if (!messagesContainerRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 80
+    stickToBottomRef.current = isNearBottom
     setShowScrollButton(!isNearBottom)
   }
 
+  // Explicit scroll (sending a message, the down-arrow button): follow again
   const scrollToBottom = () => {
+    stickToBottomRef.current = true
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
@@ -554,6 +574,24 @@ const TradingBuddyWidget = () => {
     }
   }, [isOpen])
 
+  // Walk through what the analysis is doing while it runs
+  useEffect(() => {
+    if (!isAnalyzing) {
+      setAnalyzeStage(0)
+      return
+    }
+    const timer = setInterval(() => setAnalyzeStage(stage => Math.min(stage + 1, ANALYZE_STAGES.length - 1)), 3500)
+    return () => clearInterval(timer)
+  }, [isAnalyzing])
+
+  // Grow the message box with its text (up to ~5 lines)
+  useEffect(() => {
+    const box = inputRef.current
+    if (!box) return
+    box.style.height = 'auto'
+    box.style.height = `${Math.min(box.scrollHeight, 128)}px`
+  }, [inputText])
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messages.length === 0) return
@@ -572,9 +610,11 @@ const TradingBuddyWidget = () => {
           messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
         })
       })
-    } else {
-      // On new messages, smooth scroll
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    } else if (stickToBottomRef.current) {
+      // New text while the reader is at the bottom: keep up instantly. A smooth
+      // scroll here would fight the typing updates and the reader's own scrolling.
+      const container = messagesContainerRef.current
+      if (container) container.scrollTop = container.scrollHeight
     }
   }, [messages])
 
@@ -1345,8 +1385,9 @@ const TradingBuddyWidget = () => {
       
       // Animate typing effect
       let charIndex = 0
+      const charsPerTick = Math.max(2, Math.ceil(fullResponse.length / 100)) // ~100 ticks, about 2 seconds
       typingIntervalRef.current = setInterval(() => {
-        charIndex += 2 // Type 2 characters at a time
+        charIndex += charsPerTick
         if (charIndex >= fullResponse.length) {
           charIndex = fullResponse.length
           clearInterval(typingIntervalRef.current!)
@@ -1861,6 +1902,7 @@ const TradingBuddyWidget = () => {
             onAnalyze={handleAnalyze}
             onTryChartQuestion={() => {
               setInputText('What should I wait for on this chart?')
+              setAttachChart(true)
               setTimeout(() => inputRef.current?.focus(), 50)
             }}
             onEnableTradeTracking={() => setAutoDetect(true)}
@@ -1892,10 +1934,24 @@ const TradingBuddyWidget = () => {
           )}
 
           {messages.length === 0 && (
-            <div className={`text-center text-sm mt-8 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-              <div className="text-4xl mb-2">👋</div>
-              <p className="mb-2">Hi! I'm your trading psychology coach.</p>
-              <p className="text-xs">Ask a question or analyze a chart to begin.</p>
+            <div className="mt-6 text-center">
+              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Your trading coach</p>
+              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Check a chart against your rules, or ask anything.</p>
+              <div className="mt-4 flex flex-col items-center gap-2">
+                {SUGGESTIONS.map(suggestion => (
+                  <button
+                    key={suggestion.text}
+                    onClick={() => {
+                      setInputText(suggestion.text)
+                      setAttachChart(suggestion.chart)
+                      setTimeout(() => inputRef.current?.focus(), 50)
+                    }}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${theme === 'dark' ? 'border-dark-border text-dark-body hover:bg-dark-elevated' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    {suggestion.chart ? '\u{1F4F7} ' : ''}{suggestion.text}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -2266,6 +2322,7 @@ const TradingBuddyWidget = () => {
             <div className="flex justify-start">
               <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
                 <div className="flex items-center gap-1">
+                  {isAnalyzing && <span className="mr-1.5">{ANALYZE_STAGES[analyzeStage]}</span>}
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_infinite]"></span>
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]"></span>
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.4s_infinite]"></span>
@@ -2307,158 +2364,99 @@ const TradingBuddyWidget = () => {
             </div>
           ) : (
             <>
-              {/* Chat input */}
-              <div className={`rounded-lg border px-3 py-2 ${theme === 'dark' ? 'border-dark-border bg-dark-surface' : 'border-slate-300 bg-white'}`}>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation()
-                      if (e.key === 'Enter' && !e.shiftKey && inputText.trim() && !isSending && !isAnalyzing) {
-                        e.preventDefault()
-                        if (e.ctrlKey && e.altKey) {
-                          // Ctrl+Alt+Enter: Send with chart
-                          handleSendMessage(inputText, true)
-                        } else {
-                          // Regular Enter: Send without chart
-                          handleSendMessage(inputText, false)
-                        }
+              {/* Main action */}
+              <button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || isSending}
+                title={isSending ? "Please wait for the reply" : "Check this chart against your rules"}
+                className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
+              >
+                <span className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Analyze this chart"}
+              </button>
+
+              {/* Message box */}
+              <div className={`rounded-xl border transition-colors focus-within:border-blue-500 ${theme === 'dark' ? 'border-dark-border bg-dark-surface' : 'border-slate-300 bg-white'}`}>
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    // Enter sends, Shift+Enter starts a new line; Ctrl+Alt+Enter always includes the chart
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (inputText.trim() && !isSending && !isAnalyzing) {
+                        handleSendMessage(inputText, attachChart || (e.ctrlKey && e.altKey))
+                        setAttachChart(false)
                       }
-                    }}
-                    onKeyPress={(e) => e.stopPropagation()}
-                    onKeyUp={(e) => e.stopPropagation()}
-                    placeholder={isSending ? "AI is responding..." : "What's on your mind?"}
-                    disabled={false}
-                    maxLength={500}
-                    className={`flex-1 bg-transparent ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
-                  />
-                  {isSending ? (
-                    <button
-                      onClick={stopGeneration}
-                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-red-50 ${theme === 'dark' ? 'text-red-400 hover:bg-red-950' : 'text-red-600'}`}
-                      title="Stop generating"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="6" width="12" height="12" rx="1"></rect>
-                      </svg>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        if (inputText.trim()) {
-                          handleSendMessage(inputText, false)
-                        }
-                      }}
-                      disabled={!inputText.trim()}
-                      className={`h-6 w-6 flex items-center justify-center rounded transition-colors ${!inputText.trim() ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100'} ${theme === 'dark' ? 'text-dark-text hover:bg-slate-700' : 'text-slate-500'}`}
-                      title="Send message"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              {inputText.length > 0 && (
-                <div className={`${getHalfTextSizeClass()} ${inputText.length >= 500 ? 'text-red-500 font-medium' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'} -mt-0.5`}>
-                  {inputText.length}/500 characters{inputText.length >= 500 && ' (limit reached)'}
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (inputText.trim() && !isSending) {
-                      handleSendMessage(inputText, true)
                     }
                   }}
-                  disabled={isSending || !inputText.trim()}
-                  title={isSending ? "AI is responding..." : "Send message with chart screenshot"}
-                  className={`flex-1 px-3 py-2.5 rounded-lg border ${getTextSizeClass()} font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                    isSending || !inputText.trim()
-                      ? 'opacity-40 cursor-not-allowed'
-                      : theme === 'dark'
-                      ? 'border-dark-border bg-transparent text-slate-300 hover:bg-dark-elevated'
-                      : 'border-slate-300 bg-transparent text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
-                  </svg>
-                  <span>{isSending ? "Sending..." : "Send with Chart"}</span>
-                </button>
-                
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || isSending}
-                  title={isSending ? "Please wait for AI response" : isAnalyzing ? "Analyzing chart..." : "Analyze chart without message"}
-                  className={`flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-1.5 ${getTextSizeClass()} transition-colors shadow-lg shadow-blue-600/20`}
-                >
-                  <div className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                  <span>{isAnalyzing ? "Analyzing..." : "Analyze Chart"}</span>
-                </button>
+                  onKeyPress={(e) => e.stopPropagation()}
+                  onKeyUp={(e) => e.stopPropagation()}
+                  placeholder={isSending ? "Coach is replying..." : attachChart ? "Ask about this chart..." : "Ask your coach anything..."}
+                  maxLength={500}
+                  className={`block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 leading-relaxed ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
+                />
+                <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                  <button
+                    onClick={() => setAttachChart(!attachChart)}
+                    aria-pressed={attachChart}
+                    title="Include a screenshot of your chart with this message"
+                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      attachChart
+                        ? 'border-blue-500 bg-blue-500/15 text-blue-400'
+                        : theme === 'dark' ? 'border-dark-border text-dark-text hover:text-dark-body' : 'border-slate-300 text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    Chart{attachChart ? ' on' : ''}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {inputText.length >= 400 && (
+                      <span className={`text-[11px] tabular-nums ${inputText.length >= 500 ? 'text-red-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>{inputText.length}/500</span>
+                    )}
+                    {isSending ? (
+                      <button
+                        onClick={stopGeneration}
+                        className={`h-7 w-7 flex items-center justify-center rounded-full transition-colors ${theme === 'dark' ? 'bg-dark-elevated text-red-400 hover:bg-red-950' : 'bg-slate-100 text-red-600 hover:bg-red-50'}`}
+                        title="Stop"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (inputText.trim() && !isAnalyzing) {
+                            handleSendMessage(inputText, attachChart)
+                            setAttachChart(false)
+                          }
+                        }}
+                        disabled={!inputText.trim() || isAnalyzing}
+                        className="h-7 w-7 flex items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={attachChart ? "Send with chart" : "Send"}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Usage Toggle Button */}
+              {/* What's left today */}
               {currentUsage && (
-                <button
-                  onClick={() => setShowUsage(!showUsage)}
-                  className={`${getHalfTextSizeClass()} underline ${theme === 'dark' ? 'text-dark-text hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  {showUsage ? "Hide Usage" : "View Usage"}
-                </button>
-              )}
-
-              {/* Usage Progress Bars */}
-              {currentUsage && showUsage && (
-                <div className="space-y-1.5">
-                  {/* Messages Progress */}
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5 text-slate-500 text-[10px]">
-                      <span>Messages</span>
-                      <span>{currentUsage.messages}/{currentUsage.limits.maxMessages}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-0.5 overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${
-                          currentUsage.messages >= currentUsage.limits.maxMessages
-                            ? "bg-red-500"
-                            : currentUsage.messages / currentUsage.limits.maxMessages >= 0.8
-                            ? "bg-amber-500"
-                            : "bg-blue-600"
-                        }`}
-                        style={{ width: `${Math.min((currentUsage.messages / currentUsage.limits.maxMessages) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Screenshots Progress */}
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5 text-slate-500 text-[10px]">
-                      <span>Screenshots</span>
-                      <span>{currentUsage.screenshots}/{currentUsage.limits.maxScreenshots}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-0.5 overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${
-                          currentUsage.screenshots >= currentUsage.limits.maxScreenshots
-                            ? "bg-red-500"
-                            : currentUsage.screenshots / currentUsage.limits.maxScreenshots >= 0.8
-                            ? "bg-amber-500"
-                            : "bg-green-600"
-                        }`}
-                        style={{ width: `${Math.min((currentUsage.screenshots / currentUsage.limits.maxScreenshots) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
+                <div className={`flex justify-between px-1 text-[11px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                  <span className={currentUsage.screenshots >= currentUsage.limits.maxScreenshots ? 'text-red-400' : ''}>
+                    {Math.max(0, currentUsage.limits.maxScreenshots - currentUsage.screenshots)} of {currentUsage.limits.maxScreenshots} chart checks left today
+                  </span>
+                  <span className={currentUsage.messages >= currentUsage.limits.maxMessages ? 'text-red-400' : ''}>
+                    {Math.max(0, currentUsage.limits.maxMessages - currentUsage.messages)} messages left
+                  </span>
                 </div>
               )}
           </>
@@ -2521,7 +2519,7 @@ function GettingStarted(props: {
   const items = [
     !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds.', action: 'Sign in', onClick: props.onSignIn },
     { done: props.analyzed, title: 'Check this chart against your rules', detail: 'A verdict in about 15 seconds. Free, doesn\'t count toward your daily limit.', action: props.signedIn ? 'Analyze this chart' : null, onClick: props.onAnalyze },
-    { done: props.chartChatted, title: 'Ask about your chart', detail: 'Type a question and click Send with Chart. Your first one is free too.', action: props.signedIn ? 'Try a question' : null, onClick: props.onTryChartQuestion },
+    { done: props.chartChatted, title: 'Ask about your chart', detail: 'Type a question, turn on Chart, and send. Your first one is free too.', action: props.signedIn ? 'Try a question' : null, onClick: props.onTryChartQuestion },
     props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking }
   ].filter(Boolean) as { done: boolean, title: string, detail: string, action: string | null, onClick: () => void }[]
 
