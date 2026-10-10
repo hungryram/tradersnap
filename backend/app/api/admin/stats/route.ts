@@ -39,11 +39,28 @@ function weekStart(time: number) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day)
 }
 
-type Profile = { id: string; email: string; first_name: string | null; plan: string | null; subscription_status: string | null; created_at: string; onboarded: boolean | null; trading_profile?: { markets?: string[]; platforms?: string[]; prop_firm?: boolean; experience?: string } | null }
+type Profile = { id: string; email: string; first_name: string | null; plan: string | null; subscription_status: string | null; created_at: string; onboarded: boolean | null; trading_profile?: { markets?: string[]; platforms?: string[]; prop_firm?: boolean; experience?: string } | null; uninstalled_at?: string | null }
 type Event = { user_id: string; event_type: string; created_at: string }
 type TradeRow = { user_id: string; closed_at: string }
 type Rating = { user_id: string; rating: number; snapshot: any; created_at: string }
-type Feedback = { reason: string; details: string | null; created_at: string }
+type Feedback = { reason: string; details: string | null; created_at: string; user_id?: string | null }
+
+const PROFILE_COLUMNS = [
+  "id, email, first_name, plan, subscription_status, created_at, onboarded, trading_profile, uninstalled_at",
+  "id, email, first_name, plan, subscription_status, created_at, onboarded, trading_profile",
+  "id, email, first_name, plan, subscription_status, created_at, onboarded"
+]
+async function fetchProfiles(): Promise<Profile[]> {
+  let lastError: unknown
+  for (const columns of PROFILE_COLUMNS) {
+    try {
+      return await fetchAll<Profile>((from, to) => supabase.from("profiles").select(columns).order("created_at", { ascending: false }).range(from, to) as any)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
 
 export async function GET(request: NextRequest) {
   // Same-origin only (no CORS headers); 404 for anyone who isn't the admin
@@ -55,13 +72,13 @@ export async function GET(request: NextRequest) {
     const since = new Date(now - 120 * DAY).toISOString()
 
     const [profiles, rulesetRows, events, trades, ratings, feedback] = await Promise.all([
-      fetchAll<Profile>((from, to) => supabase.from("profiles").select("id, email, first_name, plan, subscription_status, created_at, onboarded, trading_profile").order("created_at", { ascending: false }).range(from, to))
-        .catch(() => fetchAll<Profile>((from, to) => supabase.from("profiles").select("id, email, first_name, plan, subscription_status, created_at, onboarded").order("created_at", { ascending: false }).range(from, to))),
+      fetchProfiles(),
       fetchAll<{ user_id: string }>((from, to) => supabase.from("rulesets").select("user_id").range(from, to)),
       fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
       fetchOptional<TradeRow>((from, to) => supabase.from("trades").select("user_id, closed_at").range(from, to)),
       fetchOptional<Rating>((from, to) => supabase.from("analysis_ratings").select("user_id, rating, snapshot, created_at").gte("created_at", since).order("created_at", { ascending: false }).range(from, to)),
-      fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at").order("created_at", { ascending: false }).range(from, to))
+      fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at, user_id").order("created_at", { ascending: false }).range(from, to))
+        .then(rows => rows.length ? rows : fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at").order("created_at", { ascending: false }).range(from, to)))
     ])
 
     const emailById = new Map(profiles.map(p => [p.id, p.email]))
@@ -203,9 +220,18 @@ export async function GET(request: NextRequest) {
         recentDown: downs.slice(0, 20).map(r => ({ email: emailById.get(r.user_id) ?? null, created_at: r.created_at, snapshot: r.snapshot }))
       },
       uninstall: {
+        known30d: profiles.filter(p => p.uninstalled_at && now - Date.parse(p.uninstalled_at) <= 30 * DAY).length,
+        recentKnown: profiles
+          .filter(p => p.uninstalled_at)
+          .sort((a, b) => Date.parse(b.uninstalled_at!) - Date.parse(a.uninstalled_at!))
+          .slice(0, 15)
+          .map(p => {
+            const answer = feedback.find(f => f.user_id === p.id)
+            return { email: p.email, uninstalled_at: p.uninstalled_at, reason: answer?.reason ?? null, details: answer?.details ?? null, checks: activity.get(p.id)?.checks ?? 0 }
+          }),
         total: feedback.length,
         reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({ reason, count })),
-        recent: feedback.filter(f => f.details).slice(0, 10)
+        recent: feedback.filter(f => f.details).slice(0, 10).map(f => ({ reason: f.reason, details: f.details, created_at: f.created_at, email: f.user_id ? emailById.get(f.user_id) ?? null : null }))
       },
       users: profiles.map(p => {
         const a = activity.get(p.id)
@@ -222,6 +248,7 @@ export async function GET(request: NextRequest) {
           active_days_30d: a?.activeDays.size ?? 0,
           group: groupOf(p),
           has_rules: hasRules.has(p.id),
+          uninstalled_at: p.uninstalled_at ?? null,
           platforms: p.trading_profile?.platforms ?? [],
           markets: p.trading_profile?.markets ?? [],
           prop_firm: p.trading_profile?.prop_firm ?? null,

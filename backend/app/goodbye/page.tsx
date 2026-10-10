@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import AuthShell from "../components/AuthShell"
 
 const REASONS = [
@@ -20,14 +20,22 @@ export default function GoodbyePage() {
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
 
+  // Record the uninstall right away, whether or not they answer
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("t")
+    if (t) fetch("/api/uninstall", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t }) }).catch(() => {})
+  }, [])
+
   async function submit() {
     if (!reason) return
     setSending(true)
-    const version = new URLSearchParams(window.location.search).get("v") ?? undefined
+    const params = new URLSearchParams(window.location.search)
+    const version = params.get("v") ?? undefined
+    const t = params.get("t") ?? undefined
     await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason, details: details || undefined, version })
+      body: JSON.stringify({ reason, details: details || undefined, version, t })
     }).catch(() => {})
     setSent(true)
     setSending(false)

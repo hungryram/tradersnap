@@ -38,6 +38,8 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 
 **Owner analytics**
 - [x] Admin page `/dashboard/admin` (admin plan + `ADMIN_EMAILS`, 404 for everyone else): users, weekly actives, paying/MRR, funnel (signed up -> rules -> 1st check -> 3rd check -> paid), retention by sign-up week (1/2/4/8 weeks), revenue, uninstall reasons, thumbs-down verdicts, user list. *You:* set `ADMIN_EMAILS` on Vercel; run `20261013_admin.sql`.
+- [x] Admin: onboarding answers by platform/market/prop/experience (users, active, paying), usage groups (power/casual/fading/gone/never), active days in 30.
+- [x] Who uninstalled: the extension's uninstall link carries a signed per-account code (`/api/uninstall-token`); `/goodbye` records `profiles.uninstalled_at` and links the answer. Cleared on the next extension sign-in. *You:* run `20261014_uninstalls.sql`; works for users on the new extension version.
 - [x] Thumbs up/down on analysis cards (`/api/ratings`, verdict snapshot kept for review). Ships with the next extension release.
 
 **Phase 3: revenue**

@@ -8,7 +8,7 @@ type Step = { label: string; count: number }
 type UserRow = {
   email: string; name: string | null; plan: string; subscription_status: string | null
   created_at: string; last_active: string | null; checks: number; checks7d: number; trades: number; has_rules: boolean
-  active_days_30d: number; group: Group; platforms: string[]; markets: string[]; prop_firm: boolean | null; experience: string | null
+  active_days_30d: number; group: Group; uninstalled_at: string | null; platforms: string[]; markets: string[]; prop_firm: boolean | null; experience: string | null
 }
 type Group = "power" | "casual" | "fading" | "gone" | "never"
 type SegmentRow = { value: string; users: number; active: number; paying: number }
@@ -22,7 +22,13 @@ type Stats = {
   retention: { offsets: number[]; rows: { week: string; size: number; cells: (number | null)[] }[] }
   revenue: { active: number; pastDue: number; canceled: number; mrr: number }
   aiQuality: { rated: number; down: number; recentDown: { email: string | null; created_at: string; snapshot: any }[] }
-  uninstall: { total: number; reasons: { reason: string; count: number }[]; recent: { reason: string; details: string | null; created_at: string }[] }
+  uninstall: {
+    known30d: number
+    recentKnown: { email: string; uninstalled_at: string; reason: string | null; details: string | null; checks: number }[]
+    total: number
+    reasons: { reason: string; count: number }[]
+    recent: { reason: string; details: string | null; created_at: string; email: string | null }[]
+  }
   users: UserRow[]
 }
 
@@ -221,22 +227,34 @@ export default function AdminPage() {
             <p className="mt-4 text-xs text-ink-muted">Stripe's dashboard has invoices and churn details.</p>
           </Card>
 
-          <Card title="Why people uninstall">
-            {stats.uninstall.total === 0 ? (
-              <p className="text-sm text-ink-muted">No answers yet.</p>
+          <Card title="Uninstalls">
+            {stats.uninstall.recentKnown.length === 0 && stats.uninstall.total === 0 ? (
+              <p className="text-sm text-ink-muted">None recorded yet. Uninstalls are linked to accounts once users run the new extension version.</p>
             ) : (
               <>
-                <ul className="space-y-1.5 text-sm">
-                  {stats.uninstall.reasons.map(r => (
-                    <li key={r.reason} className="flex justify-between"><span className="text-ink-text">{REASON_LABELS[r.reason] ?? r.reason}</span><span className="tabular-nums">{r.count}</span></li>
-                  ))}
-                </ul>
-                {stats.uninstall.recent.length > 0 && (
-                  <ul className="mt-4 space-y-2 border-t border-ink-border pt-4 text-sm">
-                    {stats.uninstall.recent.map((f, i) => (
-                      <li key={i} className="text-ink-text">"{f.details}" <span className="text-xs text-ink-muted">{REASON_LABELS[f.reason] ?? f.reason}, {shortDate(f.created_at)}</span></li>
+                <p className="mb-3 text-sm text-ink-text"><span className="text-ink-body font-semibold">{stats.uninstall.known30d}</span> known uninstalls in the last 30 days.</p>
+                {stats.uninstall.recentKnown.length > 0 && (
+                  <ul className="mb-4 space-y-2 text-sm">
+                    {stats.uninstall.recentKnown.map(u => (
+                      <li key={u.email} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <a href={`mailto:${u.email}`} className="hover:text-blue-300">{u.email}</a>
+                        <span className="text-xs text-ink-muted">
+                          {shortDate(u.uninstalled_at)} · {u.checks} checks{u.reason ? ` · ${REASON_LABELS[u.reason] ?? u.reason}` : " · no answer"}
+                        </span>
+                        {u.details && <span className="w-full text-ink-text">"{u.details}"</span>}
+                      </li>
                     ))}
                   </ul>
+                )}
+                {stats.uninstall.reasons.length > 0 && (
+                  <div className="border-t border-ink-border pt-3">
+                    <div className="mb-2 text-xs text-ink-muted">All answers ({stats.uninstall.total}), including anonymous ones</div>
+                    <ul className="space-y-1.5 text-sm">
+                      {stats.uninstall.reasons.map(r => (
+                        <li key={r.reason} className="flex justify-between"><span className="text-ink-text">{REASON_LABELS[r.reason] ?? r.reason}</span><span className="tabular-nums">{r.count}</span></li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </>
             )}
@@ -302,6 +320,7 @@ export default function AdminPage() {
                       {u.name && <span className="text-ink-muted"> · {u.name}</span>}
                       {!u.has_rules && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">no rules</span>}
                       <GroupBadge group={u.group} />
+                      {u.uninstalled_at && <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Uninstalled {shortDate(u.uninstalled_at)}</span>}
                     </td>
                     <td className="py-2">
                       <div className="flex flex-wrap gap-1">

@@ -12,11 +12,45 @@ chrome.runtime.onInstalled.addListener(details => {
     chrome.tabs.create({ url: `${API_URL}/welcome` })
   }
   scheduleSessionRefresh()
+  ensureUninstallToken()
 })
 
-chrome.runtime.setUninstallURL(`${API_URL}/goodbye?v=${chrome.runtime.getManifest().version}`)
+// The uninstall link carries a signed code for the signed-in account (from
+// /api/uninstall-token) so the goodbye page can record whose extension was removed
+async function updateUninstallUrl() {
+  const { uninstall_token } = await chrome.storage.local.get("uninstall_token")
+  const version = chrome.runtime.getManifest().version
+  chrome.runtime.setUninstallURL(`${API_URL}/goodbye?v=${version}${uninstall_token ? `&t=${encodeURIComponent(uninstall_token)}` : ""}`)
+}
 
-chrome.runtime.onStartup.addListener(scheduleSessionRefresh)
+async function fetchUninstallToken() {
+  const { supabase_session } = await chrome.storage.local.get("supabase_session")
+  if (!supabase_session?.access_token) return
+  try {
+    const response = await fetch(`${API_URL}/api/uninstall-token`, { headers: { Authorization: `Bearer ${supabase_session.access_token}` } })
+    if (response.ok) {
+      const { token } = await response.json()
+      if (token) await chrome.storage.local.set({ uninstall_token: token })
+    }
+  } catch {
+    // Retried on the next sign-in or browser start
+  }
+  await updateUninstallUrl()
+}
+
+updateUninstallUrl()
+
+// Signed in but no code yet (e.g. signed in before this version): fetching it doesn't
+// renew the session, so this is safe for any stored login
+async function ensureUninstallToken() {
+  const { uninstall_token, supabase_session } = await chrome.storage.local.get(["uninstall_token", "supabase_session"])
+  if (!uninstall_token && supabase_session?.access_token) await fetchUninstallToken()
+}
+
+chrome.runtime.onStartup.addListener(() => {
+  scheduleSessionRefresh()
+  ensureUninstallToken()
+})
 
 // ---------------------------------------------------------------------------
 // Messages from our website (only origins in manifest externally_connectable
@@ -79,11 +113,13 @@ async function signInWithTokenHash(tokenHash: string) {
   const session = await authRequest("verify", { type: "magiclink", token_hash: tokenHash })
   if (!session?.access_token) throw new Error("No session returned")
   await chrome.storage.local.set({ supabase_session: withExpiry(session) })
+  fetchUninstallToken()
 }
 
 async function signOut() {
   const { supabase_session } = await chrome.storage.local.get("supabase_session")
-  await chrome.storage.local.remove(["supabase_session", "timeout_end"])
+  await chrome.storage.local.remove(["supabase_session", "timeout_end", "uninstall_token"])
+  await updateUninstallUrl()
   if (supabase_session?.access_token) {
     await authRequest("logout?scope=local", {}, supabase_session.access_token).catch(() => {})
   }
