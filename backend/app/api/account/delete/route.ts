@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan, stripe_customer_id")
+    .select("*")
     .eq("id", user.id)
     .single()
 
@@ -56,10 +56,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 2. Uninstall answers keep no link to a deleted user (the column would be nulled anyway)
+  // 2. Keep an anonymous record for churn stats: no email, name or id, just how they used it
+  await recordDeletion(user.id, profile, body)
+
+  // 3. Uninstall answers keep no link to a deleted user (the column would be nulled anyway)
   await supabase.from("uninstall_feedback").delete().eq("user_id", user.id)
 
-  // 3. Deleting the auth user cascades to profiles and every table keyed to the user:
+  // 4. Deleting the auth user cascades to profiles and every table keyed to the user:
   //    rulesets, usage, analyses, usage_events, chat_messages, trades, analysis_ratings
   const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id)
   if (deleteError) {
@@ -68,4 +71,34 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true })
+}
+
+const REASONS = ["not_useful", "confusing", "too_expensive", "bugs", "privacy", "wrong_platform", "other"]
+
+async function recordDeletion(userId: string, profile: any, body: any) {
+  try {
+    const [checks, events, trades] = await Promise.all([
+      supabase.from("usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("event_type", "analysis_finished"),
+      supabase.from("usage_events").select("created_at").eq("user_id", userId).limit(10000),
+      supabase.from("trades").select("id", { count: "exact", head: true }).eq("user_id", userId)
+    ])
+    const activeDays = new Set((events.data ?? []).map((e: { created_at: string }) => e.created_at.slice(0, 10))).size
+    const tradingProfile = profile?.trading_profile ?? null
+
+    await supabase.from("deleted_accounts").insert({
+      signed_up_month: profile?.created_at ? `${profile.created_at.slice(0, 7)}-01` : null,
+      plan: profile?.plan ?? "free",
+      checks: checks.count ?? 0,
+      active_days: activeDays,
+      trades: trades.count ?? 0,
+      platforms: tradingProfile?.platforms ?? null,
+      prop_firm: tradingProfile?.prop_firm ?? null,
+      experience: tradingProfile?.experience ?? null,
+      reason: REASONS.includes(body?.reason) ? body.reason : null,
+      details: typeof body?.details === "string" && body.details.trim() ? body.details.trim().slice(0, 500) : null
+    })
+  } catch (error) {
+    // Stats are nice to have; never block a deletion on them
+    console.error("[Account delete] Couldn't record anonymous stats:", error)
+  }
 }

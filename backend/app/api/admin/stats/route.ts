@@ -43,6 +43,7 @@ type Profile = { id: string; email: string; first_name: string | null; plan: str
 type Event = { user_id: string; event_type: string; created_at: string }
 type TradeRow = { user_id: string; closed_at: string }
 type Rating = { user_id: string; rating: number; snapshot: any; created_at: string }
+type Deleted = { signed_up_month: string | null; deleted_at: string; plan: string | null; checks: number; active_days: number; trades: number; platforms: string[] | null; prop_firm: boolean | null; reason: string | null; details: string | null }
 type Feedback = { reason: string; details: string | null; created_at: string; user_id?: string | null }
 
 const PROFILE_COLUMNS = [
@@ -71,14 +72,15 @@ export async function GET(request: NextRequest) {
     const now = Date.now()
     const since = new Date(now - 120 * DAY).toISOString()
 
-    const [profiles, rulesetRows, events, trades, ratings, feedback] = await Promise.all([
+    const [profiles, rulesetRows, events, trades, ratings, feedback, deleted] = await Promise.all([
       fetchProfiles(),
       fetchAll<{ user_id: string }>((from, to) => supabase.from("rulesets").select("user_id").range(from, to)),
       fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
       fetchOptional<TradeRow>((from, to) => supabase.from("trades").select("user_id, closed_at").range(from, to)),
       fetchOptional<Rating>((from, to) => supabase.from("analysis_ratings").select("user_id, rating, snapshot, created_at").gte("created_at", since).order("created_at", { ascending: false }).range(from, to)),
       fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at, user_id").order("created_at", { ascending: false }).range(from, to))
-        .then(rows => rows.length ? rows : fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at").order("created_at", { ascending: false }).range(from, to)))
+        .then(rows => rows.length ? rows : fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at").order("created_at", { ascending: false }).range(from, to))),
+      fetchOptional<Deleted>((from, to) => supabase.from("deleted_accounts").select("signed_up_month, deleted_at, plan, checks, active_days, trades, platforms, prop_firm, reason, details").order("deleted_at", { ascending: false }).range(from, to))
     ])
 
     const emailById = new Map(profiles.map(p => [p.id, p.email]))
@@ -218,6 +220,11 @@ export async function GET(request: NextRequest) {
         rated: recentRatings.length,
         down: downs.length,
         recentDown: downs.slice(0, 20).map(r => ({ email: emailById.get(r.user_id) ?? null, created_at: r.created_at, snapshot: r.snapshot }))
+      },
+      deleted: {
+        total: deleted.length,
+        last30d: deleted.filter(d => now - Date.parse(d.deleted_at) <= 30 * DAY).length,
+        recent: deleted.slice(0, 15)
       },
       uninstall: {
         known30d: profiles.filter(p => p.uninstalled_at && now - Date.parse(p.uninstalled_at) <= 30 * DAY).length,

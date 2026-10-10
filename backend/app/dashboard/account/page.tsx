@@ -40,6 +40,8 @@ export default function AccountPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = useState("")
+  const [deleteDetails, setDeleteDetails] = useState("")
 
   useEffect(() => { load() }, [])
 
@@ -106,7 +108,7 @@ export default function AccountPage() {
     setDeleting(true)
     setDeleteError(null)
     try {
-      await api("/api/account/delete", { method: "POST", body: JSON.stringify({ confirm: deleteConfirm }) })
+      await api("/api/account/delete", { method: "POST", body: JSON.stringify({ confirm: deleteConfirm, reason: deleteReason || undefined, details: deleteDetails || undefined }) })
       await signOutExtension()
       await createClient().auth.signOut().catch(() => {})
       window.location.href = "/?deleted=1"
@@ -231,6 +233,26 @@ export default function AccountPage() {
                 </ul>
                 {isPro && <Notice tone="warn">Your Pro subscription is canceled right away, so you won't be charged again.</Notice>}
                 <p className="text-xs text-ink-muted">Stripe keeps its own payment records (invoices) as required for taxes. Chats saved in the extension on this computer are cleared when it signs out.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-ink-text">Why are you leaving? (optional)</span>
+                    <select value={deleteReason} onChange={e => setDeleteReason(e.target.value)} className={inputClass}>
+                      <option value="">Prefer not to say</option>
+                      <option value="not_useful">It didn't help my trading</option>
+                      <option value="confusing">Hard to figure out</option>
+                      <option value="wrong_platform">Doesn't work where I trade</option>
+                      <option value="bugs">Something was broken</option>
+                      <option value="too_expensive">Too expensive</option>
+                      <option value="privacy">Privacy concerns</option>
+                      <option value="other">Something else</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-ink-text">Anything else? (optional)</span>
+                    <input value={deleteDetails} onChange={e => setDeleteDetails(e.target.value)} maxLength={500} className={inputClass} />
+                  </label>
+                </div>
+                <p className="text-xs text-ink-muted">Your answer is kept without your name or email, so we can improve Snapchart.</p>
                 <label className="block max-w-xs">
                   <span className="mb-1.5 block text-xs text-ink-text">Type DELETE to confirm</span>
                   <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className={inputClass} autoComplete="off" />

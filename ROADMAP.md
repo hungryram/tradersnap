@@ -117,6 +117,7 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 ## Privacy
 
 - [x] Delete account (Account page, type DELETE): cancels Stripe subscriptions first, then deletes the auth user, which cascades to every user table; uninstall answers removed; extension signs out and clears its cached chat. Immediate, no grace period. Admin accounts can't self-delete.
+- [x] Anonymous `deleted_accounts` row on deletion (sign-up month, plan, checks, active days, trades, platforms, optional reason; no email/id) shown in Admin; funnel notes how many deleted accounts it excludes. *You:* run `20261015_deleted_accounts.sql`.
 - [ ] Privacy policy (snapchartapp.com/privacy): mention account deletion in Account settings, what's deleted, and that Stripe keeps invoices. *(you)*
 
 ## 4. Business & code health

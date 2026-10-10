@@ -22,6 +22,11 @@ type Stats = {
   retention: { offsets: number[]; rows: { week: string; size: number; cells: (number | null)[] }[] }
   revenue: { active: number; pastDue: number; canceled: number; mrr: number }
   aiQuality: { rated: number; down: number; recentDown: { email: string | null; created_at: string; snapshot: any }[] }
+  deleted: {
+    total: number
+    last30d: number
+    recent: { signed_up_month: string | null; deleted_at: string; plan: string | null; checks: number; active_days: number; trades: number; platforms: string[] | null; prop_firm: boolean | null; reason: string | null; details: string | null }[]
+  }
   uninstall: {
     known30d: number
     recentKnown: { email: string; uninstalled_at: string; reason: string | null; details: string | null; checks: number }[]
@@ -137,7 +142,10 @@ export default function AdminPage() {
               )
             })}
           </ul>
-          <p className="mt-4 text-xs text-ink-muted">Installs before sign-up aren't tracked here; see the Chrome Web Store developer dashboard.</p>
+          <p className="mt-4 text-xs text-ink-muted">
+            Installs before sign-up aren't tracked here; see the Chrome Web Store developer dashboard.
+            {stats.deleted.total > 0 && ` ${stats.deleted.total} deleted ${stats.deleted.total === 1 ? "account is" : "accounts are"} not included (see Deleted accounts below).`}
+          </p>
         </Card>
 
         <Card title="How often they use it">
@@ -260,6 +268,35 @@ export default function AdminPage() {
             )}
           </Card>
         </div>
+
+        <Card title={`Deleted accounts (${stats.deleted.last30d} in the last 30 days, ${stats.deleted.total} total)`}>
+          {stats.deleted.recent.length === 0 ? (
+            <p className="text-sm text-ink-muted">Nobody has deleted their account.</p>
+          ) : (
+            <ul className="divide-y divide-ink-border/70 text-sm">
+              {stats.deleted.recent.map((d, i) => (
+                <li key={i} className="py-2.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span>
+                      <span className="capitalize">{d.plan ?? "free"}</span>
+                      {d.platforms?.length ? <span className="text-ink-text"> · {d.platforms.map(answer).join(", ")}</span> : null}
+                      {d.prop_firm ? <span className="text-ink-text"> · prop firm</span> : null}
+                      <span className="text-ink-muted"> · {d.checks} checks, {d.active_days} active days, {d.trades} trades</span>
+                    </span>
+                    <span className="text-xs text-ink-muted">
+                      {d.signed_up_month ? `joined ${new Date(`${d.signed_up_month}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric" })}, ` : ""}deleted {shortDate(d.deleted_at)}
+                    </span>
+                  </div>
+                  {(d.reason || d.details) && (
+                    <div className="mt-0.5 text-ink-text">
+                      {d.reason ? (REASON_LABELS[d.reason] ?? d.reason) : ""}{d.reason && d.details ? ": " : ""}{d.details ? `"${d.details}"` : ""}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         <Card title="Verdicts rated 👎 (last 30 days)">
           {stats.aiQuality.recentDown.length === 0 ? (
