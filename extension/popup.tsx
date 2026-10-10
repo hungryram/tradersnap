@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import Pip from "./components/Pip"
 
 import "~style.css"
 
@@ -127,16 +128,22 @@ function IndexPopup() {
   }
 
   return (
-    <div className="w-80 h-96 p-4 bg-slate-900 text-white">
-      <h1 className="text-xl font-bold mb-4">Pip</h1>
+    <div className="w-80 h-96 p-4 bg-dark-bg text-dark-body">
+      <div className="mb-4 flex items-center gap-3">
+        <Pip size={40} mood={isLoggedIn ? 'idle' : 'thinking'} />
+        <div>
+          <h1 className="text-lg font-semibold leading-tight">Pip</h1>
+          <p className="text-xs text-dark-text">Your AI trading coach</p>
+        </div>
+      </div>
       
       {!isLoggedIn ? (
         <div className="space-y-4">
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-dark-text">
             Sign in or create a free account to start checking your charts against your rules.
           </p>
           <button 
-            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white"
             onClick={() => {
               chrome.tabs.create({ 
                 url: `${process.env.PLASMO_PUBLIC_API_URL}` 
@@ -148,24 +155,24 @@ function IndexPopup() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="bg-slate-800 p-3 rounded">
-            <p className="text-xs text-slate-400">Signed in as</p>
+          <div className="bg-dark-surface p-3 rounded">
+            <p className="text-xs text-dark-text">Signed in as</p>
             <p className="text-sm font-medium truncate">{user?.email}</p>
             {userPlan && (
-              <p className="text-xs text-slate-400 mt-1">
-                Plan: <span className="text-slate-200 capitalize">{userPlan === 'pro' ? 'Pro' : 'Free'}</span>
+              <p className="text-xs text-dark-text mt-1">
+                Plan: <span className="text-dark-body capitalize">{userPlan === 'pro' ? 'Pro' : 'Free'}</span>
               </p>
             )}
           </div>
           
-          <div className="text-xs text-slate-300 space-y-1">
+          <div className="text-xs text-dark-text space-y-1">
             <p>Keyboard shortcuts when chatbox is open:</p>
-            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Alt + A</span> - Analyze chart</p>
-            <p><span className="font-mono bg-slate-800 px-1 rounded">Ctrl + Alt + Enter</span> - Send with chart</p>
+            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Alt + A</span> - Analyze chart</p>
+            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Alt + Enter</span> - Send with chart</p>
           </div>
 
           <button 
-            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm"
+            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white text-sm"
             onClick={() => {
               chrome.tabs.create({ 
                 url: `${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules` 
@@ -176,7 +183,7 @@ function IndexPopup() {
           </button>
           
           <button 
-            className="w-full bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-sm"
+            className="w-full bg-dark-elevated hover:bg-dark-border px-4 py-2 rounded-lg text-sm"
             onClick={handleSignOut}
           >
             Sign Out

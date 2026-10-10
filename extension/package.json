@@ -1,8 +1,8 @@
 {
   "name": "trading-buddy-extension",
   "displayName": "Pip: AI Trading Coach",
-  "version": "1.0.2",
-  "description": "AI trading psychology coach. Analyze charts against your rules and build disciplined trading habits with real-time feedback.",
+  "version": "1.1.0",
+  "description": "Pip, your AI trading coach (formerly Snapchart). Checks charts against your rules, logs trades and speaks up before revenge trades.",
   "author": "Pip",
   "scripts": {
     "dev": "plasmo dev",
