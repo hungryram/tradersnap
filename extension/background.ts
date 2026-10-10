@@ -118,7 +118,8 @@ async function signInWithTokenHash(tokenHash: string) {
 
 async function signOut() {
   const { supabase_session } = await chrome.storage.local.get("supabase_session")
-  await chrome.storage.local.remove(["supabase_session", "timeout_end", "uninstall_token"])
+  // Also drop the locally cached chat, so the next person on this browser (or a deleted account) leaves nothing behind
+  await chrome.storage.local.remove(["supabase_session", "timeout_end", "uninstall_token", "chat_messages", "chat_sync"])
   await updateUninstallUrl()
   if (supabase_session?.access_token) {
     await authRequest("logout?scope=local", {}, supabase_session.access_token).catch(() => {})

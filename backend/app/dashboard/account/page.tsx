@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { api } from "@/lib/dashboard-data"
-import { Card, Loading, Notice, PageHeader, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
+import { createClient } from "@/lib/supabase-client"
+import { signOutExtension } from "@/lib/extension-bridge"
+import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
 interface UserData {
   user: {
@@ -34,6 +36,10 @@ export default function AccountPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [profileMessage, setProfileMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState("")
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -93,6 +99,20 @@ export default function AccountPage() {
       if (err instanceof Error && /already/i.test(err.message)) await openBillingPortal()
       else alert("Couldn't start checkout. Please try again.")
       setBusy(false)
+    }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await api("/api/account/delete", { method: "POST", body: JSON.stringify({ confirm: deleteConfirm }) })
+      await signOutExtension()
+      await createClient().auth.signOut().catch(() => {})
+      window.location.href = "/?deleted=1"
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete your account.")
+      setDeleting(false)
     }
   }
 
@@ -191,6 +211,41 @@ export default function AccountPage() {
             Chrome Web Store
           </a>
         </Card>
+
+        {user.plan !== "admin" && (
+          <Card title="Delete account">
+            {!deleteOpen ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-ink-text">Permanently delete your account and all your data. This can't be undone.</p>
+                <button onClick={() => setDeleteOpen(true)} className={buttonDanger}>Delete account</button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-ink-text">This immediately and permanently deletes:</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-ink-text">
+                  <li>Your account and profile</li>
+                  <li>Your rules and daily limits</li>
+                  <li>Your chat history and saved messages</li>
+                  <li>Your detected trades and journal</li>
+                  <li>Your usage history and ratings</li>
+                </ul>
+                {isPro && <Notice tone="warn">Your Pro subscription is canceled right away, so you won't be charged again.</Notice>}
+                <p className="text-xs text-ink-muted">Stripe keeps its own payment records (invoices) as required for taxes. Chats saved in the extension on this computer are cleared when it signs out.</p>
+                <label className="block max-w-xs">
+                  <span className="mb-1.5 block text-xs text-ink-text">Type DELETE to confirm</span>
+                  <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className={inputClass} autoComplete="off" />
+                </label>
+                {deleteError && <Notice tone="bad">{deleteError}</Notice>}
+                <div className="flex gap-2">
+                  <button onClick={deleteAccount} disabled={deleteConfirm !== "DELETE" || deleting} className={buttonDanger}>
+                    {deleting ? "Deleting..." : "Delete my account"}
+                  </button>
+                  <button onClick={() => { setDeleteOpen(false); setDeleteConfirm(""); setDeleteError(null) }} disabled={deleting} className={buttonSecondary}>Cancel</button>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
 
         <p className="text-center text-xs text-ink-muted">
           <a href="https://www.snapchartapp.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-body">Privacy Policy</a>

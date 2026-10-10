@@ -114,6 +114,11 @@ Plan: ship section 1 → provider layer → prompt rewrite + symbol/timeframe �
 - [ ] Prop-firm integration (Tradovate / TopstepX / Rithmic): import trades, enforce daily loss / max trades, hard lockouts.
 - [ ] Structured rule builder (checkable rules: "above VWAP", "max 3 trades", "no trades 11:30–1:30 ET"). Numeric limits start in onboarding (section 0).
 
+## Privacy
+
+- [x] Delete account (Account page, type DELETE): cancels Stripe subscriptions first, then deletes the auth user, which cascades to every user table; uninstall answers removed; extension signs out and clears its cached chat. Immediate, no grace period. Admin accounts can't self-delete.
+- [ ] Privacy policy (snapchartapp.com/privacy): mention account deletion in Account settings, what's deleted, and that Stripe keeps invoices. *(you)*
+
 ## 4. Business & code health
 
 - [ ] Pricing page "$49 → $19" anchor — keep only if $49 was a real price (FTC).
