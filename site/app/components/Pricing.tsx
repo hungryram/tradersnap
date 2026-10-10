@@ -2,18 +2,18 @@ import { CHROME_STORE_URL } from "../links"
 
 // Keep in sync with backend/lib/usage.ts (DAILY_CREDITS) and the dashboard's account page
 const FREE = [
-  "About 5 chart checks and 15 coach messages a day",
+  "About 5 chart checks and 15 messages with Pip a day",
   "Automatic trade tracking and journal",
-  "Coach check-ins: losing streaks, daily limits, revenge trades",
+  "Check-ins from Pip: losing streaks, limits, revenge trades",
   "Daily loss and trade limits",
-  "3 rulesets, coach remembers 3 saved messages",
+  "3 rulesets, Pip remembers 3 saved messages",
 ]
 
 const PRO = [
-  "About 50 chart checks and 200 coach messages a day",
+  "About 50 chart checks and 200 messages with Pip a day",
   "Everything in Free",
   "20 rulesets with longer rules",
-  "Coach remembers 20 saved messages",
+  "Pip remembers 20 saved messages",
   "Longer, more detailed answers",
 ]
 

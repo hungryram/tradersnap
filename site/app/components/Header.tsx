@@ -6,10 +6,9 @@ import Pip from "./Pip"
 
 const NAV = [
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/#features", label: "Features" },
+  { href: "/#why", label: "Why Pip" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
-  { href: "/guide", label: "Guide" },
 ]
 
 export default function Header() {
@@ -57,7 +56,7 @@ export default function Header() {
             <a href={APP_URL} className="py-2.5 hover:text-ink-body">Log in</a>
           </nav>
           <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="block rounded-lg bg-brand-500 py-2.5 text-center font-medium text-ink-bg">
-            Add to Chrome, free
+            Add Pip to Chrome, free
           </a>
         </div>
       )}

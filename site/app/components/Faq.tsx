@@ -5,26 +5,34 @@ export type FaqGroup = { title: string; items: FaqItem[] }
 
 export const FAQ: FaqGroup[] = [
   {
-    title: "Getting started",
+    title: "The honest questions",
     items: [
-      { q: "What is Snapchart?", a: "A Chrome extension that sits on your chart as a trading coach. It checks your setup against your own rules, tracks your trades automatically and speaks up when you start breaking your plan, like after a losing streak or when you jump straight back into a trade after a loss." },
-      { q: "Is this a signal service?", a: "No. Snapchart never tells you what to buy or sell. It holds you to the rules you wrote yourself. Think of it as a pre-trade checklist and an accountability partner, not an oracle." },
-      { q: "Which platforms does it work with?", a: "Chart checks and the coach work on any chart you open in Chrome, including TradingView, Tradovate and Topstep. Automatic trade tracking works on TradingView today, with more platforms on the way." },
-      { q: "Do I need to write rules first?", a: "No. The coach works without them, and you can start with a template during setup. Rules make the feedback personal, so most traders add them in the first few days." },
+      { q: "Is this another signal service?", a: "No, and it never will be. Pip never tells you to buy or sell, never predicts price and never gives you entries, stops or targets. He holds you to the rules you wrote yourself. If you're looking for someone to tell you what to trade, Snapchart isn't it." },
+      { q: "Will this make me profitable?", a: "We can't promise that, and you should be wary of anyone who does. Your results depend on your strategy and the market. What Pip does is help you trade the plan you already have, especially in the moments you usually don't: after a loss, when something's running without you, or when you're past your limits." },
+      { q: "Can Pip stop me from placing a trade?", a: "No. Pip can't touch your orders, and you're always in control. What he does is speak up at the right moment, check your setup against your rules and, if you ask, put you on a short cooldown timer. Most bad trades happen in a few impulsive seconds. Pip puts a pause in those seconds." },
+      { q: "Won't it get annoying?", a: "Pip only speaks up when something actually happens: a losing streak, a quick re-entry after a loss, a limit, or your plan for the day. You can switch check-ins to warnings only, or off, any time." },
+      { q: "Why not just write my rules on a sticky note?", a: "You probably already have. The problem is that a sticky note doesn't notice you're back in two minutes after a loss, and it doesn't know you're at trade six of four. Pip does, because he sees your trades as they happen." },
     ],
   },
   {
-    title: "Trade tracking and privacy",
+    title: "Setup and platforms",
     items: [
-      { q: "How does Snapchart know my trades?", a: "It reads the Order history in TradingView's trading panel, in your own browser, while you trade. There's no broker login and no API keys. Keep the trading panel open (it can be small) and Snapchart logs each trade and its result." },
-      { q: "Can Snapchart place or change trades?", a: "No. It only reads what's on your screen. It can't place, change or close orders, and it never sees your broker password." },
-      { q: "What do you store?", a: "Your account, rules, chats and the trades it detects (symbol, size, prices and profit or loss) so your coach and journal can use them. Charts are only captured when you click Analyze or Send with chart. You can delete your account and all your data at any time from your account page." },
+      { q: "Which platforms does it work with?", a: "Pip's chart checks and chat work on any chart you open in Chrome, including TradingView, Tradovate and Topstep. Automatic trade tracking works on TradingView today, with more platforms on the way." },
+      { q: "Do I need to write rules first?", a: "No. Setup gives you templates to start from, and you can edit them any time. Your rules and daily limits are what make Pip personal, so it's worth the two minutes." },
+      { q: "How does Pip know my trades?", a: "He reads the Order history in TradingView's trading panel, in your own browser, while you trade. There's no broker login and no API keys. Keep the trading panel open (it can be small) and Pip logs each trade and its result." },
+    ],
+  },
+  {
+    title: "Privacy",
+    items: [
+      { q: "Can Snapchart access my broker account?", a: "No. Pip only reads what's on your screen in your browser. He can't place, change or close orders, and never sees your broker password." },
+      { q: "What do you store?", a: "Your account, rules, chats and the trades Pip detects (symbol, size, prices and result) so your coach and journal can use them. Charts are only captured when you click Analyze or send a chart. You can delete your account and all your data from your account page, instantly." },
     ],
   },
   {
     title: "Plans and usage",
     items: [
-      { q: "What's free?", a: "Free includes about 5 chart checks and 15 coach messages a day, automatic trade tracking, the journal, coach check-ins and daily limits. No card needed." },
+      { q: "What's free?", a: "Free includes about 5 chart checks and 15 messages with Pip a day, automatic trade tracking, the journal, check-ins and daily limits. No card needed." },
       { q: "How does usage work?", a: "You get a daily allowance, shown as a percentage. A chart check uses more of it than a message. It resets every day at midnight UTC." },
       { q: "What if I run out?", a: "Wait for the daily reset, upgrade to Pro for about 10 times more every day, or buy extra usage on any plan. Extra usage is used after your daily allowance and never expires." },
       { q: "How do I cancel Pro?", a: "Go to Account, then Manage billing. You keep Pro until the end of the period you paid for." },
