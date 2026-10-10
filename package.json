@@ -8,7 +8,9 @@
     "dev:backend": "pnpm --filter trading-buddy-backend dev",
     "build": "pnpm -r build",
     "build:extension": "pnpm --filter trading-buddy-extension build",
-    "build:backend": "pnpm --filter trading-buddy-backend build"
+    "build:backend": "pnpm --filter trading-buddy-backend build",
+    "dev:site": "pnpm --filter snapchart-site dev",
+    "build:site": "pnpm --filter snapchart-site build"
   },
   "devDependencies": {
     "pnpm": "^8.15.1"

@@ -1,6 +1,7 @@
 packages:
   - extension
   - backend
+  - site
 
 ignoredBuiltDependencies:
   - '@parcel/watcher'
