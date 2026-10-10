@@ -50,9 +50,16 @@ export async function POST(request: NextRequest) {
           await stripe.subscriptions.cancel(subscription.id)
         }
       }
-    } catch (error) {
-      console.error("[Account delete] Stripe cancel failed:", error)
-      return NextResponse.json({ error: "Couldn't cancel your subscription, so nothing was deleted. Please try again or contact support." }, { status: 502 })
+    } catch (error: any) {
+      // A customer Stripe can't find (deleted, or created in the other test/live mode)
+      // has nothing to cancel, unless our records say they're paying right now
+      const payingNow = profile.plan === "pro" && ["active", "trialing", "past_due"].includes(profile.subscription_status)
+      if (error?.code === "resource_missing" && !payingNow) {
+        console.warn("[Account delete] Stripe customer not found; no active plan, continuing")
+      } else {
+        console.error("[Account delete] Stripe cancel failed:", error)
+        return NextResponse.json({ error: "Couldn't cancel your subscription, so nothing was deleted. Please try again or contact support." }, { status: 502 })
+      }
     }
   }
 
