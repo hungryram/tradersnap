@@ -11,6 +11,12 @@ chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     chrome.tabs.create({ url: `${API_URL}/welcome` })
   }
+  // People updating from the Snapchart days get a one-time hello from Pip (see content.tsx)
+  if (details.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+    chrome.storage.local.get("pip_rename_announced").then(({ pip_rename_announced }) => {
+      if (!pip_rename_announced) chrome.storage.local.set({ pip_rename_pending: true })
+    })
+  }
   scheduleSessionRefresh()
   ensureUninstallToken()
 })

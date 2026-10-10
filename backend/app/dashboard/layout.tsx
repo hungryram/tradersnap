@@ -20,12 +20,16 @@ const HELP_NAV = [
   { href: "https://discord.com/invite/fuxFDEsDph", label: "Discord", external: true },
 ]
 
+// Snapchart was renamed to Pip on this date; older accounts see a one-time notice
+const RENAMED_AT = "2026-10-11"
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const supabase = createClient()
   const [email, setEmail] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [renameNotice, setRenameNotice] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -34,6 +38,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return
       }
       setEmail(session.user.email ?? null)
+      // Accounts from the Snapchart days hear about the new name once
+      let seen = false
+      try { seen = localStorage.getItem("pip_rename_seen") === "1" } catch {}
+      if (!seen && session.user.created_at < RENAMED_AT) setRenameNotice(true)
       fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
         .then(response => response.ok ? response.json() : null)
         .then(data => setIsAdmin(!!data?.user?.is_admin))
@@ -144,7 +152,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       <main className="md:pl-60">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10">{children}</div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
+          {renameNotice && (
+            <div className="mb-6 flex items-center gap-4 rounded-2xl border border-brand-500/30 bg-brand-500/10 p-4" role="status">
+              <Pip size={44} />
+              <p className="flex-1 text-sm leading-relaxed text-ink-body">
+                <span className="font-semibold">Snapchart is now Pip, your AI trading coach.</span>{" "}
+                <span className="text-ink-text">Same account, same rules, same trades. Just a better name. You'll find us at tradewithpip.ai.</span>
+              </p>
+              <button
+                onClick={() => {
+                  setRenameNotice(false)
+                  try { localStorage.setItem("pip_rename_seen", "1") } catch {}
+                }}
+                aria-label="Dismiss"
+                className="rounded px-2 text-lg leading-none text-ink-text hover:text-ink-body"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   )

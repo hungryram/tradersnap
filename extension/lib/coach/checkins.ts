@@ -4,7 +4,7 @@
 
 export type CheckInKind =
   | "morning_plan" | "loss_streak" | "daily_loss" | "revenge"
-  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap"
+  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap" | "announcement"
 
 export type CheckIn = {
   id: string // unique per day and event, so the same check-in never repeats

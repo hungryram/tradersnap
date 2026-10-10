@@ -583,6 +583,28 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  // One-time hello after updating from the Snapchart days (flagged by background.ts on update)
+  useEffect(() => {
+    if (!isSignedIn) return
+    ;(async () => {
+      const { pip_rename_pending } = await chrome.storage.local.get('pip_rename_pending')
+      if (!pip_rename_pending) return
+      await chrome.storage.local.set({ pip_rename_announced: true })
+      await chrome.storage.local.remove('pip_rename_pending')
+      const hello: CheckIn = {
+        id: 'pip_rename',
+        kind: 'announcement',
+        level: 'info',
+        text: "Hey, Snapchart is now Pip. That's me. Same account, same rules, same trades. Just a better name."
+      }
+      setMessages(prev => [...prev, { type: 'checkin', content: hello.text, level: hello.level, kind: hello.kind, timestamp: new Date() }])
+      if (!isOpenRef.current) {
+        setUnreadCheckins(prev => [...prev, hello])
+        setBubble(hello)
+      }
+    })()
+  }, [isSignedIn])
+
   // Morning plan: first visit of the day to a trading site, before the session is over
   useEffect(() => {
     if (!isSignedIn || !limitsLoaded) return

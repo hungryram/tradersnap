@@ -148,10 +148,11 @@ Switchover, in order:
 - [ ] Vercel, site project (root `site`): add `tradewithpip.ai` and `www.tradewithpip.ai`
 - [ ] Vercel, backend project: add `app.tradewithpip.ai`. Keep `admin.snapchartapp.com` attached as an alias (not a redirect): extension versions already installed call it, and redirects break their API calls
 - [ ] Vercel env (backend): `NEXT_PUBLIC_APP_URL=https://app.tradewithpip.ai`, then redeploy
-- [ ] Old marketing domain `www.snapchartapp.com`: redirect to `https://tradewithpip.ai`
+- [ ] Old marketing domain `www.snapchartapp.com`: redirect to `https://tradewithpip.ai/?from=snapchart` (shows the "Snapchart is now Pip" banner)
 - [ ] Supabase: Site URL and redirect URLs for `app.tradewithpip.ai`; update email templates' wording
 - [ ] Stripe: business name "Pip"; webhook endpoint `https://app.tradewithpip.ai/api/webhooks/stripe`
 - [ ] Google OAuth (when enabled): app name and authorized domains
 - [ ] Extension build env: `PLASMO_PUBLIC_API_URL=https://app.tradewithpip.ai`, then publish to the Chrome Web Store with the new name, icon and screenshots
 - [ ] Support email on the new domain, then replace `help@snapchartapp.com` (site `links.ts`, privacy, terms, dashboard FAQ)
 - [ ] Trademark search for "Pip" in software / financial education
+- [ ] Around January 2027: remove the rename notices (site `RenameBanner`, dashboard notice in `dashboard/layout.tsx`, extension hello in `content.tsx`)
