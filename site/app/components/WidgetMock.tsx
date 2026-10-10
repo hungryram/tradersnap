@@ -1,8 +1,10 @@
-// A static picture of the extension on a chart: the coach speaking up after a losing streak
+import Pip from "./Pip"
+
+// A picture of the extension on a chart: Pip speaking up after a losing streak
 export default function WidgetMock() {
   return (
     <div className="relative mx-auto w-full max-w-xl">
-      <div className="absolute -inset-6 rounded-[2rem] bg-blue-600/10 blur-2xl" aria-hidden />
+      <div className="absolute -inset-6 rounded-[2rem] bg-brand-500/10 blur-2xl" aria-hidden />
       <div className="relative overflow-hidden rounded-2xl border border-ink-border bg-ink-surface shadow-2xl">
         {/* Browser bar */}
         <div className="flex items-center gap-2 border-b border-ink-border px-4 py-2.5">
@@ -16,23 +18,29 @@ export default function WidgetMock() {
           <Chart />
 
           {/* Coach widget */}
-          <div className="absolute bottom-3 right-3 w-[78%] max-w-[300px] rounded-xl border border-ink-border bg-ink-bg/95 shadow-xl backdrop-blur">
+          <div className="absolute bottom-3 right-3 w-[80%] max-w-[310px] rounded-xl border border-ink-border bg-ink-bg/95 shadow-xl backdrop-blur">
             <div className="flex items-center justify-between border-b border-ink-border px-3 py-2">
               <div className="flex items-center gap-2">
-                <img src="/icon.png" alt="" className="h-4 w-4" />
-                <span className="text-xs font-medium">Snapchart</span>
+                <Pip mood="caution" size={22} />
+                <span className="text-xs font-medium">Pip</span>
               </div>
               <span className="text-[10px] text-ink-muted">4 trades · 1W 3L</span>
             </div>
             <div className="space-y-2.5 p-3 text-[12px] leading-relaxed">
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-100">
-                That's 3 losses in a row (−$412). Your rule is to stop after 3. Want to take 15 minutes before the next one?
+              <div className="flex items-start gap-2">
+                <Pip mood="caution" size={20} animated={false} className="mt-0.5" />
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-100">
+                  That's 3 losses in a row (−$412). Your rule is to stop after 3. Want to take 15 minutes before the next one?
+                </div>
               </div>
-              <div className="ml-auto w-fit max-w-[85%] rounded-lg bg-blue-600 px-2.5 py-1.5 text-white">
+              <div className="ml-auto w-fit max-w-[85%] rounded-lg bg-brand-500 px-2.5 py-1.5 text-ink-bg">
                 one more, this setup is clean
               </div>
-              <div className="rounded-lg bg-ink-elevated p-2.5 text-ink-text">
-                Let's check it against your rules first. Your A+ setup needs a trend on the 5m. Right now price is chopping around both MAs.
+              <div className="flex items-start gap-2">
+                <Pip mood="idle" size={20} animated={false} className="mt-0.5" />
+                <div className="rounded-lg bg-ink-elevated p-2.5 text-ink-text">
+                  Let's check it against your rules first. Your A+ setup needs a trend on the 5m. Right now price is chopping around both MAs.
+                </div>
               </div>
             </div>
             <div className="flex gap-2 border-t border-ink-border p-2.5">
@@ -59,7 +67,7 @@ function Chart() {
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
       {[0, 1, 2, 3, 4].map((i) => (
-        <line key={i} x1="0" x2={w} y1={40 + i * 75} y2={40 + i * 75} stroke="#30302e" strokeWidth="1" />
+        <line key={i} x1="0" x2={w} y1={40 + i * 75} y2={40 + i * 75} stroke="#19263F" strokeWidth="1" />
       ))}
       <polyline fill="none" stroke="#3b82f6" strokeOpacity="0.7" strokeWidth="2"
         points={candles.map((_, i) => `${(i + 1) * step},${y(52 + Math.sin(i / 2) * 2)}`).join(" ")} />

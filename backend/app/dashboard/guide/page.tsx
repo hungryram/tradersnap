@@ -49,20 +49,20 @@ export default function GuidePage() {
                 </div>
 
                 {/* Quick Start */}
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6 mb-8">
+                <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-6 mb-8">
                     <h2 className="text-xl font-semibold text-ink-body mb-3">
                         🚀 Quick Start
                     </h2>
                     <ol className="space-y-2 text-ink-text">
                         {[
                             <>Pin the Snapchart extension to your Chrome toolbar (puzzle icon → pin).</>,
-                            <>Set up your <a href="/dashboard/rules" className="text-blue-400 hover:text-blue-300 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
+                            <>Set up your <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
                             <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Snapchart</strong> button at the bottom right.</>,
                             <>Click <strong className="text-ink-body">Analyze this chart</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
-                            <>On TradingView, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-blue-400 hover:text-blue-300 underline">journal</a> fills itself.</>,
+                            <>On TradingView, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
                         ].map((step, i) => (
                             <li key={i} className="flex items-start">
-                                <span className="font-semibold text-blue-400 mr-2">{i + 1}.</span>
+                                <span className="font-semibold text-brand-300 mr-2">{i + 1}.</span>
                                 <span>{step}</span>
                             </li>
                         ))}
@@ -88,7 +88,7 @@ export default function GuidePage() {
                                         href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-blue-400 hover:text-blue-300 underline"
+                                        className="text-brand-300 hover:text-brand-200 underline"
                                     >
                                         Chrome Web Store
                                     </a>{" "}
@@ -163,7 +163,7 @@ export default function GuidePage() {
                                     You'll see a small Snapchart widget appear on your chart
                                     (bottom right corner). Click it to open the chat interface.
                                 </p>
-                                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-200">
+                                <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-4 text-sm text-brand-200">
                                     📍 <strong>Can't see the widget?</strong> Make sure you're
                                     signed in to the extension and have granted site permissions.
                                     Try refreshing the page.
@@ -416,7 +416,7 @@ export default function GuidePage() {
                 </div>
 
                 {/* Footer CTA */}
-                <div className="mt-8 bg-blue-500/10 border border-blue-500/30 rounded-lg p-6 text-center">
+                <div className="mt-8 bg-brand-500/10 border border-brand-500/30 rounded-lg p-6 text-center">
                     <h2 className="text-xl font-semibold text-ink-body mb-2">
                         Ready to Trade Smarter?
                     </h2>
@@ -429,7 +429,7 @@ export default function GuidePage() {
                             href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                            className="inline-flex items-center justify-center px-6 py-3 bg-brand-500 hover:bg-brand-400 text-ink-bg font-medium rounded-lg transition-colors"
                         >
                             Install Extension
                         </a>
@@ -448,7 +448,7 @@ export default function GuidePage() {
                         Need help?{" "}
                         <a
                             href="/dashboard/faq"
-                            className="text-blue-400 hover:text-blue-300 underline"
+                            className="text-brand-300 hover:text-brand-200 underline"
                         >
                             Check out our FAQ
                         </a>{" "}
@@ -457,7 +457,7 @@ export default function GuidePage() {
                             href="https://snapchart.canny.io/bugs-and-issues"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 underline"
+                            className="text-brand-300 hover:text-brand-200 underline"
                         >
                             contact support
                         </a>

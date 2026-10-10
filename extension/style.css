@@ -116,12 +116,12 @@
 }
 
 .markdown-content a {
-  color: #3b82f6;
+  color: #1A8A74;
   text-decoration: underline;
 }
 
 .markdown-content a:hover {
-  color: #2563eb;
+  color: #146E5E;
 }
 
 /* Dark mode overrides */
@@ -152,4 +152,8 @@
 
 .bg-red-50 .markdown-content a:hover {
   color: #b91c1c;
+}
+
+.markdown-content.dark a {
+  color: #7CF2D6;
 }

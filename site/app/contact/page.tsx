@@ -23,7 +23,7 @@ function Card({ title, text, href, link }: { title: string; text: string; href: 
     <div className="rounded-2xl border border-ink-border bg-ink-surface p-7">
       <h2 className="font-semibold">{title}</h2>
       <p className="mt-2 text-sm text-ink-text">{text}</p>
-      <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="mt-5 inline-block text-sm font-medium text-blue-400 hover:underline break-all">
+      <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="mt-5 inline-block text-sm font-medium text-brand-300 hover:underline break-all">
         {link}
       </a>
     </div>

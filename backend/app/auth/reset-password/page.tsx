@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import Pip from "../../components/Pip"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -61,11 +62,11 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-700 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <img src="/icon.png" alt="Snapchart" className="w-16 h-16 mx-auto mb-4" />
+            <div className="mx-auto mb-4 w-fit"><Pip size={64} /></div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Reset Password</h1>
             <p className="text-slate-600">Set a new password for your account</p>
           </div>
@@ -90,7 +91,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-slate-900"
                   required
                   minLength={6}
                 />
@@ -106,7 +107,7 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent text-slate-900"
                   required
                   minLength={6}
                 />
@@ -124,7 +125,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                className="w-full bg-brand-500 hover:bg-brand-400 disabled:bg-brand-700 text-ink-bg font-medium py-3 px-4 rounded-lg transition-colors"
               >
                 {isLoading ? "Updating..." : "Update Password"}
               </button>

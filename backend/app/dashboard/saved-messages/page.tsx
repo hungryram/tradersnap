@@ -228,9 +228,9 @@ export default function SavedMessagesPage() {
 
         {/* Behavioral Nudge */}
         {analysis.behavioral_nudge && (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
-            <p className="text-sm font-medium text-blue-200 mb-1">💡 Trading Tip:</p>
-            <p className="text-sm text-blue-200">{analysis.behavioral_nudge}</p>
+          <div className="bg-brand-500/10 border border-brand-500/30 rounded p-3">
+            <p className="text-sm font-medium text-brand-200 mb-1">💡 Trading Tip:</p>
+            <p className="text-sm text-brand-200">{analysis.behavioral_nudge}</p>
           </div>
         )}
       </div>
@@ -266,14 +266,14 @@ export default function SavedMessagesPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search saved messages..."
-            className="w-full px-4 py-3 border border-ink-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-ink-border rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           />
         </div>
 
         {/* Messages List */}
         {isLoading ? (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
             <p className="text-ink-text mt-4">Loading saved messages...</p>
           </div>
         ) : filteredMessages.length === 0 ? (
@@ -305,7 +305,7 @@ export default function SavedMessagesPage() {
                   <div className="flex items-center gap-2">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       msg.role === 'user' 
-                        ? 'bg-blue-500/15 text-blue-300' 
+                        ? 'bg-brand-500/15 text-brand-300' 
                         : 'bg-green-500/15 text-green-300'
                     }`}>
                       {msg.role === 'user' ? 'You' : 'Coach'}

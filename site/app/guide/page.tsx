@@ -21,10 +21,10 @@ export default function GuidePage() {
       <ol className="mx-auto max-w-3xl space-y-4 px-4 sm:px-6">
         {STEPS.map((step, i) => (
           <li key={step.title} className="flex gap-5 rounded-2xl border border-ink-border bg-ink-surface p-6">
-            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">{i + 1}</span>
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-ink-bg">{i + 1}</span>
             <div>
               <h2 className="font-semibold">{step.title}</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink-text [&_a]:text-blue-400 [&_a:hover]:underline [&_strong]:text-ink-body">{step.text}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-text [&_a]:text-brand-300 [&_a:hover]:underline [&_strong]:text-ink-body">{step.text}</p>
             </div>
           </li>
         ))}

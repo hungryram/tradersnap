@@ -97,8 +97,8 @@ export default function AuthPanel({ intro }: { intro?: string }) {
     setMode("reset-sent")
   })
 
-  const input = "w-full rounded-lg bg-ink-bg border border-ink-border px-4 py-3 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent"
-  const primary = "w-full rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium py-3 transition-colors"
+  const input = "w-full rounded-lg bg-ink-bg border border-ink-border px-4 py-3 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500/60 focus:border-transparent"
+  const primary = "w-full rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-ink-bg font-medium py-3 transition-colors"
   const link = "text-sm text-ink-text hover:text-ink-body underline-offset-4 hover:underline"
 
   return (

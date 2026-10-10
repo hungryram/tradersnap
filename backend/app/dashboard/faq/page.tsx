@@ -34,7 +34,7 @@ export default function FAQPage() {
                 href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 underline font-medium"
+                className="text-brand-300 hover:text-brand-200 underline font-medium"
               >
                 Install the extension from the Chrome Web Store
               </a>
@@ -131,7 +131,7 @@ export default function FAQPage() {
                 href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 underline"
+                className="text-brand-300 hover:text-brand-200 underline"
               >
                 reinstalling the extension
               </a>
@@ -197,7 +197,7 @@ export default function FAQPage() {
               href="https://snapchart.canny.io/bugs-and-issues" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline"
+              className="text-brand-300 hover:text-brand-200 underline"
             >
               Contact support
             </a>
@@ -211,7 +211,7 @@ export default function FAQPage() {
               <div className="space-y-4">
                 {section.questions.map((item, itemIdx) => (
                   <div key={itemIdx} className="border-b border-ink-border last:border-b-0 pb-4 last:pb-0">
-                    <h3 className="text-base font-medium text-blue-400 mb-2">{item.q}</h3>
+                    <h3 className="text-base font-medium text-brand-300 mb-2">{item.q}</h3>
                     <div className="text-ink-text text-sm leading-relaxed">{item.a}</div>
                   </div>
                 ))}
@@ -220,7 +220,7 @@ export default function FAQPage() {
           ))}
         </div>
 
-        <div className="mt-8 bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
+        <div className="mt-8 bg-brand-500/10 border border-brand-500/30 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-ink-body mb-2">Still have questions?</h2>
           <p className="text-ink-text mb-4">
             We're here to help! Reach out through any of these channels:
@@ -230,7 +230,7 @@ export default function FAQPage() {
               href="mailto:help@snapchartapp.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 bg-brand-500 hover:bg-brand-400 text-ink-bg rounded-lg transition-colors"
             >
               Report an Issue
             </a>

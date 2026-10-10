@@ -1,4 +1,5 @@
 import { DISCORD_URL } from "../links"
+import Pip from "./Pip"
 
 const LINKS = [
   { href: "/#how-it-works", label: "How it works" },
@@ -16,7 +17,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
         <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
           <a href="/" className="flex items-center gap-2.5">
-            <img src="/icon.png" alt="" className="h-7 w-7" />
+            <Pip size={30} />
             <span className="font-semibold tracking-tight">Snapchart</span>
           </a>
           <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-ink-text">

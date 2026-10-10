@@ -52,7 +52,7 @@ export function FaqList({ groups = FAQ }: { groups?: FaqGroup[] }) {
         </section>
       ))}
       <p className="text-center text-sm text-ink-muted">
-        Still stuck? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400 hover:underline">{SUPPORT_EMAIL}</a>.
+        Still stuck? Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-brand-300 hover:underline">{SUPPORT_EMAIL}</a>.
       </p>
     </div>
   )

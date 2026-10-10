@@ -98,7 +98,7 @@ export default function JournalPage() {
           )}
 
           <Card title="Trades" action={trades.length > 25 && (
-            <button onClick={() => setShowAll(!showAll)} className="text-sm text-blue-400 hover:text-blue-300">
+            <button onClick={() => setShowAll(!showAll)} className="text-sm text-brand-300 hover:text-brand-200">
               {showAll ? "Show fewer" : `Show all ${trades.length}`}
             </button>
           )}>

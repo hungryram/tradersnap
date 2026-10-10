@@ -42,7 +42,7 @@ export function Notice({ tone, children }: { tone: "good" | "bad" | "info" | "wa
     good: "border-green-500/30 bg-green-500/10 text-green-300",
     bad: "border-red-500/30 bg-red-500/10 text-red-300",
     warn: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-    info: "border-blue-500/30 bg-blue-500/10 text-blue-200",
+    info: "border-brand-500/30 bg-brand-500/10 text-brand-200",
   }[tone]
   return <div className={`rounded-lg border px-4 py-3 text-sm ${styles}`}>{children}</div>
 }
@@ -50,15 +50,15 @@ export function Notice({ tone, children }: { tone: "good" | "bad" | "info" | "wa
 export function Loading() {
   return (
     <div className="flex justify-center py-24">
-      <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink-border border-t-blue-500" />
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink-border border-t-brand-500" />
     </div>
   )
 }
 
-export const buttonPrimary = "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
+export const buttonPrimary = "inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-50 px-4 py-2 text-sm font-medium text-ink-bg transition-colors"
 export const buttonSecondary = "inline-flex items-center justify-center gap-2 rounded-lg border border-ink-border bg-ink-elevated hover:border-ink-muted disabled:opacity-50 px-4 py-2 text-sm font-medium text-ink-body transition-colors"
 export const buttonDanger = "inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/40 hover:bg-red-500/10 disabled:opacity-50 px-4 py-2 text-sm font-medium text-red-300 transition-colors"
-export const inputClass = "w-full rounded-lg border border-ink-border bg-ink-bg px-3 py-2.5 text-sm text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+export const inputClass = "w-full rounded-lg border border-ink-border bg-ink-bg px-3 py-2.5 text-sm text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500/60"
 
 export function money(value: number) {
   return `${value < 0 ? "−" : value > 0 ? "+" : ""}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

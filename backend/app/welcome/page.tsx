@@ -25,12 +25,13 @@ export default function WelcomePage() {
   return (
     <AuthShell wide>
       <div className="text-center mb-10">
+        <img src="/avatar/gif/pip-onboarding.gif" alt="Pip waving hello" width={96} height={96} className="mx-auto mb-5 h-24 w-24" />
         <div className="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs text-green-300 mb-5">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Extension installed
         </div>
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-3">Your trading coach is ready</h1>
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-3">Hi, I&apos;m Pip, your trading coach</h1>
         <p className="text-ink-text max-w-lg mx-auto">
-          Snapchart checks your charts against your own rules and keeps you disciplined while you trade. Two quick steps and you're in.
+          I check your charts against your own rules and keep you disciplined while you trade. Two quick steps and we're ready.
         </p>
       </div>
 
@@ -55,7 +56,7 @@ export default function WelcomePage() {
           {signedIn === null ? null : signedIn ? (
             <div className="space-y-4">
               <p className="text-sm text-ink-text">You're already signed in.</p>
-              <button onClick={continueSignedIn} className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 transition-colors">
+              <button onClick={continueSignedIn} className="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-ink-bg font-medium py-3 transition-colors">
                 Continue
               </button>
             </div>
@@ -73,7 +74,7 @@ export default function WelcomePage() {
 function StepLabel({ n, title }: { n: number; title: string }) {
   return (
     <div className="flex items-center gap-3 mb-2">
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">{n}</span>
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-ink-bg">{n}</span>
       <h2 className="font-semibold">{title}</h2>
     </div>
   )

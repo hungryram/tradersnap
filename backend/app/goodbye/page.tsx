@@ -59,7 +59,7 @@ export default function GoodbyePage() {
               <button
                 key={r.id}
                 onClick={() => setReason(r.id)}
-                className={`w-full text-left rounded-lg border px-4 py-3 text-sm transition-colors ${reason === r.id ? "border-blue-500 bg-blue-500/10 text-ink-body" : "border-ink-border bg-ink-surface text-ink-text hover:border-ink-muted"}`}
+                className={`w-full text-left rounded-lg border px-4 py-3 text-sm transition-colors ${reason === r.id ? "border-brand-500 bg-brand-500/10 text-ink-body" : "border-ink-border bg-ink-surface text-ink-text hover:border-ink-muted"}`}
               >
                 {r.label}
               </button>
@@ -71,9 +71,9 @@ export default function GoodbyePage() {
             maxLength={1000}
             rows={3}
             placeholder="Anything else? (optional)"
-            className="w-full rounded-lg bg-ink-bg border border-ink-border px-3 py-2.5 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+            className="w-full rounded-lg bg-ink-bg border border-ink-border px-3 py-2.5 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500/60"
           />
-          <button onClick={submit} disabled={!reason || sending} className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium py-3 transition-colors">
+          <button onClick={submit} disabled={!reason || sending} className="w-full rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-ink-bg font-medium py-3 transition-colors">
             {sending ? "Sending..." : "Send"}
           </button>
         </div>

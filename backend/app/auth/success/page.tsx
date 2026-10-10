@@ -56,11 +56,11 @@ export default function AuthSuccessPage() {
           <>
             <h1 className="text-2xl font-semibold mb-2">That sign-in link didn't work</h1>
             <p className="text-sm text-ink-text mb-6">It may have expired or already been used. Try signing in again.</p>
-            <a href="/" className="inline-block rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 transition-colors">Back to sign in</a>
+            <a href="/" className="inline-block rounded-lg bg-brand-500 hover:bg-brand-400 text-ink-bg font-medium px-6 py-3 transition-colors">Back to sign in</a>
           </>
         ) : (
           <>
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-ink-border border-t-blue-500" />
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-ink-border border-t-brand-500" />
             <p className="text-ink-text">Signing you in...</p>
           </>
         )}

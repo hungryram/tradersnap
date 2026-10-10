@@ -4,7 +4,7 @@ export function Section({ id, eyebrow, title, intro, children }: {
   return (
     <section id={id} className="mx-auto max-w-6xl px-4 sm:px-6 pt-24">
       <div className="mx-auto mb-12 max-w-2xl text-center">
-        {eyebrow && <p className="mb-3 text-sm font-medium text-blue-400">{eyebrow}</p>}
+        {eyebrow && <p className="mb-3 text-sm font-medium text-brand-300">{eyebrow}</p>}
         <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">{title}</h2>
         {intro && <p className="mt-4 text-ink-text leading-relaxed">{intro}</p>}
       </div>

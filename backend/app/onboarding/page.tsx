@@ -134,16 +134,16 @@ export default function OnboardingPage() {
   }
 
   const chip = (active: boolean) =>
-    `rounded-full border px-4 py-2 text-sm transition-colors ${active ? "border-blue-500 bg-blue-500/15 text-ink-body" : "border-ink-border bg-ink-surface text-ink-text hover:border-ink-muted"}`
-  const primary = "rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium px-6 py-3 transition-colors"
-  const input = "w-full rounded-lg bg-ink-bg border border-ink-border px-3 py-2.5 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+    `rounded-full border px-4 py-2 text-sm transition-colors ${active ? "border-brand-500 bg-brand-500/15 text-ink-body" : "border-ink-border bg-ink-surface text-ink-text hover:border-ink-muted"}`
+  const primary = "rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-ink-bg font-medium px-6 py-3 transition-colors"
+  const input = "w-full rounded-lg bg-ink-bg border border-ink-border px-3 py-2.5 text-ink-body placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500/60"
   const tradingPlatforms = PLATFORMS.filter(p => p.url && platforms.includes(p.id))
 
   return (
     <AuthShell wide>
       <div className="mb-8 flex items-center gap-2" aria-label={`Step ${step} of 3`}>
         {[1, 2, 3].map(n => (
-          <div key={n} className={`h-1 flex-1 rounded-full ${n <= step ? "bg-blue-500" : "bg-ink-border"}`} />
+          <div key={n} className={`h-1 flex-1 rounded-full ${n <= step ? "bg-brand-500" : "bg-ink-border"}`} />
         ))}
       </div>
 
@@ -191,7 +191,7 @@ export default function OnboardingPage() {
               <button
                 key={template.name}
                 onClick={() => chooseTemplate(index)}
-                className={`text-left rounded-xl border p-4 transition-colors ${templateIndex === index ? "border-blue-500 bg-blue-500/10" : "border-ink-border bg-ink-surface hover:border-ink-muted"}`}
+                className={`text-left rounded-xl border p-4 transition-colors ${templateIndex === index ? "border-brand-500 bg-brand-500/10" : "border-ink-border bg-ink-surface hover:border-ink-muted"}`}
               >
                 <div className="font-medium text-sm mb-1">{template.name}</div>
                 <div className="text-xs text-ink-text">{template.description.replace(/ - .*$/, "")}</div>
@@ -200,7 +200,7 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <button onClick={() => setEditingRules(!editingRules)} className="text-sm text-blue-400 hover:text-blue-300">
+            <button onClick={() => setEditingRules(!editingRules)} className="text-sm text-brand-300 hover:text-brand-200">
               {editingRules ? "Hide rules" : "View or edit these rules"}
             </button>
             {editingRules && (

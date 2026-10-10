@@ -11,7 +11,7 @@ export default function UsageMeter({ credits, plan, canBuyMore, compact = false 
   const [buying, setBuying] = useState(false)
   const low = credits.percent >= 80
   const out = credits.percent >= 100 && credits.bonus <= 0
-  const color = out ? "bg-red-500" : low ? "bg-amber-500" : "bg-blue-500"
+  const color = out ? "bg-red-500" : low ? "bg-amber-500" : "bg-brand-500"
 
   async function buyMore() {
     setBuying(true)

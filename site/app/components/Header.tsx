@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { APP_URL, CHROME_STORE_URL } from "../links"
+import Pip from "./Pip"
 
 const NAV = [
   { href: "/#how-it-works", label: "How it works" },
@@ -18,7 +19,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 border-b border-ink-border/60 bg-ink-bg/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <a href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <img src="/icon.png" alt="" className="h-7 w-7" />
+          <Pip size={30} />
           <span className="font-semibold tracking-tight">Snapchart</span>
         </a>
 
@@ -30,7 +31,7 @@ export default function Header() {
 
         <div className="hidden md:flex items-center gap-3">
           <a href={APP_URL} className="text-sm text-ink-text hover:text-ink-body transition-colors">Log in</a>
-          <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+          <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-ink-bg hover:bg-brand-400 transition-colors">
             Add to Chrome
           </a>
         </div>
@@ -55,7 +56,7 @@ export default function Header() {
             ))}
             <a href={APP_URL} className="py-2.5 hover:text-ink-body">Log in</a>
           </nav>
-          <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="block rounded-lg bg-blue-600 py-2.5 text-center font-medium text-white">
+          <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="block rounded-lg bg-brand-500 py-2.5 text-center font-medium text-ink-bg">
             Add to Chrome, free
           </a>
         </div>

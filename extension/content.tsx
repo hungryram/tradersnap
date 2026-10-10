@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
+import Pip, { type PipMood } from "./components/Pip"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
@@ -61,6 +62,16 @@ export const config: PlasmoCSConfig = {
 
 // Instead of inline script injection, we'll check localStorage directly from content script
 // This runs in extension context but can still access the page's localStorage via chrome APIs
+
+// Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
+function messageMood(msg: any): PipMood {
+  if (msg.type === 'checkin') return msg.level === 'warning' ? 'caution' : 'idle'
+  if (msg.type === 'error') return 'caution'
+  const status = typeof msg.content === 'object' ? msg.content?.setup_status : null
+  if (status === 'valid' || status === 'aligned' || status === 'pass') return 'happy'
+  if (status === 'invalid' || status === 'violated' || status === 'fail') return 'caution'
+  return 'idle'
+}
 
 // Message when today's allowance is used up (checked before taking a screenshot)
 function limitReachedText(plan: string, canBuyMore?: boolean) {
@@ -122,6 +133,12 @@ const TradingBuddyWidget = () => {
   const [checkinsMode, setCheckinsMode] = useState<'on' | 'warnings' | 'off'>('on')
   const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
   const [bubble, setBubble] = useState<CheckIn | null>(null)
+  // Re-render now and then so time-based moods (a fresh win) wear off
+  const [, setMoodTick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setMoodTick(n => n + 1), 30000)
+    return () => clearInterval(t)
+  }, [])
   const [lightboxData, setLightboxData] = useState<{imageUrl: string, drawings: any[], messageIndex: number} | null>(null)
   const [session, setSession] = useState<any>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
@@ -1787,6 +1804,13 @@ const TradingBuddyWidget = () => {
     }
   }, [isResizing, handleResizeMouseMove, handleResizeMouseUp])
 
+  // Pip's mood: thinking while working, wary on a streak or warning, pleased right after a win
+  const busy = isAnalyzing || isSending
+  const lastTrade = tradesToday.reduce<CoachTrade | null>((latest, t) => !latest || t.closed_at > latest.closed_at ? t : latest, null)
+  const freshWin = !!(lastTrade && (lastTrade.realized_pnl ?? 0) > 0 && Date.now() - new Date(lastTrade.closed_at).getTime() < 3 * 60 * 1000)
+  const lastMessage = messages[messages.length - 1]
+  const headerMood: PipMood = busy ? 'thinking' : lastMessage && lastMessage.type !== 'user' ? messageMood(lastMessage) : 'idle'
+
   if (!isOpen) {
     const losingStreak = !!(autoDetectTrades && tradeStats && tradeStats.lossStreak >= 2)
     const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' ? 'bg-red-400' : null
@@ -1795,6 +1819,8 @@ const TradingBuddyWidget = () => {
       trackingStatus === 'no-panel' ? "Not tracking trades: open TradingView's trading panel." : null,
       losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null
     ].filter(Boolean).join('\n')
+    const warned = unreadCheckins.some(c => c.level === 'warning')
+    const launcherMood: PipMood = busy ? 'thinking' : warned || losingStreak ? 'caution' : freshWin ? 'happy' : 'idle'
     return (
       <div
         data-snapchart-widget
@@ -1808,14 +1834,16 @@ const TradingBuddyWidget = () => {
         <button
           onMouseDown={handleLauncherMouseDown}
           title={tip}
-          className="relative flex select-none items-center gap-2 rounded-full bg-blue-600 py-1.5 pl-1.5 pr-3.5 text-sm font-medium text-white shadow-xl transition-colors hover:bg-blue-700 cursor-grab active:cursor-grabbing"
+          aria-label="Open Pip, your Snapchart coach"
+          className="relative block select-none rounded-full text-white shadow-xl shadow-black/40 transition-transform hover:scale-105 cursor-grab active:cursor-grabbing"
         >
-          <img src={chrome.runtime.getURL("assets/icon.png")} alt="" className="h-6 w-6 rounded-full" draggable={false} onError={(e) => e.currentTarget.style.display = 'none'} />
-          Snapchart
+          <Pip mood={launcherMood} size={56} />
           {autoDetectTrades && tradeStats && tradeStats.count > 0 && (
-            <span className="rounded-full bg-white/20 px-1.5 text-xs tabular-nums" title={`${tradeStats.count} trades today`}>{tradeStats.count}</span>
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-dark-border bg-dark-bg px-1.5 text-[10px] font-semibold leading-4 tabular-nums" title={`${tradeStats.count} trades today`}>
+              {tradeStats.count}
+            </span>
           )}
-          {statusDot && <span className={`absolute -left-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white ${statusDot}`} />}
+          {statusDot && <span className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full border-2 border-white ${statusDot}`} />}
           {unreadCheckins.length > 0 ? (
             <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] animate-pulse items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold" title={`${unreadCheckins.length} new from your coach`}>
               {unreadCheckins.length}
@@ -1835,7 +1863,7 @@ const TradingBuddyWidget = () => {
             role="status"
           >
             <div className="flex items-start gap-2">
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${bubble.level === 'warning' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+              <Pip mood={bubble.level === 'warning' ? 'caution' : 'idle'} size={28} />
               <p className="flex-1 leading-snug">{bubble.text}</p>
               <button
                 onClick={() => dismissCheckIn(bubble)}
@@ -1934,8 +1962,8 @@ const TradingBuddyWidget = () => {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-1.5">
-            <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" onError={(e) => e.currentTarget.style.display = 'none'} />
-            <div className="text-sm font-medium text-white">Snapchart</div>
+            <Pip mood={headerMood} size={28} title="Pip" />
+            <div className="text-sm font-medium text-white">Pip</div>
           </div>
           <div className="flex items-center gap-1 relative">
             <button
@@ -2211,8 +2239,9 @@ const TradingBuddyWidget = () => {
 
           {messages.length === 0 && (
             <div className="mt-6 text-center">
-              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Your trading coach</p>
-              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Check a chart against your rules, or ask anything.</p>
+              <div className="mx-auto mb-3 w-fit"><Pip size={64} /></div>
+              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Hi, I'm Pip, your trading coach</p>
+              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>I can check a chart against your rules, or you can ask me anything.</p>
               <div className="mt-4 flex flex-col items-center gap-2">
                 {SUGGESTIONS.map(suggestion => (
                   <button
@@ -2248,6 +2277,11 @@ const TradingBuddyWidget = () => {
                 </button>
               )}
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.type !== 'user' && (
+                  <div className="mr-2 mt-0.5 shrink-0">
+                    <Pip mood={messageMood(msg)} size={26} animated={i === messages.length - 1} />
+                  </div>
+                )}
                 {msg.type === 'user' && (
                   <div className="max-w-[80%]">
                     <div className={`${theme === 'dark' ? 'bg-dark-bubble text-dark-body' : 'bg-slate-200 text-slate-900'} px-4 py-2 rounded-2xl rounded-tr-sm ${getTextSizeClass()} transition-all ${
@@ -2316,7 +2350,7 @@ const TradingBuddyWidget = () => {
                       ? theme === 'dark' ? 'border-amber-500/40 bg-amber-500/10 text-amber-100' : 'border-amber-300 bg-amber-50 text-amber-900'
                       : theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-200 bg-white text-slate-900'
                   }`}>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Coach check-in</div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Pip checked in</div>
                     {msg.content}
                   </div>
                 )}
@@ -2602,6 +2636,7 @@ const TradingBuddyWidget = () => {
           
           {(isAnalyzing || isSending) && (
             <div className="flex justify-start">
+              <div className="mr-2 mt-0.5 shrink-0"><Pip mood="thinking" size={26} /></div>
               <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
                 <div className="flex items-center gap-1">
                   {isAnalyzing && <span className="mr-1.5">{ANALYZE_STAGES[analyzeStage]}</span>}

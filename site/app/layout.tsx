@@ -9,15 +9,14 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"], display: "swap" })
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "G-96T9YB0EZC"
 
-const title = "Snapchart: AI trading coach for discipline"
+const title = "Snapchart: meet Pip, your AI trading coach"
 const description =
-  "A Chrome extension that checks your chart against your own rules, tracks your trades and steps in when you start tilting. Not signals. Discipline."
+  "Pip lives on your chart. He checks your setup against your own rules, tracks your trades and speaks up when you start tilting. Not signals. Discipline."
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: title, template: "%s | Snapchart" },
   description,
-  icons: { icon: "/icon.png" },
   openGraph: { title, description, url: SITE_URL, siteName: "Snapchart", type: "website" },
   twitter: { card: "summary", title, description },
 }

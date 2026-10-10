@@ -8,16 +8,24 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Same warm dark palette as the extension
+      // Pip's palette (same as the site): navy like his face screen, teal like his body, mint like his eyes
       colors: {
         ink: {
-          bg: "#1f1e1d",
-          surface: "#262624",
-          elevated: "#30302e",
-          border: "#3e3e38",
-          muted: "#9c9a92",
-          text: "#c2c0b6",
-          body: "#f5f4ef",
+          bg: "#0B1220",
+          surface: "#111B2E",
+          elevated: "#19263F",
+          border: "#24344F",
+          muted: "#8391AD",
+          text: "#B4C0D6",
+          body: "#EEF3FA",
+        },
+        brand: {
+          200: "#B3F7E6",
+          300: "#7CF2D6",
+          400: "#4FD6B6",
+          500: "#2BB59A",
+          600: "#1F9A82",
+          700: "#1A7D6A",
         },
       },
     },

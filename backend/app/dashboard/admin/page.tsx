@@ -137,7 +137,7 @@ export default function AdminPage() {
                 <li key={step.label} className="grid grid-cols-[7rem_1fr_7.5rem] items-center gap-3 text-sm">
                   <span className="text-ink-text">{step.label}</span>
                   <span className="h-6 rounded-md bg-ink-elevated">
-                    <span className="flex h-6 items-center rounded-md bg-blue-600/80 px-2 text-xs tabular-nums text-white" style={{ width: `${Math.max(ofTop * 100, step.count ? 6 : 0)}%` }}>
+                    <span className="flex h-6 items-center rounded-md bg-brand-600/80 px-2 text-xs tabular-nums text-white" style={{ width: `${Math.max(ofTop * 100, step.count ? 6 : 0)}%` }}>
                       {step.count}
                     </span>
                   </span>
@@ -160,7 +160,7 @@ export default function AdminPage() {
               <button
                 key={g.id}
                 onClick={() => setGroupFilter(groupFilter === g.id ? null : g.id)}
-                className={`rounded-xl border p-3 text-left transition-colors ${groupFilter === g.id ? "border-blue-500 bg-blue-500/10" : "border-ink-border hover:border-ink-muted"}`}
+                className={`rounded-xl border p-3 text-left transition-colors ${groupFilter === g.id ? "border-brand-500 bg-brand-500/10" : "border-ink-border hover:border-ink-muted"}`}
               >
                 <div className={`text-2xl font-semibold tabular-nums ${g.tone}`}>{stats.groups[g.id] ?? 0}</div>
                 <div className="text-sm">{g.label}</div>
@@ -193,7 +193,7 @@ export default function AdminPage() {
               {stats.weekly.map(w => (
                 <div key={w.week} className="flex flex-1 flex-col items-center gap-1">
                   <span className="text-xs tabular-nums text-ink-text">{w.active}</span>
-                  <div className="w-full rounded-t-md bg-blue-500/80" style={{ height: `${(w.active / maxWeekly) * 100}%`, minHeight: w.active ? 4 : 1 }} />
+                  <div className="w-full rounded-t-md bg-brand-500/80" style={{ height: `${(w.active / maxWeekly) * 100}%`, minHeight: w.active ? 4 : 1 }} />
                   <span className="text-[10px] text-ink-muted">{shortDate(w.week)}</span>
                 </div>
               ))}
@@ -251,7 +251,7 @@ export default function AdminPage() {
                   <ul className="mb-4 space-y-2 text-sm">
                     {stats.uninstall.recentKnown.map(u => (
                       <li key={u.email} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                        <a href={`mailto:${u.email}`} className="hover:text-blue-300">{u.email}</a>
+                        <a href={`mailto:${u.email}`} className="hover:text-brand-200">{u.email}</a>
                         <span className="text-xs text-ink-muted">
                           {shortDate(u.uninstalled_at)} · {u.checks} checks{u.reason ? ` · ${REASON_LABELS[u.reason] ?? u.reason}` : " · no answer"}
                         </span>
@@ -389,7 +389,7 @@ export default function AdminPage() {
                 {users.map(u => (
                   <tr key={u.email} className="border-t border-ink-border/70">
                     <td className="px-5 py-2 sm:px-6">
-                      <a href={`mailto:${u.email}`} className="hover:text-blue-300">{u.email}</a>
+                      <a href={`mailto:${u.email}`} className="hover:text-brand-200">{u.email}</a>
                       {u.name && <span className="text-ink-muted"> · {u.name}</span>}
                       {!u.has_rules && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200">no rules</span>}
                       <GroupBadge group={u.group} />
@@ -398,7 +398,7 @@ export default function AdminPage() {
                     <td className="py-2">
                       <div className="flex flex-wrap gap-1">
                         {u.platforms.map(pl => <span key={pl} className="rounded bg-ink-elevated px-1.5 py-0.5 text-[11px] text-ink-text">{answer(pl)}</span>)}
-                        {u.prop_firm && <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[11px] text-blue-300">Prop</span>}
+                        {u.prop_firm && <span className="rounded bg-brand-500/15 px-1.5 py-0.5 text-[11px] text-brand-300">Prop</span>}
                         {u.experience && <span className="rounded bg-ink-elevated px-1.5 py-0.5 text-[11px] text-ink-muted">{answer(u.experience)}</span>}
                         {u.platforms.length === 0 && !u.experience && <span className="text-ink-muted">—</span>}
                       </div>

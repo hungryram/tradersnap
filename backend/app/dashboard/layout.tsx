@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
+import Pip from "../components/Pip"
 
 const MAIN_NAV = [
   { href: "/dashboard", label: "Today", icon: SunIcon },
@@ -56,7 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const nav = (
     <nav className="flex h-full flex-col">
       <a href="/dashboard" className="flex items-center gap-2.5 px-3 py-2 mb-6">
-        <img src="/icon.png" alt="" className="w-7 h-7" />
+        <Pip size={30} />
         <span className="font-semibold tracking-tight text-ink-body">Snapchart</span>
       </a>
 
@@ -90,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           href="https://www.tradingview.com/chart/"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-medium text-white transition-colors"
+          className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 hover:bg-brand-400 px-3 py-2 text-sm font-medium text-ink-bg transition-colors"
         >
           Open TradingView
         </a>
@@ -128,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-border bg-ink-bg px-4 py-3 md:hidden">
         <a href="/dashboard" className="flex items-center gap-2">
-          <img src="/icon.png" alt="" className="w-6 h-6" />
+          <Pip size={26} />
           <span className="font-semibold">Snapchart</span>
         </a>
         <button onClick={() => setMenuOpen(true)} className="rounded-lg p-2 text-ink-text hover:bg-ink-elevated" aria-label="Open menu">

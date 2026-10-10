@@ -7,16 +7,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Dark theme: warm neutrals (Claude.ai-style)
+        // Dark theme: Pip's navy (his face screen); same palette as the site and dashboard
         dark: {
-          bg: '#1f1e1d',
-          surface: '#262624',
-          elevated: '#30302e',
-          border: '#3e3e38',
-          text: '#c2c0b6',        // secondary text (timestamps, labels)
-          body: '#f5f4ef',        // message body text
-          placeholder: '#9c9a92',
-          bubble: '#141413',      // user message bubble
+          bg: '#0B1220',
+          surface: '#111B2E',
+          elevated: '#19263F',
+          border: '#24344F',
+          text: '#A9B6CF',        // secondary text (timestamps, labels)
+          body: '#EEF3FA',        // message body text
+          placeholder: '#8391AD',
+          bubble: '#070C16',      // user message bubble
         },
         // Light theme: warm neutral scale replaces Tailwind's cool slate
         slate: {
@@ -32,9 +32,19 @@ module.exports = {
           900: '#141413',
           950: '#0b0b0a',
         },
+        // Accent is Pip's teal. Overrides "blue" so every existing blue-* class follows the brand.
         blue: {
-          600: 'rgb(0, 145, 255)',
-          700: 'rgb(0, 130, 230)',
+          50: '#ECFBF7',
+          100: '#CFF5EA',
+          200: '#A1EAD7',
+          300: '#6FDCC1',
+          400: '#3FC8A8',
+          500: '#2BB59A',
+          600: '#1A8A74',
+          700: '#146E5E',
+          800: '#115547',
+          900: '#0E4038',
+          950: '#082621',
         }
       }
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { api, loadTrades, startOfLocalDay, summarize, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import Pip, { type PipMood } from "../components/Pip"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"
 import UsageMeter, { type Credits } from "./components/UsageMeter"
@@ -39,6 +40,8 @@ export default function TodayPage() {
         actions={<a href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer" className={buttonPrimary}>Open TradingView</a>}
       />
 
+      <PipSays {...pipLine(stats, limits)} />
+
       {!me.ruleset && (
         <div className="mb-6">
           <Notice tone="warn">
@@ -66,7 +69,7 @@ export default function TodayPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card title="Today's trades" action={<a href="/dashboard/journal" className="text-sm text-blue-400 hover:text-blue-300">Journal</a>}>
+          <Card title="Today's trades" action={<a href="/dashboard/journal" className="text-sm text-brand-300 hover:text-brand-200">Journal</a>}>
             {trades.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-sm text-ink-text">No trades recorded today.</p>
@@ -81,7 +84,7 @@ export default function TodayPage() {
         </div>
 
         <div className="space-y-6">
-          <Card title="Your limits" action={<a href="/dashboard/rules#limits" className="text-sm text-blue-400 hover:text-blue-300">Edit</a>}>
+          <Card title="Your limits" action={<a href="/dashboard/rules#limits" className="text-sm text-brand-300 hover:text-brand-200">Edit</a>}>
             {limits && (limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || limits.session_start) ? (
               <div className="space-y-4">
                 {limits.max_trades_per_day ? <LimitBar label="Trades" used={stats.count} max={limits.max_trades_per_day} /> : null}
@@ -91,7 +94,7 @@ export default function TodayPage() {
               </div>
             ) : (
               <p className="text-sm text-ink-text">
-                No limits set. <a href="/dashboard/rules#limits" className="text-blue-400 hover:text-blue-300">Add a max trades or daily loss limit</a> and Snapchart will warn you when you hit it.
+                No limits set. <a href="/dashboard/rules#limits" className="text-brand-300 hover:text-brand-200">Add a max trades or daily loss limit</a> and Snapchart will warn you when you hit it.
               </p>
             )}
           </Card>
@@ -119,7 +122,7 @@ export default function TodayPage() {
 
 function LimitBar({ label, used, max, format, neutral = false }: { label: string; used: number; max: number; format?: (v: number) => string; neutral?: boolean }) {
   const ratio = max > 0 ? Math.min(used / max, 1) : 0
-  const color = neutral ? "bg-blue-500" : ratio >= 1 ? "bg-red-500" : ratio >= 0.66 ? "bg-amber-500" : "bg-green-500"
+  const color = neutral ? "bg-brand-500" : ratio >= 1 ? "bg-red-500" : ratio >= 0.66 ? "bg-amber-500" : "bg-green-500"
   const show = format ?? ((v: number) => String(v))
   return (
     <div>
@@ -148,6 +151,36 @@ function SessionWindow({ start, end }: { start: string; end: string }) {
         <span className={`h-2 w-2 rounded-full ${inside ? "bg-green-500" : "bg-ink-muted"}`} />
         {label(start)}–{label(end)}
       </span>
+    </div>
+  )
+}
+
+// Pip's one-line read of the day, with a face to match
+function pipLine(stats: ReturnType<typeof summarize>, limits: TradingLimits | null): { mood: PipMood; text: string } {
+  const hitTrades = !!limits?.max_trades_per_day && stats.count >= limits.max_trades_per_day
+  const hitStreak = !!limits?.stop_after_losses && stats.lossStreak >= limits.stop_after_losses
+  const hitLoss = !!limits?.max_daily_loss && -stats.net >= limits.max_daily_loss
+  if (hitLoss || hitStreak || hitTrades) {
+    return { mood: "caution", text: "You've hit one of your limits for today. Your plan says you're done. Close the platform and come back fresh tomorrow." }
+  }
+  if (stats.lossStreak >= 2) {
+    return { mood: "caution", text: `That's ${stats.lossStreak} losses in a row. Take a few minutes before the next trade, and only take your A+ setup.` }
+  }
+  if (stats.count === 0) {
+    return { mood: "idle", text: "No trades yet today. Before your first one, let me check the setup against your rules." }
+  }
+  if (stats.net > 0) {
+    return { mood: "happy", text: "You're green today. Protect it: keep following your plan, and don't size up to chase more." }
+  }
+  return { mood: "idle", text: "You're within your limits. Keep checking setups against your rules before you click." }
+}
+
+function PipSays({ mood, text }: { mood: PipMood; text: string }) {
+  const tone = mood === "caution" ? "border-amber-500/30 bg-amber-500/10" : mood === "happy" ? "border-brand-500/30 bg-brand-500/10" : "border-ink-border bg-ink-surface"
+  return (
+    <div className={`mb-6 flex items-center gap-4 rounded-2xl border p-4 ${tone}`}>
+      <Pip mood={mood} size={48} title="Pip" />
+      <p className="text-sm leading-relaxed text-ink-body">{text}</p>
     </div>
   )
 }

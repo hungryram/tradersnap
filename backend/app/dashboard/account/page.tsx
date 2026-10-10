@@ -136,7 +136,7 @@ export default function AccountPage() {
       <PageHeader title="Account" subtitle={`Member since ${new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`} />
 
       <div className="space-y-6">
-        <Card title="Profile" action={!editing && <button onClick={() => setEditing(true)} className="text-sm text-blue-400 hover:text-blue-300">Edit</button>}>
+        <Card title="Profile" action={!editing && <button onClick={() => setEditing(true)} className="text-sm text-brand-300 hover:text-brand-200">Edit</button>}>
           {profileMessage && <div className="mb-4"><Notice tone={profileMessage.tone}>{profileMessage.text}</Notice></div>}
           {editing ? (
             <div className="space-y-4">
@@ -302,7 +302,7 @@ function UsageBar({ label, used, max }: { label: string; used: number; max: numb
         <span className="tabular-nums">{used} / {max}</span>
       </div>
       <div className="h-1.5 rounded-full bg-ink-elevated">
-        <div className={`h-1.5 rounded-full ${ratio >= 0.8 ? "bg-amber-500" : "bg-blue-500"}`} style={{ width: `${ratio * 100}%` }} />
+        <div className={`h-1.5 rounded-full ${ratio >= 0.8 ? "bg-amber-500" : "bg-brand-500"}`} style={{ width: `${ratio * 100}%` }} />
       </div>
     </div>
   )
@@ -312,11 +312,11 @@ function PlanCard({ name, price, was, badge, features, current, highlight = fals
   name: string; price: string; was?: string; badge?: string; features: string[]; current: boolean; highlight?: boolean; action?: React.ReactNode
 }) {
   return (
-    <div className={`flex flex-col rounded-xl border p-5 ${current ? "border-blue-500 bg-blue-500/5" : highlight ? "border-ink-muted" : "border-ink-border"}`}>
+    <div className={`flex flex-col rounded-xl border p-5 ${current ? "border-brand-500 bg-brand-500/5" : highlight ? "border-ink-muted" : "border-ink-border"}`}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">{name}</h3>
         {current ? (
-          <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs text-blue-300">Current plan</span>
+          <span className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-xs text-brand-300">Current plan</span>
         ) : badge ? (
           <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs text-amber-200">{badge}</span>
         ) : null}

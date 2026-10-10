@@ -27,7 +27,7 @@ export default function TradeTable({ trades, showDate = false }: { trades: Trade
                   {showDate ? new Date(trade.closed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : formatTime(trade.closed_at)}
                 </td>
                 <td className="py-2.5 font-medium">{tickerOf(trade.symbol)}</td>
-                <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-blue-400" : "text-red-400"}`}>{trade.side}</td>
+                <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-brand-300" : "text-red-400"}`}>{trade.side}</td>
                 <td className="py-2.5 text-right tabular-nums">{trade.qty}</td>
                 <td className="py-2.5 text-right tabular-nums text-ink-text">
                   {fmtPrice(trade.entry_price)} → {fmtPrice(trade.exit_price)}

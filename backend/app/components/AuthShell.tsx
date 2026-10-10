@@ -1,10 +1,12 @@
+import Pip from "./Pip"
+
 // Centered dark layout for sign-in, welcome, onboarding and goodbye pages
 export default function AuthShell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="min-h-screen bg-ink-bg text-ink-body flex flex-col">
       <header className="px-6 py-5">
         <a href="https://www.snapchartapp.com/" className="inline-flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <img src="/icon.png" alt="" className="w-7 h-7" />
+          <Pip size={30} />
           <span className="font-semibold tracking-tight">Snapchart</span>
         </a>
       </header>

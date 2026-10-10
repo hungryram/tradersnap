@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<defs><clipPath id="c"><circle cx="64" cy="64" r="57"/></clipPath></defs>
+<circle cx="64" cy="64" r="60" fill="#E6FAF4"/><g clip-path="url(#c)">
+<line x1="64" y1="20" x2="64" y2="30" stroke="#1E2A4A" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="64" cy="18" r="5.5" fill="#4FA3D9"/>
+<rect x="22" y="104" width="84" height="40" rx="18" fill="#2BB59A"/>
+<rect x="24" y="30" width="80" height="70" rx="22" fill="#2BB59A"/>
+<rect x="33" y="40" width="62" height="50" rx="14" fill="#16233B"/>
+<path d="M44 64 Q51 55 58 64" fill="none" stroke="#8FD3FF" stroke-width="4" stroke-linecap="round"/>
+<path d="M70 64 Q77 55 84 64" fill="none" stroke="#8FD3FF" stroke-width="4" stroke-linecap="round"/>
+<path d="M52 80 L58 77 L63 79 L76 70" fill="none" stroke="#8FD3FF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M70 70 L76 70 L76 76" fill="none" stroke="#8FD3FF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="20" cy="66" r="6" fill="#1F8C77"/><circle cx="108" cy="66" r="6" fill="#1F8C77"/></g>
+<circle cx="64" cy="64" r="57" fill="none" stroke="#4FA3D9" stroke-width="6"/></svg>

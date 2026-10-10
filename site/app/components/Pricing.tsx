@@ -48,9 +48,9 @@ function Plan({ name, price, was, badge, note, items, cta, highlight = false }: 
   name: string; price: string; was?: string; badge?: string; note: string; items: string[]; cta: string; highlight?: boolean
 }) {
   return (
-    <div className={`relative flex flex-col rounded-2xl border p-7 ${highlight ? "border-blue-500/60 bg-blue-600/[0.07]" : "border-ink-border bg-ink-surface"}`}>
+    <div className={`relative flex flex-col rounded-2xl border p-7 ${highlight ? "border-brand-500/60 bg-brand-500/[0.07]" : "border-ink-border bg-ink-surface"}`}>
       {badge && (
-        <span className="absolute -top-3 left-7 rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">{badge}</span>
+        <span className="absolute -top-3 left-7 rounded-full bg-brand-500 px-3 py-1 text-xs font-medium text-ink-bg">{badge}</span>
       )}
       <h3 className="text-lg font-semibold">{name}</h3>
       <div className="mt-3 flex items-baseline gap-2">
@@ -70,7 +70,7 @@ function Plan({ name, price, was, badge, note, items, cta, highlight = false }: 
         href={CHROME_STORE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className={`mt-8 rounded-lg py-3 text-center font-medium transition-colors ${highlight ? "bg-blue-600 text-white hover:bg-blue-500" : "border border-ink-border text-ink-body hover:bg-ink-elevated"}`}
+        className={`mt-8 rounded-lg py-3 text-center font-medium transition-colors ${highlight ? "bg-brand-500 text-ink-bg hover:bg-brand-400" : "border border-ink-border text-ink-body hover:bg-ink-elevated"}`}
       >
         {cta}
       </a>
@@ -80,7 +80,7 @@ function Plan({ name, price, was, badge, note, items, cta, highlight = false }: 
 
 function Check() {
   return (
-    <svg className="mt-0.5 h-4 w-4 flex-none text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className="mt-0.5 h-4 w-4 flex-none text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   )

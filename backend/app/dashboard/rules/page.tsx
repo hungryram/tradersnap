@@ -178,7 +178,7 @@ export default function RulesPage() {
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs text-ink-text">Rules <span className="text-ink-muted">({rulesText.length}/{maxChars})</span></span>
-                  <button onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-blue-400 hover:text-blue-300">
+                  <button onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-brand-300 hover:text-brand-200">
                     {showTemplates ? "Hide templates" : "Start from a template"}
                   </button>
                 </div>
@@ -219,7 +219,7 @@ export default function RulesPage() {
                 )}
               </div>
               {rulesets.length >= maxRulesets && userPlan === "free" && (
-                <p className="text-xs text-ink-muted">Free plan holds {maxRulesets} rulesets. <a href="/dashboard/account#plans" className="text-blue-400 hover:text-blue-300">Pro holds 20.</a></p>
+                <p className="text-xs text-ink-muted">Free plan holds {maxRulesets} rulesets. <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro holds 20.</a></p>
               )}
             </div>
           </Card>
