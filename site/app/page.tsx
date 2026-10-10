@@ -72,7 +72,7 @@ const TRUST = [
   { title: "Delete everything, anytime", text: "One button in your account removes your account and all your data." },
 ]
 
-// Placeholder social proof. Replace with real quotes from real traders (with their permission) before launch.
+// Real quotes from real traders (with their permission). The section stays hidden while this is empty.
 const TESTIMONIALS: { quote: string; name: string; detail: string }[] = []
 
 export default function Home() {
@@ -199,24 +199,19 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* Social proof (placeholders until real quotes exist) */}
-      <Section eyebrow="From traders" title="What traders say about Pip">
-        <div className="grid gap-4 md:grid-cols-3">
-          {TESTIMONIALS.length > 0
-            ? TESTIMONIALS.map((t) => (
-                <figure key={t.name} className="rounded-2xl border border-ink-border bg-ink-surface p-6">
-                  <blockquote className="leading-relaxed text-ink-body">&ldquo;{t.quote}&rdquo;</blockquote>
-                  <figcaption className="mt-4 text-sm text-ink-muted">{t.name} · {t.detail}</figcaption>
-                </figure>
-              ))
-            : [1, 2, 3].map((n) => (
-                <figure key={n} className="rounded-2xl border border-dashed border-ink-border p-6">
-                  <blockquote className="leading-relaxed text-ink-muted">[Testimonial placeholder {n}: a real quote from a trader about a moment Pip helped them stick to their plan.]</blockquote>
-                  <figcaption className="mt-4 text-sm text-ink-muted">[Name] · [Trading style or market]</figcaption>
-                </figure>
-              ))}
-        </div>
-      </Section>
+      {/* Social proof: shows once TESTIMONIALS has real quotes */}
+      {TESTIMONIALS.length > 0 && (
+        <Section eyebrow="From traders" title="What traders say about Pip">
+          <div className="grid gap-4 md:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <figure key={t.name} className="rounded-2xl border border-ink-border bg-ink-surface p-6">
+                <blockquote className="leading-relaxed text-ink-body">&ldquo;{t.quote}&rdquo;</blockquote>
+                <figcaption className="mt-4 text-sm text-ink-muted">{t.name} · {t.detail}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Setup */}
       <Section eyebrow="Get started" title="Two minutes from now, Pip is on your chart">
