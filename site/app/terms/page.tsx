@@ -1,185 +1,162 @@
 import type { Metadata } from "next"
 import Legal from "../components/Legal"
+import { APP_URL, SITE_URL, SUPPORT_EMAIL } from "../links"
 
 export const metadata: Metadata = { title: "Terms of Service" }
 
-// Wording from the previous site (January 25, 2026), renamed from Snapchart to Pip on October 10, 2026
+// Keep this in step with the product: update it (and the date) when plans, payments,
+// features or how Pip can be used change.
 export default function Page() {
+  const mail = <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
   return (
     <Legal title="Terms of Service" updated="October 10, 2026">
-<h2>1. Acceptance of Terms</h2>
-<p>By accessing or using Pip (the &quot;Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms, do not use the Service.</p>
-<h2>2. NOT FINANCIAL ADVICE - CRITICAL DISCLAIMER</h2>
-<p>READ CAREFULLY:</p>
-<ul>
-<li>
-<strong>Pip is NOT a financial advisor.</strong> We are not registered as a broker-dealer, investment advisor, or financial institution. The Service provides educational and informational content only.</li>
-<li>
-<strong>All content is educational, NOT advice.</strong> Any signals, indicators, patterns, buy/sell suggestions, price predictions, entry/exit points, support/resistance levels, trend directions, or trading opportunities provided by the Service (whether AI-generated or otherwise) are for educational and informational purposes ONLY and do NOT constitute investment advice, recommendations, or solicitations to buy or sell securities.</li>
-<li>
-<strong>Do NOT rely on AI signals for trading decisions.</strong> AI-generated signals, analysis, or insights are experimental, educational tools only. They are NOT vetted investment recommendations. Making trading decisions based on AI output is done entirely at your own risk.</li>
-<li>
-<strong>AI is inherently unreliable.</strong> AI-generated content may be inaccurate, incomplete, misleading, biased, hallucinated, outdated, or completely wrong. AI cannot predict market movements. Do not trust AI output without conducting your own independent research and analysis.</li>
-<li>
-<strong>You are solely responsible</strong> for all trading decisions and their consequences. We accept ZERO liability for losses, regardless of whether you relied on Service content, AI signals, analysis, or any other feature.</li>
-<li>
-<strong>No performance guarantees.</strong> We make no representations about the profitability, accuracy, or success rate of any signals, patterns, or analysis provided by the Service.</li>
-<li>
-<strong>Trading involves substantial risk.</strong> You can lose your entire investment and more. Leverage, margin, and derivatives can amplify losses. Only trade with money you can afford to lose.</li>
-<li>
-<strong>Past performance is not indicative of future results.</strong> Historical data, backtests, and patterns do not predict future market behavior. Markets can remain irrational longer than you can remain solvent.</li>
-<li>
-<strong>No guarantee of accuracy or timeliness.</strong> Market data, charts, signals, and analysis may be delayed, inaccurate, incomplete, or unavailable. Do not rely on real-time accuracy.</li>
-<li>
-<strong>Consult licensed professionals.</strong> Before making any investment decisions, consult with a licensed financial advisor, CPA, or attorney who understands your personal financial situation. Pip is not a substitute for professional advice.</li>
-<li>
-<strong>Educational use only.</strong> Use the Service to learn about technical analysis and market patterns, NOT to make actual trading decisions. Paper trade and test strategies extensively before risking real capital.</li>
-</ul>
-<h2>3. Eligibility</h2>
-<p>You must:</p>
-<ul>
-<li>Be at least 18 years old</li>
-<li>Have the legal capacity to enter into binding contracts</li>
-<li>Not be prohibited from using the Service under applicable laws</li>
-<li>Comply with all local laws regarding online conduct and trading</li>
-</ul>
-<h2>4. Account Responsibilities</h2>
-<p>You agree to:</p>
-<ul>
-<li>Provide accurate and complete registration information</li>
-<li>Maintain the security of your account credentials</li>
-<li>Notify us immediately of any unauthorized access</li>
-<li>Accept responsibility for all activities under your account</li>
-<li>Not share your account with others</li>
-</ul>
-<h2>5. Prohibited Uses</h2>
-<p>You may NOT:</p>
-<ul>
-<li>Use the Service for illegal purposes or to violate any laws</li>
-<li>Reverse engineer, decompile, or disassemble the Service</li>
-<li>Scrape, mine, or extract data without authorization</li>
-<li>Distribute malware or viruses</li>
-<li>Impersonate others or provide false information</li>
-<li>Interfere with or disrupt the Service</li>
-<li>Attempt to gain unauthorized access to our systems</li>
-<li>Use automated systems (bots) without permission</li>
-<li>Resell or redistribute the Service without authorization</li>
-<li>Use the Service to provide financial advice to others</li>
-</ul>
-<h2>6. Intellectual Property</h2>
-<p>All content, features, and functionality of the Service are owned by Pip and protected by copyright, trademark, and other intellectual property laws. You may not:</p>
-<ul>
-<li>Copy, modify, or create derivative works</li>
-<li>Use our trademarks without written permission</li>
-<li>Remove copyright or proprietary notices</li>
-</ul>
-<h2>7. User Content</h2>
-<p>By submitting content (charts, messages, feedback), you grant us a worldwide, royalty-free license to use, reproduce, and display that content for providing and improving the Service. You represent that:</p>
-<ul>
-<li>You own or have rights to the content you submit</li>
-<li>Your content does not violate any laws or third-party rights</li>
-<li>Your content does not contain malicious code</li>
-</ul>
-<h2>8. Limitation of Liability</h2>
-<p>TO THE MAXIMUM EXTENT PERMITTED BY LAW:</p>
-<ul>
-<li>
-<strong>Service provided &quot;AS IS&quot;</strong> without warranties of any kind, express or implied, including merchantability, fitness for a particular purpose, or non-infringement.</li>
-<li>
-<strong>We are not liable</strong> for trading losses, missed opportunities, financial damages, or lost profits of any kind, regardless of whether you relied on AI output, signals, patterns, or any Service content.</li>
-<li>
-<strong>We are not liable</strong> for AI errors, hallucinations, bugs, glitches, downtime, data loss, data corruption, or inaccurate information.</li>
-<li>
-<strong>We are not liable</strong> for indirect, incidental, consequential, special, exemplary, or punitive damages, even if advised of their possibility.</li>
-<li>
-<strong>We are not liable</strong> if AI accidentally generates content resembling trading signals, recommendations, or actionable insights. Using such content is entirely at your own risk.</li>
-<li>
-<strong>We are not liable</strong> for the performance of any AI signals, patterns, or analysis, whether provided intentionally as a feature or generated accidentally. No guarantee of profitability or accuracy exists.</li>
-<li>
-<strong>Our total liability</strong> for all claims arising from your use of the Service shall not exceed the lesser of (a) $100 USD or (b) the amount you paid to Pip in the 12 months preceding the claim.</li>
-<li>
-<strong>No guarantee</strong> of uptime, availability, accuracy, completeness, reliability, or fitness for trading purposes.</li>
-<li>
-<strong>California residents:</strong> You waive California Civil Code Section 1542, which states: &quot;A general release does not extend to claims that the creditor or releasing party does not know or suspect to exist in his or her favor at the time of executing the release and that, if known by him or her, would have materially affected his or her settlement with the debtor or released party.&quot;</li>
-</ul>
-<h2>9. Indemnification</h2>
-<p>You agree to indemnify, defend, and hold harmless Pip, its officers, directors, employees, and agents from any claims, damages, losses, liabilities, and expenses (including legal fees) arising from:</p>
-<ul>
-<li>Your use of the Service</li>
-<li>Your violation of these Terms</li>
-<li>Your trading decisions or activities</li>
-<li>Your violation of any third-party rights</li>
-</ul>
-<h2>10. Service Modifications and Termination</h2>
-<p>We reserve the right to:</p>
-<ul>
-<li>Modify or discontinue the Service at any time without notice</li>
-<li>Change pricing and subscription terms</li>
-<li>Suspend or terminate your account for violations</li>
-<li>Refuse service to anyone for any reason</li>
-</ul>
-<h2>11. Subscription and Payments</h2>
-<p>If you purchase a premium subscription:</p>
-<ul>
-<li>Subscriptions auto-renew unless canceled</li>
-<li>All fees are non-refundable unless required by law</li>
-<li>Premium features (including AI signals/analysis if available) are educational tools, NOT financial advice</li>
-<li>No refunds will be issued for trading losses or poor signal performance</li>
-<li>We may change pricing or features with 30 days&#x27; notice</li>
-<li>You authorize us to charge your payment method</li>
-<li>Failure to pay may result in immediate suspension of service</li>
-</ul>
-<h2>12. Privacy</h2>
-<p>Your use of the Service is subject to our <a href="/privacy">Privacy Policy</a>, which is incorporated into these Terms by reference.</p>
-<h2>13. Third-Party Services</h2>
-<p>The Service may integrate with third-party platforms (TradingView, brokers, etc.). We are not responsible for:</p>
-<ul>
-<li>Third-party service availability or functionality</li>
-<li>Third-party terms, policies, or practices</li>
-<li>Data accuracy from third-party sources</li>
-</ul>
-<h2>14. Dispute Resolution</h2>
-<h3>14.1 Governing Law</h3>
-<p>These Terms are governed by the laws of the State of California, without regard to conflict of law principles. You agree to submit to the personal jurisdiction of courts located in California.</p>
-<h3>14.2 Binding Arbitration</h3>
-<p>Any disputes, claims, or controversies arising from these Terms or the Service shall be resolved through binding arbitration administered by the American Arbitration Association (AAA) in accordance with its Commercial Arbitration Rules. Arbitration shall take place in California.</p>
-<p>
-<strong>Class Action Waiver:</strong> You agree to bring claims only in your individual capacity and not as a plaintiff or class member in any class, collective, or representative action. You waive the right to participate in class actions, class arbitrations, or representative actions.</p>
-<p>
-<strong>Exception:</strong> You may assert claims in small claims court if they qualify and remain in small claims court.</p>
-<h3>14.3 Costs</h3>
-<p>Each party shall bear their own costs and attorney&#x27;s fees unless otherwise awarded by the arbitrator or court.</p>
-<h2>15. California Consumer Rights</h2>
-<p>If you are a California resident, you have certain rights under the California Consumer Privacy Act (CCPA). Please see our <a href="/privacy">Privacy Policy</a> for details on data collection and your rights.</p>
-<p>California residents may contact the Complaint Assistance Unit of the Division of Consumer Services of the California Department of Consumer Affairs by mail at 1625 North Market Blvd., Sacramento, CA 95834, or by telephone at (916) 445-1254 or (800) 952-5210.</p>
-<h2>16. Geographic Restrictions</h2>
-<p>The Service may not be available in all jurisdictions. You are responsible for compliance with local laws. We make no claims that the Service is appropriate or legal in your location.</p>
-<h2>17. Regulatory Compliance</h2>
-<p>Pip is not registered as a broker-dealer, investment advisor, or financial institution. We do not hold, manage, or have access to your trading funds.</p>
-<h2>18. Force Majeure</h2>
-<p>We are not liable for any failure or delay in performance due to circumstances beyond our reasonable control, including but not limited to: acts of God, natural disasters, war, terrorism, riots, embargoes, acts of civil or military authorities, fire, floods, accidents, pandemics, network infrastructure failures, strikes, or shortages of transportation, facilities, fuel, energy, labor, or materials.</p>
-<h2>19. Severability</h2>
-<p>If any provision of these Terms is found to be unenforceable, the remaining provisions shall remain in full effect.</p>
-<h2>20. Entire Agreement</h2>
-<p>These Terms, along with our Privacy Policy, constitute the entire agreement between you and Pip regarding the Service.</p>
-<h2>21. Changes to Terms</h2>
-<p>We may modify these Terms at any time. Changes will be effective immediately upon posting. Continued use of the Service constitutes acceptance of modified Terms. For material changes, we will provide notice via email or prominent Service notification.</p>
-<h2>22. Contact Information</h2>
-<p>For questions about these Terms, contact us at:</p>
-<p>Email: <a href="mailto:help@snapchartapp.com">help@snapchartapp.com</a>
-</p>
-<p>By using Pip, you acknowledge and agree that:</p>
-<ul>
-<li>You have read, understood, and agree to be bound by these Terms</li>
-<li>You accept all risks associated with trading and financial markets</li>
-<li>You will not hold Pip liable for any trading losses, regardless of cause</li>
-<li>You understand this Service provides NO financial advice or investment recommendations</li>
-<li>Any signals, analysis, or insights provided (including AI-generated content) are educational tools only and NOT advice</li>
-<li>You will NOT make trading decisions based solely on Service content, AI signals, or analysis without conducting your own research</li>
-<li>You will conduct your own due diligence and consult licensed professionals before trading</li>
-<li>You waive any claims against Pip for losses arising from Service use or reliance on any content</li>
-<li>You understand that paying for premium features does NOT convert educational content into advice</li>
-</ul>
+      <h2>1. Acceptance of these terms</h2>
+      <p>
+        These Terms of Service (&quot;Terms&quot;) govern your use of Pip, formerly called Snapchart: the Pip Chrome extension, the dashboard at{" "}
+        <a href={APP_URL}>{APP_URL.replace("https://", "")}</a> and the website at <a href={SITE_URL}>{SITE_URL.replace("https://", "")}</a> (together,
+        the &quot;Service&quot;), provided by Pip (&quot;Pip,&quot; &quot;we,&quot; &quot;our&quot; or &quot;us&quot;). By creating an account, installing the
+        extension or using the Service, you agree to these Terms and to our <a href="/privacy">Privacy Policy</a>. If you don&apos;t agree, don&apos;t use
+        the Service.
+      </p>
+
+      <h2>2. Not financial advice: read this carefully</h2>
+      <ul>
+        <li><strong>Pip is not a financial advisor.</strong> We are not registered as a broker-dealer, investment adviser, commodity trading advisor or financial institution. The Service is an educational and discipline tool only.</li>
+        <li><strong>Pip does not tell you what to trade.</strong> It compares what you show it against rules you wrote yourself. Nothing in the Service (whether AI-generated or otherwise) is a recommendation or solicitation to buy, sell or hold any security, future, option, currency or other instrument, and nothing is a signal, prediction or entry, exit, stop or target.</li>
+        <li><strong>AI is unreliable.</strong> AI-generated content may be inaccurate, incomplete, misleading, outdated or simply wrong, including how it reads your chart and whether a setup matches your rules. Verify everything yourself.</li>
+        <li><strong>You are solely responsible</strong> for every trading decision you make and its results, whether or not you used the Service, followed or ignored its feedback, or relied on its trade tracking.</li>
+        <li><strong>No guarantees.</strong> We make no promise that using Pip will improve your discipline, results or profitability.</li>
+        <li><strong>Trading involves substantial risk.</strong> You can lose more than you invest. Leverage, margin and derivatives can magnify losses. Only trade with money you can afford to lose. Past performance does not indicate future results.</li>
+        <li><strong>Consult licensed professionals</strong> before making investment decisions.</li>
+      </ul>
+
+      <h2>3. Eligibility</h2>
+      <p>You must be at least 18, able to form a binding contract, and not barred from using the Service under applicable law. You are responsible for complying with the laws that apply to you, including those about trading.</p>
+
+      <h2>4. Your account</h2>
+      <ul>
+        <li>Give accurate information and keep your sign-in secure. Sign-in links and codes are for you only.</li>
+        <li>One person per account. Don&apos;t share your account.</li>
+        <li>You&apos;re responsible for activity under your account. Tell us promptly at {mail} if you think someone else has accessed it.</li>
+      </ul>
+
+      <h2>5. What the Service does, and its limits</h2>
+      <ul>
+        <li><strong>Chart checks and chat.</strong> When you ask, Pip captures your chart and gives AI-generated feedback based on your rules.</li>
+        <li><strong>Trade tracking.</strong> Where supported, the extension reads trades from the trading panel shown in your browser. Detection depends on what the platform displays and may be incomplete, delayed or wrong. Don&apos;t rely on it as your official record of trades, profits, losses or taxes; your broker&apos;s statements are the record.</li>
+        <li><strong>Check-ins, limits and cooldowns.</strong> Pip&apos;s check-ins, daily-limit warnings and cooldown timers are reminders. They don&apos;t block, place, change or close orders, and you remain in full control of your trading.</li>
+        <li><strong>Third-party platforms.</strong> The Service works alongside sites such as TradingView, Tradovate and Topstep. We aren&apos;t affiliated with or endorsed by them, their names and marks belong to their owners, and they can change their sites in ways that stop features from working. Your use of those platforms is governed by their own terms.</li>
+        <li><strong>Changes and availability.</strong> We may add, change or remove features, and we don&apos;t guarantee the Service will always be available or error-free.</li>
+      </ul>
+
+      <h2>6. Plans, usage and payments</h2>
+      <ul>
+        <li><strong>Free and Pro.</strong> The Free plan and the Pro subscription each include a daily usage allowance, which resets at midnight UTC. Allowances are approximate (a chart check uses more than a message) and we may adjust them.</li>
+        <li><strong>Subscriptions.</strong> Pro renews automatically each billing period until you cancel. Cancel any time in your account&apos;s billing settings; you keep Pro until the end of the period you&apos;ve paid for. You authorize us, through Stripe, to charge your payment method for each renewal.</li>
+        <li><strong>Extra usage.</strong> You can buy extra usage as a one-time purchase. It is used after your daily allowance, doesn&apos;t expire while your account is open, has no cash value, can&apos;t be transferred, and ends when your account is deleted or terminated.</li>
+        <li><strong>Prices.</strong> We may change prices. For existing subscriptions we&apos;ll give at least 30 days&apos; notice before a change applies to you. Introductory or launch prices may end at any time for new purchases.</li>
+        <li><strong>Refunds.</strong> Payments are non-refundable except where the law requires otherwise. We don&apos;t give refunds for trading losses or for how you used the Service&apos;s feedback.</li>
+        <li><strong>Taxes and failed payments.</strong> Prices may not include taxes. If a payment fails, we may downgrade or suspend paid features.</li>
+      </ul>
+
+      <h2>7. Acceptable use</h2>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Use the Service for anything illegal, or to give financial advice or signals to others.</li>
+        <li>Resell, sublicense or redistribute the Service or its output as a product or service.</li>
+        <li>Reverse engineer, decompile or copy the extension or Service, except where the law allows despite this restriction.</li>
+        <li>Get around usage limits, security or access controls, or use bots or automation to access the Service.</li>
+        <li>Interfere with or overload the Service, or upload malicious code.</li>
+        <li>Impersonate anyone or give false information.</li>
+      </ul>
+
+      <h2>8. Your content</h2>
+      <p>
+        You own what you put into the Service: your rules, messages, chart images and trade data (&quot;Your Content&quot;). You give us a worldwide,
+        non-exclusive, royalty-free license to host, process and display Your Content only as needed to run, secure and improve the Service, including
+        sending it to our service providers as described in the Privacy Policy. You confirm you have the right to share Your Content with us. This license
+        ends when you delete Your Content or your account, except for the anonymous statistics described in the Privacy Policy.
+      </p>
+
+      <h2>9. Our property</h2>
+      <p>
+        The Service, including the Pip name and character, software, design and content, belongs to us and is protected by intellectual property laws. We
+        give you a personal, non-transferable, revocable license to use the Service under these Terms. Don&apos;t use our name, character or logos without
+        written permission. If you send us feedback or ideas, we may use them without obligation to you.
+      </p>
+
+      <h2>10. Ending your use</h2>
+      <p>
+        You can stop using Pip at any time and delete your account from the Account page in your dashboard, which also cancels any subscription. We may
+        suspend or end your access if you break these Terms, if required by law, or to protect the Service or other users. Sections that by their nature
+        should survive (including 2, 8, 11 to 14) survive termination.
+      </p>
+
+      <h2>11. Disclaimers</h2>
+      <p>
+        TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE,&quot; WITHOUT WARRANTIES OF ANY KIND,
+        WHETHER EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY AND NON-INFRINGEMENT. We don&apos;t warrant that
+        AI output, chart readings, trade detection, check-ins or usage counts will be accurate, complete, timely or uninterrupted.
+      </p>
+
+      <h2>12. Limitation of liability</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW:</p>
+      <ul>
+        <li><strong>We are not liable</strong> for any trading losses, missed opportunities or lost profits, however caused, including any reliance on AI output, chart checks, trade tracking, check-ins, limits or any other part of the Service.</li>
+        <li><strong>We are not liable</strong> for AI errors, bugs, downtime, data loss, or changes made by third-party platforms.</li>
+        <li><strong>We are not liable</strong> for indirect, incidental, consequential, special, exemplary or punitive damages, even if told they were possible.</li>
+        <li><strong>Our total liability</strong> for all claims relating to the Service shall not exceed the lesser of (a) $100 USD or (b) the amount you paid us in the 12 months before the claim.</li>
+        <li><strong>California residents:</strong> you waive California Civil Code Section 1542, which says: &quot;A general release does not extend to claims that the creditor or releasing party does not know or suspect to exist in his or her favor at the time of executing the release and that, if known by him or her, would have materially affected his or her settlement with the debtor or released party.&quot;</li>
+      </ul>
+      <p>Some places don&apos;t allow certain limits on liability, so some of these may not apply to you.</p>
+
+      <h2>13. Indemnification</h2>
+      <p>
+        You agree to defend, indemnify and hold harmless Pip and its owners, employees and agents from claims, losses and expenses (including reasonable
+        legal fees) arising from your use of the Service, your trading, Your Content, or your breach of these Terms or anyone else&apos;s rights.
+      </p>
+
+      <h2>14. Disputes</h2>
+      <h3>14.1 Governing law</h3>
+      <p>These Terms are governed by the laws of the State of California, without regard to conflict-of-law rules.</p>
+      <h3>14.2 Binding arbitration</h3>
+      <p>
+        Any dispute relating to these Terms or the Service will be resolved by binding individual arbitration administered by the American Arbitration
+        Association under its Consumer Arbitration Rules, held in California or remotely. Either of us may instead bring a qualifying claim in small claims
+        court.
+      </p>
+      <p>
+        <strong>Class action waiver:</strong> you and we may bring claims only individually, not as a plaintiff or class member in any class, collective or
+        representative action.
+      </p>
+      <h3>14.3 Costs</h3>
+      <p>Each party bears its own costs and attorneys&apos; fees, unless the arbitrator or the law provides otherwise.</p>
+
+      <h2>15. California consumer notice</h2>
+      <p>
+        California residents may contact the Complaint Assistance Unit of the Division of Consumer Services of the California Department of Consumer
+        Affairs in writing at 1625 North Market Blvd., Suite N 112, Sacramento, CA 95834, or by telephone at (916) 445-1254 or (800) 952-5210.
+      </p>
+
+      <h2>16. Other terms</h2>
+      <ul>
+        <li><strong>Where Pip is available:</strong> the Service may not be appropriate or available everywhere, and you&apos;re responsible for following local laws.</li>
+        <li><strong>Regulatory status:</strong> we don&apos;t hold, manage or have access to your funds or brokerage accounts.</li>
+        <li><strong>Events outside our control:</strong> we aren&apos;t responsible for failures caused by events beyond our reasonable control, such as outages of internet, hosting or AI providers, natural disasters or government action.</li>
+        <li><strong>Severability:</strong> if part of these Terms is unenforceable, the rest stays in effect.</li>
+        <li><strong>No waiver:</strong> not enforcing a term isn&apos;t a waiver of it.</li>
+        <li><strong>Assignment:</strong> you can&apos;t transfer these Terms; we may as part of a merger, acquisition or sale of assets.</li>
+        <li><strong>Entire agreement:</strong> these Terms and the Privacy Policy are the whole agreement between you and us about the Service.</li>
+      </ul>
+
+      <h2>17. Changes to these Terms</h2>
+      <p>
+        We may update these Terms as the Service changes, and we&apos;ll change the date at the top. For material changes we&apos;ll tell you by email or in
+        the product before they take effect. Continuing to use the Service after that means you accept the updated Terms.
+      </p>
+
+      <h2>18. Contact</h2>
+      <p>Questions about these Terms: {mail}</p>
     </Legal>
   )
 }
