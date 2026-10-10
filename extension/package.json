@@ -95,6 +95,14 @@
         "https://admin.snapchartapp.com/*",
         "http://localhost/*"
       ]
+    },
+    "commands": {
+      "toggle-snapchart": {
+        "suggested_key": {
+          "default": "Alt+Shift+S"
+        },
+        "description": "Open or close the Snapchart chat"
+      }
     }
   }
 }

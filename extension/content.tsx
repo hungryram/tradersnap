@@ -75,8 +75,14 @@ const SUGGESTIONS = [
 const TradingBuddyWidget = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [position, setPosition] = useState({ x: 20, y: 20 })
+  const [position, setPosition] = useState({ x: 20, y: 60 })
   const [isDragging, setIsDragging] = useState(false)
+  // Where in the header the drag started, so the window moves with the cursor instead of jumping
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+  // Saved position/size are loaded once; don't save until then
+  const layoutLoadedRef = useRef(false)
+  // Launcher button: offset from the bottom-right corner, draggable
+  const [launcherPos, setLauncherPos] = useState({ right: 20, bottom: 20 })
   const [messages, setMessages] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState("")
@@ -650,6 +656,10 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     // Listen for messages from background script
     const messageListener = (message: any) => {
+      if (message.type === "TOGGLE_WIDGET") {
+        setIsOpen(open => !open)
+      }
+
       if (message.type === "OPEN_WIDGET") {
         setIsOpen(true)
         analytics.extensionOpened({ sessionId: session?.id })
@@ -1443,23 +1453,77 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  // Keep the window on screen: fully inside horizontally, header always reachable
+  const clampPosition = (pos: { x: number, y: number }, width = size.width) => ({
+    x: Math.min(Math.max(0, pos.x), Math.max(0, window.innerWidth - width)),
+    y: Math.min(Math.max(0, pos.y), Math.max(0, window.innerHeight - 80))
+  })
+
+  // Drag from anywhere on the header except its buttons
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setIsDragging(true)
-    }
+    if ((e.target as HTMLElement).closest('button, a, input, textarea, select')) return
+    e.preventDefault()
+    dragOffsetRef.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    setIsDragging(true)
   }
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
-      setPosition({
-        x: e.clientX - 150,
-        y: e.clientY - 25
-      })
+      setPosition(clampPosition({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y }))
     }
   }
 
   const handleMouseUp = () => {
     setIsDragging(false)
+  }
+
+  // Restore where the window and launcher were left; first time, open on the right below the site's toolbar
+  useEffect(() => {
+    chrome.storage.local.get(['widget_layout', 'launcher_pos']).then(({ widget_layout, launcher_pos }) => {
+      const width = Math.min(widget_layout?.width ?? size.width, window.innerWidth)
+      const height = widget_layout?.height ?? size.height
+      if (widget_layout) setSize({ width, height })
+      setPosition(clampPosition(widget_layout ? { x: widget_layout.x, y: widget_layout.y } : { x: window.innerWidth - width - 24, y: 60 }, width))
+      if (launcher_pos) setLauncherPos(launcher_pos)
+      layoutLoadedRef.current = true
+    }).catch(() => { layoutLoadedRef.current = true })
+
+    const keepOnScreen = () => setPosition(pos => clampPosition(pos))
+    window.addEventListener('resize', keepOnScreen)
+    return () => window.removeEventListener('resize', keepOnScreen)
+  }, [])
+
+  // Remember position and size once a drag or resize ends
+  useEffect(() => {
+    if (!layoutLoadedRef.current || isDragging || isResizing) return
+    chrome.storage.local.set({ widget_layout: { ...position, ...size } }).catch(() => {})
+  }, [isDragging, isResizing])
+
+  // Launcher: drag to move, click to open
+  const handleLauncherMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const start = { x: e.clientX, y: e.clientY, right: launcherPos.right, bottom: launcherPos.bottom }
+    let moved = false
+    let latest = launcherPos
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - start.x
+      const dy = ev.clientY - start.y
+      if (!moved && Math.hypot(dx, dy) < 4) return
+      moved = true
+      latest = {
+        right: Math.min(Math.max(0, start.right - dx), window.innerWidth - 60),
+        bottom: Math.min(Math.max(0, start.bottom - dy), window.innerHeight - 40)
+      }
+      setLauncherPos(latest)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      if (moved) chrome.storage.local.set({ launcher_pos: latest }).catch(() => {})
+      else setIsOpen(true)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
   }
 
   useEffect(() => {
@@ -1573,22 +1637,37 @@ const TradingBuddyWidget = () => {
   }, [isResizing, handleResizeMouseMove, handleResizeMouseUp])
 
   if (!isOpen) {
+    const losingStreak = !!(autoDetectTrades && tradeStats && tradeStats.lossStreak >= 2)
+    const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' ? 'bg-red-400' : null
+    const tip = [
+      'Open Snapchart (Alt+Shift+S). Drag to move.',
+      trackingStatus === 'no-panel' ? "Not tracking trades: open TradingView's trading panel." : null,
+      losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null
+    ].filter(Boolean).join('\n')
     return (
       <div
         data-snapchart-widget
         style={{
           position: "fixed",
-          bottom: "20px",
-          right: "20px",
+          bottom: `${launcherPos.bottom}px`,
+          right: `${launcherPos.right}px`,
           zIndex: 2147483647
         }}
       >
         <button
-          onClick={() => setIsOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-xl font-medium flex items-center gap-2"
+          onMouseDown={handleLauncherMouseDown}
+          title={tip}
+          className="relative flex select-none items-center gap-2 rounded-full bg-blue-600 py-1.5 pl-1.5 pr-3.5 text-sm font-medium text-white shadow-xl transition-colors hover:bg-blue-700 cursor-grab active:cursor-grabbing"
         >
-          <img src={chrome.runtime.getURL("assets/icon.png")} alt="Snapchart" className="w-6 h-6" onError={(e) => e.currentTarget.style.display = 'none'} />
+          <img src={chrome.runtime.getURL("assets/icon.png")} alt="" className="h-6 w-6 rounded-full" draggable={false} onError={(e) => e.currentTarget.style.display = 'none'} />
           Snapchart
+          {autoDetectTrades && tradeStats && tradeStats.count > 0 && (
+            <span className="rounded-full bg-white/20 px-1.5 text-xs tabular-nums" title={`${tradeStats.count} trades today`}>{tradeStats.count}</span>
+          )}
+          {statusDot && <span className={`absolute -left-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white ${statusDot}`} />}
+          {losingStreak && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold">{tradeStats!.lossStreak}L</span>
+          )}
         </button>
       </div>
     )
@@ -1658,7 +1737,10 @@ const TradingBuddyWidget = () => {
         minWidth: '300px',
         minHeight: '400px'
       }}
-      onKeyDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Escape' && !lightboxData && !showMenu) setIsOpen(false)
+      }}
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
@@ -1849,6 +1931,7 @@ const TradingBuddyWidget = () => {
             )}
             <button
               onClick={() => setIsOpen(false)}
+              title="Close (Esc or Alt+Shift+S)"
               className="text-white hover:text-blue-100 text-base"
             >
               ✕

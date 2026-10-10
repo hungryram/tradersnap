@@ -165,6 +165,13 @@ function refreshSessionIfNeeded(force = false): Promise<void> {
   return refreshing
 }
 
+// Keyboard shortcut (Alt+Shift+S by default; users can change it at chrome://extensions/shortcuts)
+chrome.commands.onCommand.addListener(async command => {
+  if (command !== "toggle-snapchart") return
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_WIDGET" }).catch(() => {})
+})
+
 // ---------------------------------------------------------------------------
 // Messages from our own content script / popup
 // ---------------------------------------------------------------------------
