@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
-import { getLimits } from "@/lib/usage"
+import { creditStateFromProfile, getLimits, usagePayload } from "@/lib/usage"
 import { isAdminEmail } from "@/lib/admin"
 
 const supabase = createClient(
@@ -137,6 +137,12 @@ export async function GET(request: NextRequest) {
       maxFavorites: planLimits.maxFavoritesInContext
     }
 
+    // Credits for today (null until 20261016_credits.sql has run)
+    const credits = creditStateFromProfile(profile, planLimits)
+    const today = new Date().toISOString().slice(0, 10)
+    const sameDay = profile.usage_reset_date === today
+    const legacyUsage = usagePayload(credits, { messages: sameDay ? profile.message_count || 0 : 0, screenshots: sameDay ? profile.screenshot_count || 0 : 0 }, planLimits)
+
     // Count actual favorited messages
     const { count: favoritesCount } = await supabase
       .from('chat_messages')
@@ -165,14 +171,17 @@ export async function GET(request: NextRequest) {
         updated_at: ruleset.updated_at
       } : null,
       usage: {
+        // Old message/screenshot fields stay for extension builds before 1.1, expressed in today's credits
         messages: {
-          used: profile.message_count || 0,
-          limit: limits.maxMessages
+          used: legacyUsage.messages,
+          limit: legacyUsage.limits.maxMessages
         },
         screenshots: {
-          used: profile.screenshot_count || 0,
-          limit: limits.maxScreenshots
+          used: legacyUsage.screenshots,
+          limit: legacyUsage.limits.maxScreenshots
         },
+        credits: credits ?? undefined,
+        canBuyMore: !!process.env.STRIPE_PRICE_ID_TOPUP,
         favorites: {
           used: favoritesCount || 0,
           limit: limits.maxFavorites

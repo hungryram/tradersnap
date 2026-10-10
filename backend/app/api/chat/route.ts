@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
-import { claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type UsageCost } from "@/lib/usage"
+import { claimWelcomeCredit, consumeUsage, creditState, getLimits, refundUsage, usagePayload, type Reservation, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 
@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
   // (a single insert would give both rows the same NOW())
   const requestStartedAt = new Date().toISOString()
   // Set once usage is reserved; cleared on success. Any failure after that refunds it.
-  let reserved: { userId: string, cost: UsageCost } | null = null
+  let reserved: { userId: string, reservation: Reservation } | null = null
   
   try {
     // 1. Validate JWT
@@ -356,6 +356,19 @@ export async function POST(request: NextRequest) {
     const cost: UsageCost = { messages: 1, screenshots: isNewScreenshot ? 1 : 0 }
     const quota = await consumeUsage(supabase, user.id, cost, limits)
 
+    if (!quota.allowed && quota.credits) {
+      const canBuyMore = !!process.env.STRIPE_PRICE_ID_TOPUP
+      const response = NextResponse.json({
+        error: "Daily usage limit reached",
+        message: `You've used today's allowance. It resets at midnight UTC.${canBuyMore ? " You can buy more to keep going today" + (isPaid ? "." : ", or upgrade to Pro for about 10x more every day.") : isPaid ? "" : " Upgrade to Pro for about 10x more every day."}`,
+        limit: limits.maxMessages,
+        current: quota.messages,
+        requiresUpgrade: !isPaid,
+        canBuyMore
+      }, { status: 429 })
+      return addCorsHeaders(response, origin)
+    }
+
     if (!quota.allowed) {
       const messageLimitHit = quota.messages >= limits.maxMessages
       const response = NextResponse.json(messageLimitHit ? {
@@ -377,7 +390,7 @@ export async function POST(request: NextRequest) {
       }, { status: 429 })
       return addCorsHeaders(response, origin)
     }
-    reserved = { userId: user.id, cost }
+    reserved = { userId: user.id, reservation: quota.reservation }
 
     // 6. Fetch user's ruleset (primary first, then any ruleset)
     let { data: ruleset } = await supabase
@@ -563,13 +576,13 @@ Use for time-based coaching when they ask about the next candle or how long they
     // 11. Usage was reserved up front; give it back if the response failed
     if (responseFailed) {
       console.log('[Chat API] Response failed - not counting towards usage limits')
-      await refundUsage(supabase, user.id, cost)
+      await refundUsage(supabase, user.id, quota.reservation)
     }
     reserved = null
 
     // The first question sent with a chart while getting started is on us
     const welcomeFree = !responseFailed && isNewScreenshot && await claimWelcomeCredit(supabase, user.id, "welcome_chart_chat_used")
-    if (welcomeFree) await refundUsage(supabase, user.id, cost)
+    if (welcomeFree) await refundUsage(supabase, user.id, quota.reservation)
     const refunded = responseFailed || welcomeFree
 
     // 12. Return response with message IDs and action
@@ -579,11 +592,16 @@ Use for time-based coaching when they ask about the next candle or how long they
       assistantMessageId,
       action,
       welcomeFree: welcomeFree || undefined,
-      usage: {
-        messages: refunded ? quota.messages - cost.messages : quota.messages,
-        screenshots: refunded ? quota.screenshots - cost.screenshots : quota.screenshots,
-        limits: limits
-      }
+      usage: usagePayload(
+        quota.credits && refunded
+          ? creditState(quota.credits.used - (quota.reservation.units - quota.reservation.fromBonus), quota.credits.bonus + quota.reservation.fromBonus, limits)
+          : quota.credits,
+        {
+          messages: refunded ? quota.messages - cost.messages : quota.messages,
+          screenshots: refunded ? quota.screenshots - cost.screenshots : quota.screenshots
+        },
+        limits
+      )
     })
     return addCorsHeaders(response, origin)
 
@@ -591,7 +609,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     console.error("Chat error:", error)
 
     if (reserved) {
-      await refundUsage(supabase, reserved.userId, reserved.cost)
+      await refundUsage(supabase, reserved.userId, reserved.reservation)
     }
     
     if (error instanceof z.ZodError) {

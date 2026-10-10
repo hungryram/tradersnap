@@ -62,6 +62,14 @@ export const config: PlasmoCSConfig = {
 // Instead of inline script injection, we'll check localStorage directly from content script
 // This runs in extension context but can still access the page's localStorage via chrome APIs
 
+// Message when today's allowance is used up (checked before taking a screenshot)
+function limitReachedText(plan: string, canBuyMore?: boolean) {
+  const more = canBuyMore ? " You can buy more to keep going today." : ""
+  return plan === 'free'
+    ? `You've used today's free allowance. It resets at midnight UTC.${more} Pro gives you about 10x more every day.`
+    : `You've used today's allowance. It resets at midnight UTC.${more}`
+}
+
 // Shown under "Analyze this chart" while an analysis runs
 const ANALYZE_STAGES = ["Capturing your chart...", "Reading price action...", "Checking your rules...", "Writing your verdict..."]
 
@@ -328,7 +336,9 @@ const TradingBuddyWidget = () => {
                 limits: {
                   maxMessages: meData.usage.messages.limit,
                   maxScreenshots: meData.usage.screenshots.limit
-                }
+                },
+                credits: meData.usage.credits,
+                canBuyMore: meData.usage.canBuyMore
               })
             }
           }
@@ -915,10 +925,10 @@ const TradingBuddyWidget = () => {
         if (userData?.usage.screenshots.used >= userData?.usage.screenshots.limit) {
           setMessages(prev => [...prev, {
             type: 'error',
-            content: userData.user.plan === 'pro' 
-              ? "You've reached your daily limit of 50 chart analyses. Your limit resets at midnight UTC."
-              : `You've used all 5 free chart analyses today. [Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account) for 50 charts/day.`,
-            timestamp: new Date()
+            content: limitReachedText(userData.user.plan, userData.usage.canBuyMore),
+            timestamp: new Date(),
+            requiresUpgrade: userData.user.plan === 'free',
+            canBuyMore: !!userData.usage.canBuyMore
           }])
           return
         }
@@ -980,8 +990,10 @@ const TradingBuddyWidget = () => {
         const errorData = await analyzeResponse.json().catch(() => ({}))
         setMessages(prev => [...prev, {
           type: 'error',
-          content: errorData.error || 'Analysis failed. Please try again.',
-          timestamp: new Date()
+          content: errorData.message || errorData.error || 'Analysis failed. Please try again.',
+          timestamp: new Date(),
+          requiresUpgrade: errorData.requiresUpgrade,
+          canBuyMore: errorData.canBuyMore
         }])
         return
       }
@@ -1055,7 +1067,9 @@ const TradingBuddyWidget = () => {
             limits: {
               maxMessages: meData.usage.messages.limit,
               maxScreenshots: meData.usage.screenshots.limit
-            }
+            },
+            credits: meData.usage.credits,
+            canBuyMore: meData.usage.canBuyMore
           })
         }
       }
@@ -1259,11 +1273,10 @@ const TradingBuddyWidget = () => {
               setIsSending(false)
               const errorMsg = {
                 type: 'error',
-                content: userData.user.plan === 'free' 
-                  ? `You've used all 5 chart screenshots for today. [Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account) for 50 screenshots per day.`
-                  : `You've used all 50 chart screenshots for today. Limit resets at midnight UTC.`,
+                content: limitReachedText(userData.user.plan, userData.usage.canBuyMore),
                 timestamp: new Date(),
-                requiresUpgrade: userData.user.plan === 'free'
+                requiresUpgrade: userData.user.plan === 'free',
+                canBuyMore: !!userData.usage.canBuyMore
               }
               setMessages(prev => [...prev, errorMsg])
               return
@@ -1429,7 +1442,8 @@ const TradingBuddyWidget = () => {
             type: 'error',
             content: errorData.message,
             timestamp: new Date(),
-            requiresUpgrade: errorData.requiresUpgrade
+            requiresUpgrade: errorData.requiresUpgrade,
+            canBuyMore: errorData.canBuyMore
           }
           setMessages(prev => [...prev, errorMsg])
           setIsSending(false)
@@ -1445,7 +1459,7 @@ const TradingBuddyWidget = () => {
       
       // Update usage tracking
       if (chatResult.usage) {
-        setCurrentUsage(chatResult.usage)
+        setCurrentUsage((prev: any) => ({ ...chatResult.usage, canBuyMore: prev?.canBuyMore }))
       }
       
       // Notify user if chart wasn't counted due to quality
@@ -2258,19 +2272,6 @@ const TradingBuddyWidget = () => {
                           onClick={() => setLightboxData({ imageUrl: msg.chartImage, drawings: [], messageIndex: i })}
                           title="Click to view full size"
                         />
-                        {currentUsage?.limits && currentUsage.limits.maxScreenshots === 5 && (
-                          <p className={`text-[10px] mt-1 italic ${theme === 'dark' ? 'text-blue-200' : 'text-slate-700'}`}>
-                            Lower resolution on Free plan may affect analysis accuracy.{' '}
-                            <a 
-                              href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className={`underline font-medium ${theme === 'dark' ? 'text-blue-300 hover:text-white' : 'text-blue-800 hover:text-blue-950'}`}
-                            >
-                              Upgrade to Pro
-                            </a>
-                          </p>
-                        )}
                       </div>
                     )}
                   </div>
@@ -2279,6 +2280,14 @@ const TradingBuddyWidget = () => {
                 {msg.type === 'error' && (
                   <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()}`}>
                     <div className={`markdown-content ${theme === 'dark' ? 'dark' : ''}`} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                    {msg.canBuyMore && (
+                      <button
+                        onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
+                        className="mt-3 w-full border border-blue-600 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+                      >
+                        Buy more for today
+                      </button>
+                    )}
                     {msg.requiresUpgrade && (
                       <button
                         onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
@@ -2722,7 +2731,25 @@ const TradingBuddyWidget = () => {
               </div>
 
               {/* What's left today */}
-              {currentUsage && (
+              {currentUsage?.credits ? (
+                <div className={`px-1 text-[11px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`h-1 flex-1 rounded-full ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-200'}`}>
+                      <div
+                        className={`h-1 rounded-full ${currentUsage.credits.percent >= 100 && currentUsage.credits.bonus <= 0 ? 'bg-red-500' : currentUsage.credits.percent >= 80 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                        style={{ width: `${currentUsage.credits.percent}%` }}
+                      />
+                    </div>
+                    <span className="tabular-nums">{currentUsage.credits.percent}% used today</span>
+                  </div>
+                  <div className="mt-0.5 flex justify-between">
+                    <span>About {currentUsage.credits.checksLeft} chart {currentUsage.credits.checksLeft === 1 ? 'check' : 'checks'} left</span>
+                    {currentUsage.credits.percent >= 80 && (currentUsage.canBuyMore || currentUsage.limits?.maxScreenshots !== undefined) && (
+                      <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Get more</a>
+                    )}
+                  </div>
+                </div>
+              ) : currentUsage && (
                 <div className={`flex justify-between px-1 text-[11px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
                   <span className={currentUsage.screenshots >= currentUsage.limits.maxScreenshots ? 'text-red-400' : ''}>
                     {Math.max(0, currentUsage.limits.maxScreenshots - currentUsage.screenshots)} of {currentUsage.limits.maxScreenshots} chart checks left today

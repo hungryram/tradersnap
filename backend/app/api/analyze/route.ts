@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
 import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
 import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
-import { claimWelcomeCredit, consumeUsage, getLimits, refundUsage } from "@/lib/usage"
+import { CREDIT_COSTS, claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type Reservation, type UsageCost } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
 const supabase = createClient(
@@ -42,7 +42,7 @@ export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(response, origin)
 }
 
-const screenshotCost = { messages: 0, screenshots: 1 }
+const screenshotCost: UsageCost = { messages: 0, screenshots: 1, units: CREDIT_COSTS.analysis }
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin")
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
   const requestStartedAt = new Date().toISOString()
   // Set once usage is reserved; cleared on success. Any failure after that refunds it.
   let refundUserId: string | null = null
+  let reservation: Reservation | null = null
   
   try {
     // 1. Validate JWT from Authorization header
@@ -107,18 +108,23 @@ export async function POST(request: NextRequest) {
 
     if (!usage.allowed) {
       const isPaid = profile.plan === 'pro' || profile.plan === 'admin'
+      const canBuyMore = !!process.env.STRIPE_PRICE_ID_TOPUP
       const response = NextResponse.json({
-        error: "Daily screenshot limit reached",
-        message: isPaid
-          ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
-          : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
+        error: "Daily usage limit reached",
+        message: usage.credits
+          ? `You've used today's allowance. It resets at midnight UTC.${canBuyMore ? " You can buy more to keep going today" + (isPaid ? "." : ", or upgrade to Pro for about 10x more every day.") : isPaid ? "" : " Upgrade to Pro for about 10x more every day."}`
+          : isPaid
+            ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
+            : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
         limit: limits.maxScreenshots,
         current: usage.screenshots,
-        requiresUpgrade: !isPaid
+        requiresUpgrade: !isPaid,
+        canBuyMore
       }, { status: 429 })
       return addCorsHeaders(response, origin)
     }
     refundUserId = user.id
+    reservation = usage.reservation
 
     // 6. Build prompt from the trader's rules and context
     const coachingPrompt = buildAnalysisPrompt(ruleset.rules_text, {
@@ -169,7 +175,7 @@ export async function POST(request: NextRequest) {
 
     if (messagesError) {
       console.error('[Analyze API] Failed to save messages:', messagesError)
-      await refundUsage(supabase, user.id, screenshotCost)
+      await refundUsage(supabase, user.id, reservation)
       refundUserId = null
       const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
       return addCorsHeaders(response, origin)
@@ -181,7 +187,7 @@ export async function POST(request: NextRequest) {
 
     if (!userMsg || !assistantMsg) {
       console.error('[Analyze API] Failed to retrieve message IDs')
-      await refundUsage(supabase, user.id, screenshotCost)
+      await refundUsage(supabase, user.id, reservation)
       refundUserId = null
       const response = NextResponse.json({ error: "Failed to save messages" }, { status: 500 })
       return addCorsHeaders(response, origin)
@@ -198,7 +204,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('[Analyze API] Failed to save analysis:', insertError)
-      await refundUsage(supabase, user.id, screenshotCost)
+      await refundUsage(supabase, user.id, reservation)
       refundUserId = null
       const response = NextResponse.json({ error: "Failed to save analysis" }, { status: 500 })
       return addCorsHeaders(response, origin)
@@ -207,13 +213,13 @@ export async function POST(request: NextRequest) {
     // Usage was reserved up front; give it back if the chart was unreadable
     if (chartUnreadable) {
       console.log('[Analyze API] Chart unreadable - not counting towards usage')
-      await refundUsage(supabase, user.id, screenshotCost)
+      await refundUsage(supabase, user.id, reservation)
     }
     refundUserId = null
 
     // The first analysis while getting started is on us
     const welcomeFree = !chartUnreadable && await claimWelcomeCredit(supabase, user.id, "welcome_analysis_used")
-    if (welcomeFree) await refundUsage(supabase, user.id, screenshotCost)
+    if (welcomeFree) await refundUsage(supabase, user.id, reservation)
 
     // Include ruleset name and message IDs in response
     const responseWithRuleset = {
@@ -234,7 +240,7 @@ export async function POST(request: NextRequest) {
     console.error("Analysis error:", error)
 
     if (refundUserId) {
-      await refundUsage(supabase, refundUserId, screenshotCost)
+      await refundUsage(supabase, refundUserId, reservation)
     }
     
     if (error instanceof z.ZodError) {

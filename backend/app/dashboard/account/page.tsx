@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { api } from "@/lib/dashboard-data"
 import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
+import UsageMeter, { type Credits } from "../components/UsageMeter"
 import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
 interface UserData {
@@ -19,6 +20,8 @@ interface UserData {
     messages: { used: number; limit: number }
     screenshots: { used: number; limit: number }
     favorites: { used: number; limit: number }
+    credits?: Credits
+    canBuyMore?: boolean
   }
 }
 
@@ -44,6 +47,9 @@ export default function AccountPage() {
   const [deleteDetails, setDeleteDetails] = useState("")
 
   useEffect(() => { load() }, [])
+
+  // Back from a top-up checkout
+  const [topupDone] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("topup") === "success")
 
   async function load() {
     try {
@@ -170,12 +176,20 @@ export default function AccountPage() {
         </Card>
 
         <Card title="Usage today">
-          <div className="grid gap-5 sm:grid-cols-3">
-            <UsageBar label="Coach messages" used={usage.messages.used} max={usage.messages.limit} />
-            <UsageBar label="Chart checks" used={usage.screenshots.used} max={usage.screenshots.limit} />
-            <UsageBar label="Saved messages your coach remembers" used={usage.favorites.used} max={usage.favorites.limit} />
-          </div>
-          <p className="mt-4 text-xs text-ink-muted">Daily limits reset at midnight UTC.</p>
+          {topupDone && <div className="mb-4"><Notice tone="good">Thanks! Your extra usage is added. It's used after your daily allowance and never expires.</Notice></div>}
+          {usage.credits ? (
+            <div className="grid gap-6 sm:grid-cols-[2fr_1fr]">
+              <UsageMeter credits={usage.credits} plan={user.plan} canBuyMore={!!usage.canBuyMore} />
+              <UsageBar label="Saved messages your coach remembers" used={usage.favorites.used} max={usage.favorites.limit} />
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-3">
+              <UsageBar label="Coach messages" used={usage.messages.used} max={usage.messages.limit} />
+              <UsageBar label="Chart checks" used={usage.screenshots.used} max={usage.screenshots.limit} />
+              <UsageBar label="Saved messages your coach remembers" used={usage.favorites.used} max={usage.favorites.limit} />
+            </div>
+          )}
+          <p className="mt-4 text-xs text-ink-muted">Daily allowance resets at midnight UTC. A chart check uses more of it than a message.</p>
         </Card>
 
         <div id="plans" className="scroll-mt-8">

@@ -48,6 +48,13 @@ Today: nothing happens after install, sign-in is the default form, email confirm
 - [x] Admin: shown / replied / dismissed per moment, and how many set warnings-only or off.
 - [ ] Let the chat AI see the trader's daily limits too (today it only sees trades).
 
+**Usage as a percentage + buy more** (estimates; tune in `backend/lib/usage.ts`)
+- [x] One daily allowance in units: message 1, chart message 3, analysis 5; Free 40/day, Pro 450/day. Users see "62% used, about 3 chart checks left". Bought units are used after the daily allowance and never expire.
+- [x] `consume_credits` / `refund_credits` / `add_bonus_credits` (20261016_credits.sql); falls back to the old counters until it runs. Old extension builds still get message/screenshot fields.
+- [x] Top-up checkout (`/api/checkout` `{ kind: "topup" }`) + webhook crediting once per session. Buy more on Today/Account and in the extension when running low.
+- [ ] *You:* run `20261016_credits.sql`; create a one-time Stripe price and set `STRIPE_PRICE_ID_TOPUP` (+ `TOPUP_UNITS`) on Vercel, then redeploy.
+- [ ] Log analysis token usage (chat already does) to calibrate the unit costs against real API spend.
+
 **Phase 3: revenue**
 - [ ] Upgrade prompts at the moment of value (limit hit right after a useful analysis) instead of a generic $19 button.
 - [ ] Referral ("give a week of Pro, get a week").

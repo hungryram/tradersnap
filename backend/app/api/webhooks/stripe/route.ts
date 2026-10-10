@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
+import { TOPUP_UNITS } from "@/lib/usage"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover"
@@ -89,6 +90,24 @@ export async function POST(request: NextRequest) {
 
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session
+
+      // Top-up: add the bought units once per checkout session (retries are ignored)
+      if (session.mode === "payment" && session.metadata?.kind === "topup" && session.metadata.supabase_user_id) {
+        if (session.payment_status !== "paid") break
+        const units = Number(session.metadata.units) || TOPUP_UNITS
+        const { error } = await supabase.rpc("add_bonus_credits", {
+          p_user_id: session.metadata.supabase_user_id,
+          p_units: units,
+          p_session_id: session.id,
+          p_amount_cents: session.amount_total ?? null
+        })
+        if (error) {
+          console.error("[Stripe webhook] add_bonus_credits failed:", error)
+          // Non-2xx makes Stripe retry later
+          return NextResponse.json({ error: "Could not add credits" }, { status: 500 })
+        }
+        break
+      }
 
       if (session.metadata?.supabase_user_id && session.customer) {
         // Link the customer first so the subscription sync below can find the profile

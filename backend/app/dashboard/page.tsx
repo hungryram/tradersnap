@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { api, loadTrades, startOfLocalDay, summarize, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"
+import UsageMeter, { type Credits } from "./components/UsageMeter"
 
 type Me = {
   user: { first_name: string | null; plan: string; trading_limits: TradingLimits | null }
   ruleset: { id: string; name: string } | null
-  usage: { messages: { used: number; limit: number }; screenshots: { used: number; limit: number } }
+  usage: { messages: { used: number; limit: number }; screenshots: { used: number; limit: number }; credits?: Credits; canBuyMore?: boolean }
 }
 
 export default function TodayPage() {
@@ -96,12 +97,18 @@ export default function TodayPage() {
           </Card>
 
           <Card title="Usage today">
-            <div className="space-y-4">
-              <LimitBar label="Coach messages" used={me.usage.messages.used} max={me.usage.messages.limit} neutral />
-              <LimitBar label="Chart checks" used={me.usage.screenshots.used} max={me.usage.screenshots.limit} neutral />
-            </div>
-            {me.user.plan === "free" && (
-              <a href="/dashboard/account#plans" className={`${buttonSecondary} mt-5 w-full`}>Get more with Pro</a>
+            {me.usage.credits ? (
+              <UsageMeter credits={me.usage.credits} plan={me.user.plan} canBuyMore={!!me.usage.canBuyMore} compact />
+            ) : (
+              <>
+                <div className="space-y-4">
+                  <LimitBar label="Coach messages" used={me.usage.messages.used} max={me.usage.messages.limit} neutral />
+                  <LimitBar label="Chart checks" used={me.usage.screenshots.used} max={me.usage.screenshots.limit} neutral />
+                </div>
+                {me.user.plan === "free" && (
+                  <a href="/dashboard/account#plans" className={`${buttonSecondary} mt-5 w-full`}>Get more with Pro</a>
+                )}
+              </>
             )}
           </Card>
         </div>

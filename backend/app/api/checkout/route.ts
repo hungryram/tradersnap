@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
+import { TOPUP_UNITS } from "@/lib/usage"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover"
@@ -27,13 +28,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    // Price and plan are decided server-side; never trust the client for either
-    const priceId = process.env.STRIPE_PRICE_ID_PRO || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO
+    // { kind: "topup" } buys a one-time pack of usage; anything else is the Pro subscription.
+    // Price and plan are decided server-side; never trust the client for either.
+    const body = await request.json().catch(() => ({}))
+    const isTopup = body?.kind === "topup"
+    const priceId = isTopup
+      ? process.env.STRIPE_PRICE_ID_TOPUP
+      : process.env.STRIPE_PRICE_ID_PRO || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO
     const plan = "pro"
 
     if (!priceId) {
-      console.error("Checkout error: STRIPE_PRICE_ID_PRO is not configured")
-      return NextResponse.json({ error: "Checkout unavailable" }, { status: 500 })
+      console.error(`Checkout error: ${isTopup ? "STRIPE_PRICE_ID_TOPUP" : "STRIPE_PRICE_ID_PRO"} is not configured`)
+      return NextResponse.json({ error: isTopup ? "Buying more isn't available yet" : "Checkout unavailable" }, { status: isTopup ? 400 : 500 })
     }
 
     // Get user's profile to check for existing Stripe customer
@@ -44,7 +50,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     // Prevent duplicate subscriptions - redirect to billing portal if already subscribed
-    if (profile?.plan === "pro" && profile?.subscription_status === "active") {
+    if (!isTopup && profile?.plan === "pro" && profile?.subscription_status === "active") {
       return NextResponse.json(
         { error: "Already subscribed", redirectToPortal: true },
         { status: 400 }
@@ -90,6 +96,19 @@ export async function POST(request: NextRequest) {
     const baseUrl = "https://admin.snapchartapp.com"
 
     // Create Checkout Session
+    if (isTopup) {
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "payment",
+        payment_method_types: ["card"],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/dashboard/account?topup=success`,
+        cancel_url: `${baseUrl}/dashboard/account`,
+        metadata: { supabase_user_id: user.id, kind: "topup", units: String(TOPUP_UNITS) }
+      })
+      return NextResponse.json({ url: session.url })
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
