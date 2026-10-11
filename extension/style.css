@@ -116,12 +116,14 @@
 }
 
 .markdown-content a {
-  color: #1A8A74;
+  color: #146E5E;
+  font-weight: 500;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .markdown-content a:hover {
-  color: #146E5E;
+  color: #0E4038;
 }
 
 /* Dark mode overrides */
@@ -146,14 +148,21 @@
   background-color: rgba(220, 38, 38, 0.1);
 }
 
-.bg-red-50 .markdown-content a {
-  color: #dc2626;
+.markdown-content.dark a {
+  color: #7CF2D6;
 }
 
-.bg-red-50 .markdown-content a:hover {
+.markdown-content.dark a:hover {
+  color: #B3F7E6;
+}
+
+/* Error and limit messages keep their light red bubble in both themes, so their links stay dark red */
+.bg-red-50 .markdown-content a,
+.bg-red-50 .markdown-content.dark a {
   color: #b91c1c;
 }
 
-.markdown-content.dark a {
-  color: #7CF2D6;
+.bg-red-50 .markdown-content a:hover,
+.bg-red-50 .markdown-content.dark a:hover {
+  color: #7f1d1d;
 }
