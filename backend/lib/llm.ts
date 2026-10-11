@@ -275,6 +275,32 @@ async function chatOpenAI(opts: Parameters<typeof chat>[0]): Promise<ChatResult>
 // Small structured jobs (background, cheap model)
 // ---------------------------------------------------------------------------
 
+// A short piece of plain text from the small model, e.g. Pip's morning check-in
+export async function smallText(opts: { system: string; prompt: string; maxTokens?: number }): Promise<{ text: string | null; tokens: TokenUsage | null }> {
+  if (provider === "anthropic") {
+    const response = await anthropic().beta.messages.create({
+      model: ANTHROPIC_SMALL_MODEL,
+      max_tokens: opts.maxTokens ?? 400,
+      system: opts.system,
+      messages: [{ role: "user", content: opts.prompt }]
+    })
+    const text = response.content
+      .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text")
+      .map(block => block.text)
+      .join("")
+      .trim()
+    return { text: response.stop_reason === "end_turn" && text ? text : null, tokens: anthropicTokens(response) }
+  }
+
+  const completion = await openai().chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "system", content: opts.system }, { role: "user", content: opts.prompt }],
+    max_completion_tokens: opts.maxTokens ?? 400
+  })
+  const choice = completion.choices[0]
+  return { text: choice?.finish_reason === "stop" ? choice.message.content?.trim() || null : null, tokens: openaiTokens("gpt-5-mini", completion.usage) }
+}
+
 // One short JSON answer from the small model, e.g. updating Pip's notes
 export async function smallJson<T>(opts: { system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number }): Promise<{ output: T; tokens: TokenUsage | null }> {
   if (provider === "anthropic") {

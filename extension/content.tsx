@@ -67,6 +67,8 @@ export const config: PlasmoCSConfig = {
 // Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
 // something and speaking up
 const CHECKIN_TYPING_MS = 1500
+// How long Pip may take to write his own morning plan or recap before the plain version is used
+const COMPOSE_TIMEOUT_MS = 6000
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 // Sample check-ins for trying the delivery in development builds (widget menu)
@@ -578,8 +580,35 @@ const TradingBuddyWidget = () => {
     return true
   }
 
+  // Asks the server for Pip's own wording; null (and the plain text is used) if it's slow or fails
+  const composeCheckIn = async (checkIn: CheckIn): Promise<string | null> => {
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      if (!supabase_session?.access_token) return null
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), COMPOSE_TIMEOUT_MS)
+      const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/checkins/compose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
+        body: JSON.stringify({
+          kind: checkIn.kind,
+          fallback: checkIn.text,
+          facts: checkIn.compose,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+        }),
+        signal: controller.signal
+      }).finally(() => clearTimeout(timer))
+      if (!response.ok) return null
+      const data = await response.json()
+      return typeof data.text === 'string' && data.text.trim() ? data.text.trim() : null
+    } catch {
+      return null
+    }
+  }
+
   const deliverCheckIns = async (candidates: (CheckIn | null)[], options: { preview?: boolean } = {}) => {
-    for (const checkIn of candidates) {
+    for (let checkIn of candidates) {
       if (!checkIn) continue
       if (!options.preview) {
         const mode = checkinsModeRef.current
@@ -592,8 +621,13 @@ const TradingBuddyWidget = () => {
 
       setBubble(null)
       setPipTyping(true)
-      await sleep(CHECKIN_TYPING_MS)
+      // The morning plan and recap can be written fresh by Pip; the rules-based text is the fallback
+      const [composed] = await Promise.all([
+        checkIn.compose ? composeCheckIn(checkIn) : Promise.resolve(null),
+        sleep(CHECKIN_TYPING_MS)
+      ])
       setPipTyping(false)
+      if (composed) checkIn = { ...checkIn, text: composed }
 
       setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, timestamp: new Date() }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
@@ -2182,7 +2216,8 @@ const TradingBuddyWidget = () => {
                     <div className={`px-4 pb-1 text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Dev: preview check-in</div>
                     {[
                       { label: 'Revenge trade (widget closes)', checkIn: PREVIEW_CHECKINS[0] },
-                      { label: 'Daily loss limit (widget closes)', checkIn: PREVIEW_CHECKINS[1] }
+                      { label: 'Daily loss limit (widget closes)', checkIn: PREVIEW_CHECKINS[1] },
+                      { label: 'Morning plan, written by Pip (widget closes)', checkIn: morningPlan(coachContext()) }
                     ].map(({ label, checkIn }) => (
                       <button
                         key={checkIn.id}
