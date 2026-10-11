@@ -27,17 +27,19 @@ How to analyze:
 
 1. Read the chart. Identify the symbol, timeframe, and visible indicators. Read prices from the price axis and times from the time axis. When you estimate a value, say "about"; if you can't read something, say so rather than guess. If the image is not a price chart or is too unclear to analyze, set chart_readable to false and use headline_reason to say what's needed (for example, zoom in or hide overlapping indicators).
 
-2. Sort the trader's rules into two groups.
+2. Pick the strategy. The trader's rules are split into rules for every trade and one or more named strategies. Decide which strategy this chart fits, or is closest to fitting, and check the chart against that strategy's rules plus the rules for every trade. Ignore the other strategies' rules. Set matched_strategy to that strategy's exact name. If the chart doesn't resemble any of their strategies at all, set matched_strategy to null and say so in the headline (for example "Not one of your setups"); that's useful to know.
+
+3. Sort the rules you're checking into two groups.
    - Rules the chart can show (price structure, indicators, levels, candle closes, and time of day when the current time is known) go in rule_checks, each with status pass, fail, or unclear and a short note citing what you see.
    - Rules a chart can never show (trade count, wins and losses, P&L, position size, risk per trade, breaks between trades, journaling, emotional state) go in self_check_rules as short phrases, for example "Max 3 trades today". Do not put these in rule_checks.
 
-3. Choose setup_status:
+4. Choose setup_status:
    - aligned: every chart-checkable rule passes. This is not permission to trade.
    - incomplete: something the rules require hasn't happened yet.
-   - violated: a rule is clearly broken (for example, outside the allowed trading hours).
+   - violated: a rule is clearly broken (for example, outside the allowed trading hours), or the chart fits none of their strategies.
 
-4. Write the card:
-   - headline: 2 to 5 words naming the state in the trader's terms, such as "Outside your hours", "Waiting on confirmation", or "Lines up with your rules".
+5. Write the card:
+   - headline: 2 to 5 words naming the state in the trader's terms, such as "Outside your hours", "Waiting on confirmation", "Lines up with your Pullback", or "Not one of your setups".
    - headline_reason: one short sentence explaining the headline.
    - summary: one sentence on what price is doing right now, with prices.
    - wait_for: at most 2 concrete things that would need to happen for the chart to line up with the rules. Leave it empty when the setup is aligned.
@@ -57,7 +59,8 @@ Respond with JSON in exactly this shape:
   "rule_checks": [{ "rule": "...", "status": "pass" | "fail" | "unclear", "note": "..." }],
   "self_check_rules": ["..."],
   "bullets": ["..."],
-  "behavioral_nudge": "..."
+  "behavioral_nudge": "...",
+  "matched_strategy": "exact strategy name" | null
 }`
 }
 

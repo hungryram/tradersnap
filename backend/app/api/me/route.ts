@@ -160,6 +160,7 @@ export async function GET(request: NextRequest) {
         onboarded: profile.onboarded,
         trading_profile: profile.trading_profile ?? null,
         trading_limits: profile.trading_limits ?? null,
+        always_rules: profile.always_rules ?? null,
         plan: profile.plan,
         is_admin: profile.plan === "admin" && isAdminEmail(user.email),
         subscription_status: profile.subscription_status,
@@ -207,6 +208,7 @@ const hhmm = z.string().regex(/^\d{2}:\d{2}$/)
 const profilePatchSchema = z.object({
   onboarded: z.boolean().optional(),
   first_name: z.string().max(80).optional(),
+  always_rules: z.string().max(2000).nullable().optional(),
   trading_profile: z.object({
     markets: z.array(z.enum(["futures", "stocks", "options", "forex", "crypto"])).max(5),
     platforms: z.array(z.enum(["tradingview", "tradovate", "topstepx", "ninjatrader", "other"])).max(5),

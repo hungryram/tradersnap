@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
+import { activeStrategyLimit } from "@/lib/strategies"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -113,16 +114,15 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id)
     }
 
-    const { data: ruleset, error } = await supabase
-      .from("rulesets")
-      .insert({
-        user_id: user.id,
-        name: validated.name,
-        rules_text: validated.rules_text,
-        is_primary: validated.is_primary ?? true // First ruleset is primary by default
-      })
-      .select()
-      .single()
+    const isPrimary = validated.is_primary ?? true // First ruleset is primary by default
+    // Active (checked by Pip) if it's the primary one, or there's room under the plan's limit
+    const { count: activeCount, error: activeError } = await supabase
+      .from("rulesets").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_active", true)
+    const isActive = isPrimary || (!activeError && (activeCount ?? 0) < activeStrategyLimit(userPlan))
+    const row = { user_id: user.id, name: validated.name, rules_text: validated.rules_text, is_primary: isPrimary }
+    let { data: ruleset, error } = await supabase.from("rulesets").insert({ ...row, is_active: isActive }).select().single()
+    // Before 20261020_strategies.sql has run there's no is_active column
+    if (error?.code === "PGRST204") ({ data: ruleset, error } = await supabase.from("rulesets").insert(row).select().single())
 
     if (error) throw error
 

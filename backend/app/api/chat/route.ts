@@ -8,6 +8,7 @@ import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
 import { loadTradePatterns } from "@/lib/trade-patterns"
+import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
 
 // Recent conversation sent with each message. The window starts on a multiple
@@ -51,7 +52,8 @@ When the trader asks for help writing, fixing or tightening their trading rules:
 - You may suggest discipline and risk rules freely (stop-loss rule, max trades per day, daily loss limit, cooldown after losses, no trading right after the open).
 - Make each rule checkable: concrete things visible on a chart or in their trades (timeframe, level or indicator they use, candle condition, time window, number, dollar amount).
 - When you have a full ruleset, put the COMPLETE ruleset (not just the changes) in one fenced block that starts with \`\`\`rules and ends with \`\`\`, one rule per line starting with "- ". Keep it under ${maxChars} characters. Then say in one line that they can tap "Save as my rules" below to make these the rules you check their charts against.
-- Only use a \`\`\`rules block for a complete ruleset you'd be happy for them to save.`
+- Only use a \`\`\`rules block for a complete ruleset you'd be happy for them to save.
+- They can have several strategies (setups). Write one strategy's rules per block; "Save as my rules" replaces their main strategy, and they can add more strategies on the Rules page.`
 }
 
 function buildAdminPrompt({
@@ -422,26 +424,16 @@ export async function POST(request: NextRequest) {
     }
     reserved = { userId: user.id, reservation: quota.reservation }
 
-    // 6. Fetch user's ruleset (primary first, then any ruleset)
-    let { data: ruleset } = await supabase
-      .from("rulesets")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("is_primary", true)
-      .maybeSingle()
-
-    // If no primary ruleset, get any ruleset
-    if (!ruleset) {
-      const { data: anyRuleset } = await supabase
-        .from("rulesets")
-        .select("*")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle()
-      ruleset = anyRuleset
-    }
-
-    const userRules = ruleset?.rules_text || "No specific rules defined yet."
+    // 6. The trader's active strategies, rules for every trade and daily limits
+    const strategies = await loadActiveStrategies(supabase, user.id)
+    const ruleset = strategies[0] ?? null
+    const [alwaysRules, { data: limitsRow }] = await Promise.all([
+      loadAlwaysRules(supabase, user.id),
+      supabase.from("profiles").select("trading_limits").eq("id", user.id).single()
+    ])
+    const userRules = strategies.length || alwaysRules
+      ? strategiesBlock(strategies, alwaysRules, limitsRow?.trading_limits ?? null)
+      : "No specific rules defined yet."
 
     // Build user name context (use first name for natural conversation)
     const firstName = profile.first_name?.trim()
@@ -523,7 +515,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       image: validatedRequest.image,
       plan: profile.plan,
       // Cache key based on user rules to group similar prompts together
-      cacheKey: `v1:${profile.plan}:${ruleset?.id || 'norules'}`
+      cacheKey: `v1:${profile.plan}:${strategies.map(st => st.id).join(',') || 'norules'}`
     })
 
     let aiResponse = result.text

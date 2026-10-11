@@ -2592,6 +2592,14 @@ const TradingBuddyWidget = () => {
 
                     return (
                       <>
+                        {/* Which of their strategies this chart was checked against */}
+                        {'matched_strategy' in analysis && (
+                          <div className={`mb-1.5 text-[11px] ${muted}`}>
+                            {analysis.matched_strategy
+                              ? <>Checked against your <span className={dark ? 'text-dark-body font-medium' : 'text-slate-900 font-medium'}>{analysis.matched_strategy}</span> strategy</>
+                              : 'Not one of your strategies'}
+                          </div>
+                        )}
                         {/* Verdict first */}
                         <div className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-semibold uppercase tracking-wide mb-1.5 ${getVerdictColor(analysis.setup_status)}`}>
                           {analysis.headline || getVerdictLabel(analysis.setup_status)}

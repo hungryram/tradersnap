@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
+import { activeStrategyLimit } from "@/lib/strategies"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -10,7 +11,8 @@ const supabase = createClient(
 const updateRulesetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   rules_text: z.string().min(10).max(5000).optional(),
-  is_primary: z.boolean().optional()
+  is_primary: z.boolean().optional(),
+  is_active: z.boolean().optional()
 })
 
 // GET /api/rulesets/[id] - Get single ruleset
@@ -94,6 +96,21 @@ export async function PATCH(
         { error: `Rules text exceeds ${maxRulesLength} character limit for ${userPlan} plan` },
         { status: 400 }
       )
+    }
+
+    // Turning a strategy on: stay within the plan's number of active strategies
+    if (validated.is_active === true) {
+      const { count } = await supabase
+        .from("rulesets").select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("is_active", true).neq("id", id)
+      const max = activeStrategyLimit(userPlan)
+      if ((count ?? 0) >= max) {
+        return NextResponse.json({
+          error: userPlan === "free"
+            ? "The Free plan checks 1 strategy at a time. Turn your other one off first, or go Pro to check up to 5 at once."
+            : `You can have ${max} strategies on at once. Turn one off first.`
+        }, { status: 403 })
+      }
     }
 
     // If setting as primary, unset any existing primary

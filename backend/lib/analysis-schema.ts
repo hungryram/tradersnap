@@ -29,7 +29,9 @@ export const analysisOutputSchema = z.object({
   // Rules the trader has to confirm themselves (trade count, P&L, risk, ...)
   self_check_rules: z.array(z.string()),
   bullets: z.array(z.string()),
-  behavioral_nudge: z.string()
+  behavioral_nudge: z.string(),
+  // Name of the trader's strategy this chart fits or is closest to; null when it fits none
+  matched_strategy: z.string().nullable()
 })
 
 // What /api/analyze accepts back from a model. Lenient on the newer fields so a
@@ -39,7 +41,8 @@ export const analysisResponseSchema = analysisOutputSchema.partial({
   headline: true,
   headline_reason: true,
   wait_for: true,
-  self_check_rules: true
+  self_check_rules: true,
+  matched_strategy: true
 }).extend({
   rule_checks: z.array(z.object({
     rule: z.string(),

@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
 import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
 import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
+import { loadActiveStrategies, loadAlwaysRules, matchStrategy, strategiesBlock } from "@/lib/strategies"
 import { CREDIT_COSTS, claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type Reservation, type UsageCost, allowanceUsedMessage } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan')
+      .select('plan, trading_limits')
       .eq('id', user.id)
       .single()
 
@@ -90,18 +91,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedRequest = analyzeRequestSchema.parse(body)
 
-    // 4. Fetch ruleset
-    const { data: ruleset } = await supabase
-      .from("rulesets")
-      .select("*")
-      .eq("id", validatedRequest.rulesetId)
-      .eq("user_id", user.id)
-      .single()
-
-    if (!ruleset) {
+    // 4. The trader's active strategies (the chart is checked against whichever fits)
+    const strategies = await loadActiveStrategies(supabase, user.id, validatedRequest.rulesetId)
+    if (strategies.length === 0) {
       const response = NextResponse.json({ error: "Ruleset not found" }, { status: 404 })
       return addCorsHeaders(response, origin)
     }
+    const alwaysRules = await loadAlwaysRules(supabase, user.id)
 
     // 5. Atomically check + reserve one screenshot (refunded below if the analysis fails)
     const limits = getLimits(profile.plan)
@@ -128,7 +124,7 @@ export async function POST(request: NextRequest) {
     reservation = usage.reservation
 
     // 6. Build prompt from the trader's rules and context
-    const coachingPrompt = buildAnalysisPrompt(ruleset.rules_text, {
+    const coachingPrompt = buildAnalysisPrompt(strategiesBlock(strategies, alwaysRules, profile.trading_limits ?? null), {
       ...validatedRequest.context,
       timestamp: validatedRequest.timestamp,
       timezone: validatedRequest.timezone
@@ -196,13 +192,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Save analysis to database (linked to session for deletion)
-    const { error: insertError } = await supabase.from("analyses").insert({
+    const matched = matchStrategy(strategies, validatedResponse.matched_strategy)
+    const analysisRow = {
       user_id: user.id,
-      ruleset_id: validatedRequest.rulesetId,
+      ruleset_id: matched?.id ?? validatedRequest.rulesetId,
       session_id: validatedRequest.sessionId || null,
       verdict: verdict,
-      payload: validatedResponse
-    })
+      payload: { ...validatedResponse, matched_strategy: matched?.name ?? null }
+    }
+    let { error: insertError } = await supabase.from("analyses").insert({ ...analysisRow, strategy_id: matched?.id ?? null })
+    // Before 20261020_strategies.sql has run there's no strategy_id column
+    if (insertError?.code === "PGRST204") ({ error: insertError } = await supabase.from("analyses").insert(analysisRow))
 
     if (insertError) {
       console.error('[Analyze API] Failed to save analysis:', insertError)
@@ -226,7 +226,8 @@ export async function POST(request: NextRequest) {
     // Include ruleset name and message IDs in response
     const responseWithRuleset = {
       ...validatedResponse,
-      ruleset_name: ruleset.name,
+      matched_strategy: matched?.name ?? null,
+      ruleset_name: matched?.name ?? strategies[0].name,
       userMessageId: userMsg.id,
       assistantMessageId: assistantMsg.id,
       chartUnreadable: chartUnreadable || undefined,
