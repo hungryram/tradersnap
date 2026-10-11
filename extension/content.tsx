@@ -358,6 +358,7 @@ const TradingBuddyWidget = () => {
           if (meResponse.ok) {
             const meData = await meResponse.json()
             setTradingLimits(meData.user?.trading_limits ?? null)
+            firstNameRef.current = meData.user?.first_name ?? null
             setLimitsLoaded(true)
             if (meData.usage) {
               setCurrentUsage({
@@ -549,6 +550,7 @@ const TradingBuddyWidget = () => {
   const checkinsModeRef = useRef(checkinsMode)
   const tradesTodayRef = useRef(tradesToday)
   const limitsRef = useRef(tradingLimits)
+  const firstNameRef = useRef<string | null>(null)
   const lastInfoAtRef = useRef(0)
   const openPositionsRef = useRef<Set<string> | null>(null)
   const onPositionsRef = useRef<(positions: Map<string, number>) => void>(() => {})
@@ -563,7 +565,7 @@ const TradingBuddyWidget = () => {
     }).catch(() => {})
   }, [])
 
-  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current })
+  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current, name: firstNameRef.current })
 
   // One list of shown check-ins per day in storage, so another tab never repeats one
   const claimCheckIn = async (id: string) => {

@@ -32,6 +32,7 @@ export type CoachContext = {
   now: Date
   trades: CoachTrade[] // closed today, any order
   limits: CoachLimits | null
+  name?: string | null // first name, when the trader gave one
 }
 
 export const REVENGE_MINUTES = 5
@@ -71,7 +72,8 @@ export function morningPlan(ctx: CoachContext): CheckIn {
     l?.max_daily_loss && `stop if down $${l.max_daily_loss}`,
     l?.session_start && l?.session_end && `trade ${clock(l.session_start)} to ${clock(l.session_end)}`
   ].filter(Boolean)
-  const greeting = ctx.now.getHours() < 12 ? "Morning." : "Hey."
+  const name = ctx.name?.trim()
+  const greeting = `${ctx.now.getHours() < 12 ? "Morning" : "Hey"}${name ? `, ${name}` : ""}.`
   return {
     id: `${dayKey(ctx.now)}:morning_plan`,
     kind: "morning_plan",

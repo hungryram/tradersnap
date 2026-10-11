@@ -33,6 +33,7 @@ export default function OnboardingPage() {
   const [extensionVersion, setExtensionVersion] = useState<string | null | undefined>(undefined)
 
   // Step 1
+  const [firstName, setFirstName] = useState("")
   const [markets, setMarkets] = useState<Market[]>(["futures"])
   const [platforms, setPlatforms] = useState<Platform[]>(["tradingview"])
   const [propFirm, setPropFirm] = useState<boolean | null>(null)
@@ -54,10 +55,15 @@ export default function OnboardingPage() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return router.replace("/")
       setSession(session)
+      // Name from Google sign-in, if any; replaced below by the saved one
+      const meta = session.user.user_metadata ?? {}
+      const fromSignIn = String(meta.given_name || meta.full_name || meta.name || "").trim().split(/\s+/)[0]
+      if (fromSignIn) setFirstName(fromSignIn)
       const response = await fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
       if (response.ok) {
         const { user, ruleset } = await response.json()
         if (user?.onboarded && ruleset) router.replace("/dashboard")
+        if (user?.first_name) setFirstName(user.first_name)
       }
     })
     detectExtension().then(setExtensionVersion)
@@ -94,7 +100,7 @@ export default function OnboardingPage() {
     setSaving(true)
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
     try {
-      const template = templateIndex !== null ? RULE_TEMPLATES[templateIndex] : null
+      const template = templateIndex !== null && templateIndex >= 0 ? RULE_TEMPLATES[templateIndex] : null
       const rulesetResponse = await fetch("/api/rulesets", {
         method: "POST",
         headers,
@@ -111,6 +117,7 @@ export default function OnboardingPage() {
         headers,
         body: JSON.stringify({
           onboarded: true,
+          ...(firstName.trim() ? { first_name: firstName.trim() } : {}),
           trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}) },
           trading_limits: {
             max_trades_per_day: numberOrNull(maxTrades),
@@ -150,9 +157,20 @@ export default function OnboardingPage() {
       {step === 1 && (
         <div className="space-y-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Tell us how you trade</h1>
-            <p className="text-ink-text">So your coach talks about the right things.</p>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Tell Pip how you trade</h1>
+            <p className="text-ink-text">So he talks about the right things.</p>
           </div>
+
+          <Question title="What should Pip call you?">
+            <input
+              value={firstName}
+              onChange={e => setFirstName(e.target.value)}
+              maxLength={40}
+              autoComplete="given-name"
+              placeholder="Your first name (optional)"
+              className={`${input} max-w-xs`}
+            />
+          </Question>
 
           <Question title="What do you trade?">
             {MARKETS.map(m => <button key={m.id} onClick={() => setMarkets(toggle(markets, m.id))} className={chip(markets.includes(m.id))}>{m.label}</button>)}
@@ -183,7 +201,10 @@ export default function OnboardingPage() {
         <div className="space-y-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Your rules</h1>
-            <p className="text-ink-text">Your coach checks every chart against these. Pick the closest setup; you can edit it any time.</p>
+            <p className="text-ink-text">
+              Pip checks every chart against these. Start from the closest template and tweak it, or write your own. You can change them any time
+              on the Rules page in your dashboard.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -197,6 +218,13 @@ export default function OnboardingPage() {
                 <div className="text-xs text-ink-text">{template.description.replace(/ - .*$/, "")}</div>
               </button>
             ))}
+            <button
+              onClick={() => { setTemplateIndex(-1); setRulesText(""); setEditingRules(true) }}
+              className={`text-left rounded-xl border border-dashed p-4 transition-colors ${templateIndex === -1 ? "border-brand-500 bg-brand-500/10" : "border-ink-border hover:border-ink-muted"}`}
+            >
+              <div className="font-medium text-sm mb-1">Write my own</div>
+              <div className="text-xs text-ink-text">Start from a blank page with the rules you already trade by.</div>
+            </button>
           </div>
 
           <div>
@@ -204,7 +232,13 @@ export default function OnboardingPage() {
               {editingRules ? "Hide rules" : "View or edit these rules"}
             </button>
             {editingRules && (
-              <textarea value={rulesText} onChange={e => setRulesText(e.target.value)} rows={12} className={`${input} mt-3 font-mono text-sm`} />
+              <textarea
+                value={rulesText}
+                onChange={e => setRulesText(e.target.value)}
+                rows={12}
+                placeholder={"One rule per line, in plain words. For example:\n- Only trade with the trend on the 5m\n- Wait for a pullback to the 20 EMA\n- Stop loss below the last swing low\n- No trades in the first 5 minutes after the open"}
+                className={`${input} mt-3 font-mono text-sm`}
+              />
             )}
           </div>
 
