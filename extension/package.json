@@ -53,8 +53,7 @@
         ],
         "matches": [
           "https://app.tradewithpip.ai/*",
-          "https://app.tradewithpip.ai/*",
-        "https://admin.snapchartapp.com/*",
+          "https://admin.snapchartapp.com/*",
           "https://www.tradingview.com/*",
           "https://tradingview.com/*",
           "https://*.tradingview.com/*",
@@ -94,6 +93,7 @@
     ],
     "externally_connectable": {
       "matches": [
+        "https://app.tradewithpip.ai/*",
         "https://admin.snapchartapp.com/*",
         "http://localhost/*"
       ]
