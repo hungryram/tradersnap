@@ -210,13 +210,43 @@ async function captureScreenshot() {
       throw new Error('No active tab found')
     }
 
-    const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
+    const png = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
       format: "png"
     })
 
-    return { success: true, dataUrl }
+    return { success: true, dataUrl: await shrinkScreenshot(png) }
   } catch (error) {
     console.error("[Background] Screenshot capture failed:", error)
     return { success: false, error: (error as Error).message }
+  }
+}
+
+// Full-resolution PNGs of large or high-DPI screens can be 5-10 MB, over the
+// server's 4.5 MB request limit. Scale to the AI's useful maximum (2576px on the
+// long edge, what the server would resize to anyway) and send a sharp JPEG.
+const SCREENSHOT_MAX_EDGE = 2576
+const SCREENSHOT_QUALITY = 0.88
+
+async function shrinkScreenshot(pngDataUrl: string): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(await (await fetch(pngDataUrl)).blob())
+    const scale = Math.min(1, SCREENSHOT_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+    const width = Math.round(bitmap.width * scale)
+    const height = Math.round(bitmap.height * scale)
+    const canvas = new OffscreenCanvas(width, height)
+    const context = canvas.getContext("2d")
+    if (!context) return pngDataUrl
+    context.imageSmoothingQuality = "high"
+    context.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close()
+    const jpeg = await canvas.convertToBlob({ type: "image/jpeg", quality: SCREENSHOT_QUALITY })
+
+    const bytes = new Uint8Array(await jpeg.arrayBuffer())
+    let binary = ""
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return `data:image/jpeg;base64,${btoa(binary)}`
+  } catch (error) {
+    console.warn("[Background] Couldn't shrink screenshot, sending the original:", error)
+    return pngDataUrl
   }
 }

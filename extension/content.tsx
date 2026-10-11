@@ -64,18 +64,15 @@ export const config: PlasmoCSConfig = {
 // Instead of inline script injection, we'll check localStorage directly from content script
 // This runs in extension context but can still access the page's localStorage via chrome APIs
 
+// Largest image (as a data URL) a request can carry under the server's 4.5 MB body limit
+const MAX_IMAGE_CHARS = 4_000_000
+
 // Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
 // something and speaking up
 const CHECKIN_TYPING_MS = 1500
 // How long Pip may take to write a check-in in his own words before the plain version is used
 const COMPOSE_TIMEOUT_MS = { warning: 3000, info: 6000 }
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-// Sample check-ins for trying the delivery in development builds (widget menu)
-const PREVIEW_CHECKINS: CheckIn[] = [
-  { id: 'preview_info', kind: 'revenge', level: 'warning', text: "You're back in 2 minutes after a -$180 loss. Was this setup on your plan, or is it the last trade talking?" },
-  { id: 'preview_urgent', kind: 'daily_loss', level: 'warning', text: "You're -$520 today, past your $500 daily loss limit. Your rule says stop here." }
-]
 
 // A complete ruleset Pip drafted in a reply (a code block marked "rules"), or null
 function rulesFromReply(content: unknown): string | null {
@@ -617,17 +614,15 @@ const TradingBuddyWidget = () => {
     }
   }
 
-  const deliverCheckIns = async (candidates: (CheckIn | null)[], options: { preview?: boolean } = {}) => {
+  const deliverCheckIns = async (candidates: (CheckIn | null)[]) => {
     for (let checkIn of candidates) {
       if (!checkIn) continue
-      if (!options.preview) {
-        const mode = checkinsModeRef.current
-        if (mode === 'off' || (mode === 'warnings' && checkIn.level !== 'warning')) continue
-        // Gentle messages at most every 5 minutes; warnings always get through
-        if (checkIn.level === 'info' && Date.now() - lastInfoAtRef.current < 5 * 60_000) continue
-        if (!(await claimCheckIn(checkIn.id))) continue
-        if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
-      }
+      const mode = checkinsModeRef.current
+      if (mode === 'off' || (mode === 'warnings' && checkIn.level !== 'warning')) continue
+      // Gentle messages at most every 5 minutes; warnings always get through
+      if (checkIn.level === 'info' && Date.now() - lastInfoAtRef.current < 5 * 60_000) continue
+      if (!(await claimCheckIn(checkIn.id))) continue
+      if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
 
       setBubble(null)
       setPipTyping(true)
@@ -1538,8 +1533,9 @@ const TradingBuddyWidget = () => {
       // Include chart image if captured or use last analyzed chart
       if (chartImage) {
         requestBody.image = chartImage
-      } else if (lastChartImage && !includeChart) {
-        // Include last chart for context in follow-up questions
+      } else if (lastChartImage && !includeChart && lastChartImage.length < MAX_IMAGE_CHARS) {
+        // Include last chart for context in follow-up questions (skipped if it's an
+        // old full-size screenshot that would push the request over the server's limit)
         requestBody.image = lastChartImage
         requestBody.isContextImage = true
         requestBody.chartToken = lastChartToken
@@ -2239,30 +2235,6 @@ const TradingBuddyWidget = () => {
                   >
                     Clear Chat
                   </button>
-                )}
-                {process.env.NODE_ENV === 'development' && (
-                  <>
-                    <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
-                    <div className={`px-4 pb-1 text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Dev: preview check-in</div>
-                    {[
-                      { label: 'Revenge trade (widget closes)', checkIn: PREVIEW_CHECKINS[0] },
-                      { label: 'Daily loss limit (widget closes)', checkIn: PREVIEW_CHECKINS[1] },
-                      { label: 'Morning plan, written by Pip (widget closes)', checkIn: morningPlan(coachContext()) }
-                    ].map(({ label, checkIn }) => (
-                      <button
-                        key={checkIn.id}
-                        onClick={() => {
-                          setShowMenu(false)
-                          setIsOpen(false)
-                          // Give the launcher a moment to appear, then deliver as if it just happened
-                          setTimeout(() => deliverCheckIns([{ ...checkIn, id: `${checkIn.id}_${Date.now()}` }], { preview: true }), 800)
-                        }}
-                        className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </>
                 )}
                 <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                 <button
