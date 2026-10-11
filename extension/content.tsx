@@ -65,9 +65,8 @@ export const config: PlasmoCSConfig = {
 // This runs in extension context but can still access the page's localStorage via chrome APIs
 
 // Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
-// something and speaking up. Urgent warnings skip the pause.
+// something and speaking up
 const CHECKIN_TYPING_MS = 1500
-const URGENT_CHECKINS = new Set(['daily_loss', 'over_max'])
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 // Sample check-ins for trying the delivery in development builds (widget menu)
@@ -589,12 +588,10 @@ const TradingBuddyWidget = () => {
         if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
       }
 
-      if (!URGENT_CHECKINS.has(checkIn.kind)) {
-        setBubble(null)
-        setPipTyping(true)
-        await sleep(CHECKIN_TYPING_MS)
-        setPipTyping(false)
-      }
+      setBubble(null)
+      setPipTyping(true)
+      await sleep(CHECKIN_TYPING_MS)
+      setPipTyping(false)
 
       setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, timestamp: new Date() }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
@@ -2182,8 +2179,8 @@ const TradingBuddyWidget = () => {
                     <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                     <div className={`px-4 pb-1 text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Dev: preview check-in</div>
                     {[
-                      { label: 'With typing (widget closes)', checkIn: PREVIEW_CHECKINS[0] },
-                      { label: 'Urgent, no typing (widget closes)', checkIn: PREVIEW_CHECKINS[1] }
+                      { label: 'Revenge trade (widget closes)', checkIn: PREVIEW_CHECKINS[0] },
+                      { label: 'Daily loss limit (widget closes)', checkIn: PREVIEW_CHECKINS[1] }
                     ].map(({ label, checkIn }) => (
                       <button
                         key={checkIn.id}
