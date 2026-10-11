@@ -23,6 +23,14 @@ type Stats = {
   retention: { offsets: number[]; rows: { week: string; size: number; cells: (number | null)[] }[] }
   revenue: { active: number; pastDue: number; canceled: number; mrr: number }
   aiQuality: { rated: number; down: number; recentDown: { email: string | null; created_at: string; snapshot: any }[] }
+  aiCost?: {
+    tracked: boolean
+    last30d: number
+    last7d: number
+    perActiveUser7d: number | null
+    features: { feature: string; requests: number; avgInput: number; avgOutput: number; cachedShare: number | null; avgCost: number; total: number }[]
+    daily: { day: string; cost: number }[]
+  }
   deleted: {
     total: number
     last30d: number
@@ -334,6 +342,8 @@ export default function AdminPage() {
           )}
         </Card>
 
+        {stats.aiCost && <AiCostCard cost={stats.aiCost} />}
+
         <Card title="Verdicts rated 👎 (last 30 days)">
           {stats.aiQuality.recentDown.length === 0 ? (
             <p className="text-sm text-ink-muted">{stats.aiQuality.rated ? "No thumbs down. Nice." : "No ratings yet. They start once the extension update with 👍/👎 is published."}</p>
@@ -420,6 +430,57 @@ export default function AdminPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+const FEATURE_LABEL: Record<string, string> = { chat: "Chat messages", analysis: "Chart checks", notes: "Pip's notes (daily)" }
+const usd = (v: number) => v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`
+
+function AiCostCard({ cost }: { cost: NonNullable<Stats["aiCost"]> }) {
+  const max = Math.max(...cost.daily.map(d => d.cost), 0.0001)
+  return (
+    <Card title="AI cost (estimated from list prices)">
+      {!cost.tracked ? (
+        <p className="text-sm text-ink-muted">No data yet. Costs are recorded per request once the 20261017_memory_and_costs.sql migration has run.</p>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div><p className="text-xs text-ink-muted">Last 7 days</p><p className="text-xl font-semibold tabular-nums">{usd(cost.last7d)}</p></div>
+            <div><p className="text-xs text-ink-muted">Last 30 days</p><p className="text-xl font-semibold tabular-nums">{usd(cost.last30d)}</p></div>
+            <div><p className="text-xs text-ink-muted">Per active user (7 days)</p><p className="text-xl font-semibold tabular-nums">{cost.perActiveUser7d === null ? "-" : usd(cost.perActiveUser7d)}</p></div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs text-ink-muted">Per day, last 14 days</p>
+            <div className="flex h-20 items-end gap-1">
+              {cost.daily.map(d => (
+                <div key={d.day} title={`${d.day}: ${usd(d.cost)}`} className="flex-1 rounded-t bg-brand-500/70" style={{ height: `${Math.max(2, (d.cost / max) * 100)}%` }} />
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-ink-muted">
+                <tr><th className="py-1.5 font-normal">Last 30 days</th><th className="font-normal">Requests</th><th className="font-normal">Avg in</th><th className="font-normal">Cached</th><th className="font-normal">Avg out</th><th className="font-normal">Avg cost</th><th className="font-normal">Total</th></tr>
+              </thead>
+              <tbody className="tabular-nums">
+                {cost.features.map(f => (
+                  <tr key={f.feature} className="border-t border-ink-border">
+                    <td className="py-2">{FEATURE_LABEL[f.feature] ?? f.feature}</td>
+                    <td>{f.requests}</td>
+                    <td>{f.avgInput.toLocaleString()}</td>
+                    <td>{f.cachedShare === null ? "-" : `${Math.round(f.cachedShare * 100)}%`}</td>
+                    <td>{f.avgOutput.toLocaleString()}</td>
+                    <td>{f.requests ? usd(f.avgCost) : "-"}</td>
+                    <td>{usd(f.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-ink-muted">&quot;Cached&quot; is the share of input read from the prompt cache (billed at 5% of the normal price). Output includes Pip&apos;s thinking.</p>
+        </div>
+      )}
+    </Card>
   )
 }
 

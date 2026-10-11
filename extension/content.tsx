@@ -1411,9 +1411,13 @@ const TradingBuddyWidget = () => {
         return
       }
 
-      // Build conversation history (last 10 messages for context)
-      const conversationHistory = messages
-        .slice(-10)
+      // Conversation history: the real exchanges (not errors or notices), last 20.
+      // historyStart tells the server where they sit in the whole chat, so it can
+      // keep its window steady between messages (which keeps it cached and cheap).
+      const exchanges = messages.filter(msg => msg.type === 'user' || msg.type === 'assistant' || msg.type === 'checkin')
+      const historyStart = Math.max(0, exchanges.length - 20)
+      const conversationHistory = exchanges
+        .slice(historyStart)
         .map(msg => {
           let content = ''
           if (typeof msg.content === 'string') {
@@ -1440,6 +1444,7 @@ const TradingBuddyWidget = () => {
         message: text,
         includeChart,
         conversationHistory,
+        historyStart,
         timestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString()

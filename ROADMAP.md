@@ -156,3 +156,12 @@ Switchover, in order:
 - [ ] Support email on the new domain, then replace `help@snapchartapp.com` (site `links.ts`, privacy, terms, dashboard FAQ)
 - [ ] Trademark search for "Pip" in software / financial education
 - [ ] Around January 2027: remove the rename notices (site `RenameBanner`, dashboard notice in `dashboard/layout.tsx`, extension hello in `content.tsx`)
+
+## Pip's memory and AI cost tracking (October 2026)
+
+- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
+- Short-term memory: the last 12+ messages, same on every plan, in a window that moves in steps of 8 so it stays cached (needs extension 1.1.0 to send `historyStart`).
+- Long-term memory: Pip's notes, updated at most once a day per trader by a small model (`ANTHROPIC_SMALL_MODEL`, default claude-haiku-5-5), only after 4+ new messages. Editable at /dashboard/memory, can be turned off.
+- Trade patterns (last 30 days, no AI) go into Pip's memory and the Memory page.
+- Cost controls: prompt and memory cached for 1 hour, recent chat for 5 minutes; plain chat thinks at `low` effort, chat with a chart at `medium` (`ANTHROPIC_CHAT_EFFORT`, `ANTHROPIC_CHAT_IMAGE_EFFORT`).
+- Every AI request is logged with tokens and an estimated cost; see "AI cost" on the admin page. Prices live in `backend/lib/llm-cost.ts`.

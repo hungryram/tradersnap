@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod"
 import OpenAI from "openai"
 import sharp from "sharp"
 import type { z } from "zod"
+import type { LlmUsage as TokenUsage } from "./llm-cost"
 
 // Provider layer for /api/analyze and /api/chat. Routes build prompts; this file
 // owns which model runs them. Set AI_PROVIDER=anthropic to switch to Claude.
@@ -14,6 +15,12 @@ const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5"
 const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_MODEL
 // Thinking effort for chart analysis: higher is more careful but slower
 const ANALYZE_EFFORT = (process.env.ANTHROPIC_ANALYZE_EFFORT || "medium") as "low" | "medium" | "high"
+// Thinking effort for chat. Plain conversation doesn't need deep thinking, and
+// thinking is billed as output (the most expensive tokens); a chart gets more.
+const CHAT_EFFORT = (process.env.ANTHROPIC_CHAT_EFFORT || "low") as "low" | "medium" | "high"
+const CHAT_IMAGE_EFFORT = (process.env.ANTHROPIC_CHAT_IMAGE_EFFORT || "medium") as "low" | "medium" | "high"
+// Small, cheap model for background jobs like updating Pip's notes
+const ANTHROPIC_SMALL_MODEL = process.env.ANTHROPIC_SMALL_MODEL || "claude-haiku-5-5"
 
 // Opt into server-side refusal fallbacks: a declined request is re-run on the
 // model Anthropic recommends for that refusal category instead of failing.
@@ -42,6 +49,26 @@ export type ChatResult = {
   finishReason: "stop" | "length" | "refusal" | "other"
   model: string
   usage: LlmUsage | null
+  // Detailed counts for cost tracking (lib/llm-cost)
+  tokens: TokenUsage | null
+}
+
+export type AnalysisResult = { output: unknown; tokens: TokenUsage | null }
+
+function anthropicTokens(response: { model: string; usage: Anthropic.Beta.BetaUsage }): TokenUsage {
+  return {
+    model: response.model,
+    inputTokens: response.usage.input_tokens,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    outputTokens: response.usage.output_tokens
+  }
+}
+
+function openaiTokens(model: string, usage: OpenAI.CompletionUsage | undefined): TokenUsage | null {
+  if (!usage) return null
+  const cached = usage.prompt_tokens_details?.cached_tokens || 0
+  return { model, inputTokens: usage.prompt_tokens - cached, cacheWriteTokens: 0, cacheReadTokens: cached, outputTokens: usage.completion_tokens }
 }
 
 const isPaidPlan = (plan?: string | null) => plan === "pro" || plan === "admin"
@@ -56,7 +83,7 @@ export async function analyzeChart(opts: {
   prompt: string
   schema: z.ZodType
   plan?: string | null
-}): Promise<unknown> {
+}): Promise<AnalysisResult> {
   if (provider === "anthropic") {
     const response = await anthropic().beta.messages.parse({
       model: ANTHROPIC_MODEL,
@@ -80,7 +107,7 @@ export async function analyzeChart(opts: {
     if (response.stop_reason === "max_tokens" || response.parsed_output == null) {
       throw new Error(`Analysis output incomplete (stop_reason: ${response.stop_reason})`)
     }
-    return response.parsed_output
+    return { output: response.parsed_output, tokens: anthropicTokens(response) }
   }
 
   // Use auto-res for free plan (~765 tokens, much better readability), high-res for pro (full detail)
@@ -100,7 +127,7 @@ export async function analyzeChart(opts: {
     max_completion_tokens: 1500
   })
 
-  return JSON.parse(completion.choices[0].message.content || "{}")
+  return { output: JSON.parse(completion.choices[0].message.content || "{}"), tokens: openaiTokens("gpt-5.1", completion.usage) }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +136,7 @@ export async function analyzeChart(opts: {
 
 export async function chat(opts: {
   system: string
-  // Per-user context that changes rarely (saved messages); cached with the system prompt
+  // Per-user context that changes at most daily (saved messages, Pip's notes, trade patterns); cached
   memory?: string | null
   // Per-request context (current time); kept out of the cached prefix
   volatileContext?: string | null
@@ -126,10 +153,11 @@ export async function chat(opts: {
 async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResult> {
   const model = isPaidPlan(opts.plan) ? ANTHROPIC_MODEL : ANTHROPIC_MODEL_FREE
 
-  // Frozen system prompt + saved messages form the cached prefix
-  const system: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: opts.system }]
-  if (opts.memory) system.push({ type: "text", text: opts.memory })
-  system[system.length - 1].cache_control = { type: "ephemeral" }
+  // Cached prefix, most stable first. The system prompt and memory change at most
+  // daily, so they're cached for an hour (trading sessions have long gaps between
+  // messages); each is its own breakpoint so a memory update keeps the prompt cached.
+  const system: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: opts.system, cache_control: { type: "ephemeral", ttl: "1h" } }]
+  if (opts.memory) system.push({ type: "text", text: opts.memory, cache_control: { type: "ephemeral", ttl: "1h" } })
 
   // Conversation must start with a user turn; skip empty turns
   const history = opts.history.filter(turn => turn.content.trim().length > 0)
@@ -139,8 +167,12 @@ async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResu
   if (opts.image) userContent.push(await toClaudeImage(opts.image))
   userContent.push({ type: "text", text: opts.message })
 
+  // The recent conversation is cached too (5 minutes): the next message re-sends it
+  // at a fraction of the price while the trader keeps chatting
   const messages: Anthropic.Beta.BetaMessageParam[] = [
-    ...history.map(turn => ({ role: turn.role, content: turn.content })),
+    ...history.map((turn, i): Anthropic.Beta.BetaMessageParam => i === history.length - 1
+      ? { role: turn.role, content: [{ type: "text", text: turn.content, cache_control: { type: "ephemeral" } }] }
+      : { role: turn.role, content: turn.content }),
     { role: "user", content: userContent }
   ]
   // Operator context after the user turn, so it never invalidates the cached prefix
@@ -151,7 +183,7 @@ async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResu
     max_tokens: 16000,
     betas: [FALLBACK_BETA],
     fallbacks: "default",
-    output_config: { effort: "medium" },
+    output_config: { effort: opts.image ? CHAT_IMAGE_EFFORT : CHAT_EFFORT },
     system,
     messages
   })
@@ -180,7 +212,8 @@ async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResu
       outputTokens: response.usage.output_tokens,
       cachedTokens,
       totalTokens: inputTokens + response.usage.output_tokens
-    }
+    },
+    tokens: anthropicTokens(response)
   }
 }
 
@@ -233,8 +266,37 @@ async function chatOpenAI(opts: Parameters<typeof chat>[0]): Promise<ChatResult>
       outputTokens: usage.completion_tokens,
       cachedTokens: usage.prompt_tokens_details?.cached_tokens || 0,
       totalTokens: usage.total_tokens
-    } : null
+    } : null,
+    tokens: openaiTokens(model, usage)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Small structured jobs (background, cheap model)
+// ---------------------------------------------------------------------------
+
+// One short JSON answer from the small model, e.g. updating Pip's notes
+export async function smallJson<T>(opts: { system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number }): Promise<{ output: T; tokens: TokenUsage | null }> {
+  if (provider === "anthropic") {
+    const response = await anthropic().beta.messages.parse({
+      model: ANTHROPIC_SMALL_MODEL,
+      max_tokens: opts.maxTokens ?? 2000,
+      output_config: { format: betaZodOutputFormat(opts.schema) },
+      system: opts.system,
+      messages: [{ role: "user", content: opts.prompt }]
+    })
+    if (response.parsed_output == null) throw new Error(`Small model output incomplete (stop_reason: ${response.stop_reason})`)
+    return { output: response.parsed_output as T, tokens: anthropicTokens(response) }
+  }
+
+  const completion = await openai().chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "system", content: opts.system }, { role: "user", content: opts.prompt }],
+    response_format: { type: "json_object" },
+    max_completion_tokens: opts.maxTokens ?? 2000
+  })
+  const output = opts.schema.parse(JSON.parse(completion.choices[0].message.content || "{}"))
+  return { output, tokens: openaiTokens("gpt-5-mini", completion.usage) }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { APP_ORIGINS, APP_URL, SUPPORT_EMAIL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -6,6 +6,22 @@ import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
 import { claimWelcomeCredit, consumeUsage, creditState, getLimits, refundUsage, usagePayload, type Reservation, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
+import { loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
+import { loadTradePatterns } from "@/lib/trade-patterns"
+import { logLlmUsage } from "@/lib/llm-cost"
+
+// Recent conversation sent with each message. The window starts on a multiple
+// of HISTORY_STEP, so it holds still for a few exchanges and stays cached,
+// then jumps forward; it always has at least HISTORY_MIN recent messages.
+const HISTORY_MIN = 12
+const HISTORY_STEP = 8
+
+function historyWindow<T>(turns: T[], historyStart?: number): T[] {
+  if (historyStart === undefined) return turns.slice(-HISTORY_MIN) // older extensions
+  const total = historyStart + turns.length
+  const start = Math.floor(Math.max(0, total - HISTORY_MIN) / HISTORY_STEP) * HISTORY_STEP
+  return turns.slice(Math.max(0, start - historyStart))
+}
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -252,6 +268,7 @@ const chatRequestSchema = z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string().max(8000)
   })).max(50).optional(),
+  historyStart: z.number().int().min(0).optional(), // position of conversationHistory[0] in the whole chat
   timestamp: z.string().optional(), // ISO timestamp from client
   timezone: z.string().optional(), // IANA timezone (e.g., "America/New_York")
   dayStart: z.string().optional() // ISO time of the trader's local midnight
@@ -459,9 +476,21 @@ Use for time-based coaching when they ask about the next candle or how long they
       ? `SAVED MESSAGES (User's important insights/rules to always remember):\n${favoritedMessages.map(m => `[${m.role}]: ${m.content}`).join('\n\n')}`
       : null
 
-    // Conversation history (limit based on plan to control token usage)
-    const historyLimit = profile.plan === 'admin' ? 50 : profile.plan === 'pro' ? 20 : 10
-    const history = (validatedRequest.conversationHistory ?? []).slice(-historyLimit)
+    // Long-term memory: Pip's notes and trading patterns (stable all day, so cached).
+    // Skipped entirely when the trader has turned memory off.
+    const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits').eq('id', user.id).single()
+    const memoryOn = memorySettings?.memory_enabled !== false
+    const [notes, patterns] = memoryOn
+      ? await Promise.all([
+          loadNotes(supabase, user.id),
+          loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone)
+        ])
+      : [[], []]
+    const memory = [favoritedContext, memoryContext(notes, patterns)].filter(Boolean).join('\n\n') || null
+
+    // Recent conversation, the same size on every plan (see historyWindow)
+    const fullHistory = validatedRequest.conversationHistory ?? []
+    const history = profile.plan === 'admin' ? fullHistory : historyWindow(fullHistory, validatedRequest.historyStart)
 
     // Message with chart image (either new capture or context from previous analysis)
     const imageDescription = validatedRequest.isContextImage
@@ -474,7 +503,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     // 8. Call the model (provider + model selection live in lib/llm)
     const result = await llmChat({
       system: coachingPrompt,
-      memory: favoritedContext,
+      memory,
       volatileContext: [timeContext, tradesContext].filter(Boolean).join("\n\n") || null,
       history,
       message: userMessage,
@@ -506,6 +535,12 @@ Use for time-based coaching when they ask about the next candle or how long they
         aiResponse = "I'm sorry, I couldn't generate a response. Please try again."
       }
     }
+
+    // Cost tracking, and the once-a-day notes update, after the reply is sent
+    after(async () => {
+      await logLlmUsage(supabase, user.id, 'chat', result.tokens)
+      if (memoryOn) await maybeRefreshNotes(supabase, user.id)
+    })
 
     // Track token usage (check the provider dashboard for actual costs)
     const usage = result.usage

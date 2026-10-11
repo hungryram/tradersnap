@@ -32,6 +32,52 @@ async function fetchOptional<T>(build: (from: number, to: number) => PromiseLike
   }
 }
 
+type LlmRow = {
+  user_id: string | null
+  feature: "chat" | "analysis" | "notes"
+  input_tokens: number
+  cache_write_tokens: number
+  cache_read_tokens: number
+  output_tokens: number
+  cost_usd: number | string | null
+  created_at: string
+}
+
+// What the AI costs: per feature (last 30 days), per day (last 14) and per active user (last 7)
+function aiCost(rows: LlmRow[], now: number) {
+  const cost = (r: LlmRow) => Number(r.cost_usd ?? 0)
+  const features = (["chat", "analysis", "notes"] as const).map(feature => {
+    const list = rows.filter(r => r.feature === feature)
+    const n = list.length || 1
+    const input = list.reduce((s, r) => s + r.input_tokens + r.cache_write_tokens + r.cache_read_tokens, 0)
+    const cached = list.reduce((s, r) => s + r.cache_read_tokens, 0)
+    return {
+      feature,
+      requests: list.length,
+      avgInput: Math.round(input / n),
+      avgOutput: Math.round(list.reduce((s, r) => s + r.output_tokens, 0) / n),
+      cachedShare: input ? cached / input : null,
+      avgCost: list.reduce((s, r) => s + cost(r), 0) / n,
+      total: list.reduce((s, r) => s + cost(r), 0)
+    }
+  })
+  const week = rows.filter(r => now - Date.parse(r.created_at) <= 7 * DAY)
+  const weekUsers = new Set(week.map(r => r.user_id).filter(Boolean)).size
+  const weekCost = week.reduce((s, r) => s + cost(r), 0)
+  const daily = Array.from({ length: 14 }, (_, i) => {
+    const day = new Date(now - (13 - i) * DAY).toISOString().slice(0, 10)
+    return { day, cost: rows.filter(r => r.created_at.slice(0, 10) === day).reduce((s, r) => s + cost(r), 0) }
+  })
+  return {
+    tracked: rows.length > 0,
+    last30d: rows.reduce((s, r) => s + cost(r), 0),
+    last7d: weekCost,
+    perActiveUser7d: weekUsers ? weekCost / weekUsers : null,
+    features,
+    daily
+  }
+}
+
 // Monday 00:00 UTC of the week containing `time`
 function weekStart(time: number) {
   const d = new Date(time)
@@ -72,7 +118,7 @@ export async function GET(request: NextRequest) {
     const now = Date.now()
     const since = new Date(now - 120 * DAY).toISOString()
 
-    const [profiles, rulesetRows, events, trades, ratings, feedback, deleted] = await Promise.all([
+    const [profiles, rulesetRows, events, trades, ratings, feedback, deleted, llmRows] = await Promise.all([
       fetchProfiles(),
       fetchAll<{ user_id: string }>((from, to) => supabase.from("rulesets").select("user_id").range(from, to)),
       fetchAll<Event>((from, to) => supabase.from("usage_events").select("user_id, event_type, created_at, metadata").gte("created_at", since).order("created_at", { ascending: true }).range(from, to)),
@@ -80,7 +126,8 @@ export async function GET(request: NextRequest) {
       fetchOptional<Rating>((from, to) => supabase.from("analysis_ratings").select("user_id, rating, snapshot, created_at").gte("created_at", since).order("created_at", { ascending: false }).range(from, to)),
       fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at, user_id").order("created_at", { ascending: false }).range(from, to))
         .then(rows => rows.length ? rows : fetchOptional<Feedback>((from, to) => supabase.from("uninstall_feedback").select("reason, details, created_at").order("created_at", { ascending: false }).range(from, to))),
-      fetchOptional<Deleted>((from, to) => supabase.from("deleted_accounts").select("signed_up_month, deleted_at, plan, checks, active_days, trades, platforms, prop_firm, reason, details").order("deleted_at", { ascending: false }).range(from, to))
+      fetchOptional<Deleted>((from, to) => supabase.from("deleted_accounts").select("signed_up_month, deleted_at, plan, checks, active_days, trades, platforms, prop_firm, reason, details").order("deleted_at", { ascending: false }).range(from, to)),
+      fetchOptional<LlmRow>((from, to) => supabase.from("llm_usage").select("user_id, feature, input_tokens, cache_write_tokens, cache_read_tokens, output_tokens, cost_usd, created_at").gte("created_at", new Date(now - 30 * DAY).toISOString()).range(from, to))
     ])
 
     const emailById = new Map(profiles.map(p => [p.id, p.email]))
@@ -245,6 +292,7 @@ export async function GET(request: NextRequest) {
         down: downs.length,
         recentDown: downs.slice(0, 20).map(r => ({ email: emailById.get(r.user_id) ?? null, created_at: r.created_at, snapshot: r.snapshot }))
       },
+      aiCost: aiCost(llmRows, now),
       deleted: {
         total: deleted.length,
         last30d: deleted.filter(d => now - Date.parse(d.deleted_at) <= 30 * DAY).length,

@@ -243,6 +243,7 @@ export default function AccountPage() {
                   <li>Your account and profile</li>
                   <li>Your rules and daily limits</li>
                   <li>Your chat history and saved messages</li>
+                  <li>Everything Pip remembers about you</li>
                   <li>Your detected trades and journal</li>
                   <li>Your usage history and ratings</li>
                 </ul>

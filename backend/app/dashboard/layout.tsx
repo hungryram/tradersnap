@@ -12,6 +12,7 @@ const MAIN_NAV = [
   { href: "/dashboard/journal", label: "Journal", icon: BookIcon },
   { href: "/dashboard/rules", label: "Rules", icon: ListIcon },
   { href: "/dashboard/saved-messages", label: "Saved", icon: StarIcon },
+  { href: "/dashboard/memory", label: "Memory", icon: MemoryIcon },
   { href: "/dashboard/account", label: "Account", icon: UserIcon },
 ]
 
@@ -189,4 +190,5 @@ function BookIcon() { return <Svg><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5
 function ListIcon() { return <Svg><path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2" /></Svg> }
 function StarIcon() { return <Svg><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" /></Svg> }
 function ChartIcon() { return <Svg><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></Svg> }
+function MemoryIcon() { return <Svg><path d="M12 5a3 3 0 0 0-5.8-1A3 3 0 0 0 4 8a3 3 0 0 0 0 5 3 3 0 0 0 3 4 3 3 0 0 0 5 1z" /><path d="M12 5a3 3 0 0 1 5.8-1A3 3 0 0 1 20 8a3 3 0 0 1 0 5 3 3 0 0 1-3 4 3 3 0 0 1-5 1z" /><path d="M12 5v13" /></Svg> }
 function UserIcon() { return <Svg><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></Svg> }

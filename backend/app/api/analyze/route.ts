@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
+import { logLlmUsage } from "@/lib/llm-cost"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
@@ -134,13 +135,14 @@ export async function POST(request: NextRequest) {
     })
 
     // Provider + model selection live in lib/llm
-    const aiResponse = await analyzeChart({
+    const { output: aiResponse, tokens } = await analyzeChart({
       system: coachingPrompt,
       image: validatedRequest.image,
       prompt: "Analyze this chart.",
       schema: analysisOutputSchema,
       plan: profile.plan
     })
+    after(() => logLlmUsage(supabase, user.id, "analysis", tokens))
     const validatedResponse = trimAnalysis(analysisResponseSchema.parse(aiResponse))
 
     // Unreadable charts don't count towards usage (reported by the model as a structured field)
