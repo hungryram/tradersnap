@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { SUPPORT_EMAIL } from "@/lib/urls"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 
@@ -454,9 +455,7 @@ export default function GuidePage() {
                         </a>{" "}
                         or{" "}
                         <a
-                            href="https://snapchart.canny.io/bugs-and-issues"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={`mailto:${SUPPORT_EMAIL}`}
                             className="text-brand-300 hover:text-brand-200 underline"
                         >
                             contact support

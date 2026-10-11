@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { APP_ORIGINS, APP_URL } from "@/lib/urls"
+import { APP_ORIGINS, APP_URL, SUPPORT_EMAIL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
@@ -209,9 +209,8 @@ AVAILABLE NOW:
 - Trade Quality
 - Ruleset checklist
 
-WANT SOMETHING NEW?
-Feature requests: https://snapchart.canny.io/feature-requests
-Join Discord: https://discord.gg/vCSS8mbV3U`
+WANT SOMETHING NEW, OR FOUND A BUG?
+Email ${SUPPORT_EMAIL}. Every message is read by the person building Pip.`
 
   const goal = tier === "pro"
     ? `GOAL

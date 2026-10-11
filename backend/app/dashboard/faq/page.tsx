@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { SUPPORT_EMAIL } from "@/lib/urls"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 
@@ -149,7 +150,7 @@ export default function FAQPage() {
         },
         {
           q: "Can I use Pip on mobile?",
-          a: "Currently, Pip is a desktop Chrome extension. Mobile support is on our roadmap—request this feature on our Feature Requests page!"
+          a: "Currently, Pip is a desktop Chrome extension. Mobile support is on our roadmap. Email us if you'd use it."
         }
       ]
     },
@@ -193,10 +194,8 @@ export default function FAQPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Frequently Asked Questions</h1>
           <p className="text-ink-text">
             Find answers to common questions about Pip. Can't find what you're looking for?{" "}
-            <a 
-              href="https://snapchart.canny.io/bugs-and-issues" 
-              target="_blank" 
-              rel="noopener noreferrer"
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="text-brand-300 hover:text-brand-200 underline"
             >
               Contact support
@@ -227,7 +226,7 @@ export default function FAQPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <a 
-              href="mailto:help@snapchartapp.com"
+              href={`mailto:${SUPPORT_EMAIL}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-4 py-2 bg-brand-500 hover:bg-brand-400 text-ink-bg rounded-lg transition-colors"
@@ -235,7 +234,7 @@ export default function FAQPage() {
               Report an Issue
             </a>
             <a 
-              href="mailto:help@snapchartapp.com"
+              href={`mailto:${SUPPORT_EMAIL}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-4 py-2 bg-ink-surface hover:bg-ink-elevated text-ink-text rounded-lg transition-colors border border-ink-border"

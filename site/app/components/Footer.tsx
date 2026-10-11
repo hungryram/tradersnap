@@ -1,4 +1,3 @@
-import { DISCORD_URL } from "../links"
 import Pip from "./Pip"
 
 const LINKS = [
@@ -24,9 +23,6 @@ export default function Footer() {
             {LINKS.map((l) => (
               <a key={l.href} href={l.href} className="hover:text-ink-body transition-colors">{l.label}</a>
             ))}
-            <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-ink-body transition-colors">
-              <img src="/discord.svg" alt="" className="h-3.5 w-3.5" /> Discord
-            </a>
           </nav>
         </div>
         <p className="mt-10 text-xs leading-relaxed text-ink-muted max-w-4xl">

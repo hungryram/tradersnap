@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
 import Pip from "../components/Pip"
+import { SUPPORT_EMAIL } from "@/lib/urls"
 
 const MAIN_NAV = [
   { href: "/dashboard", label: "Today", icon: SunIcon },
@@ -17,7 +18,7 @@ const MAIN_NAV = [
 const HELP_NAV = [
   { href: "/dashboard/guide", label: "Guide" },
   { href: "/dashboard/faq", label: "FAQ" },
-  { href: "https://discord.com/invite/fuxFDEsDph", label: "Discord", external: true },
+  { href: `mailto:${SUPPORT_EMAIL}`, label: "Contact support", external: true },
 ]
 
 // Snapchart was renamed to Pip on this date; older accounts see a one-time notice

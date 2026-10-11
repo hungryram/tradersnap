@@ -2137,21 +2137,12 @@ const TradingBuddyWidget = () => {
                 <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                 <button
                   onClick={() => {
-                    window.open('https://snapchart.canny.io/', '_blank')
+                    window.open('mailto:help@snapchartapp.com?subject=Pip%20feedback', '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
-                  Feature Requests
-                </button>
-                <button
-                  onClick={() => {
-                    window.open('https://discord.gg/vCSS8mbV3U', '_blank')
-                    setShowMenu(false)
-                  }}
-                  className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
-                >
-                  Join Discord
+                  Send feedback or report a bug
                 </button>
                 <button
                   onClick={() => {
