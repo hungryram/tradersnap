@@ -34,7 +34,7 @@ async function fetchOptional<T>(build: (from: number, to: number) => PromiseLike
 
 type LlmRow = {
   user_id: string | null
-  feature: "chat" | "analysis" | "notes"
+  feature: "chat" | "analysis" | "notes" | "checkin" | "rules"
   input_tokens: number
   cache_write_tokens: number
   cache_read_tokens: number
@@ -43,10 +43,45 @@ type LlmRow = {
   created_at: string
 }
 
+// AI cost per user over the last 30 days
+function costPerUser(rows: LlmRow[]) {
+  const byUser = new Map<string, { cost: number; requests: number; byFeature: Record<string, number> }>()
+  for (const r of rows) {
+    if (!r.user_id) continue
+    const entry = byUser.get(r.user_id) ?? { cost: 0, requests: 0, byFeature: {} }
+    const cost = Number(r.cost_usd ?? 0)
+    entry.cost += cost
+    entry.requests++
+    entry.byFeature[r.feature] = (entry.byFeature[r.feature] ?? 0) + cost
+    byUser.set(r.user_id, entry)
+  }
+  return byUser
+}
+
+// The 15 users who cost the most, with what they pay, so margin is visible
+function topCostUsers(byUser: ReturnType<typeof costPerUser>, profiles: { id: string; email: string; plan: string | null; subscription_status: string | null }[]) {
+  const byId = new Map(profiles.map(p => [p.id, p]))
+  return [...byUser.entries()]
+    .sort((a, b) => b[1].cost - a[1].cost)
+    .slice(0, 15)
+    .map(([id, entry]) => {
+      const p = byId.get(id)
+      const paying = p?.plan === "pro" && p.subscription_status === "active"
+      return {
+        email: p?.email ?? "(deleted account)",
+        plan: p?.plan ?? "free",
+        cost: entry.cost,
+        requests: entry.requests,
+        byFeature: entry.byFeature,
+        revenue: paying ? PRO_PRICE : 0
+      }
+    })
+}
+
 // What the AI costs: per feature (last 30 days), per day (last 14) and per active user (last 7)
 function aiCost(rows: LlmRow[], now: number) {
   const cost = (r: LlmRow) => Number(r.cost_usd ?? 0)
-  const features = (["chat", "analysis", "notes"] as const).map(feature => {
+  const features = (["chat", "analysis", "checkin", "notes", "rules"] as const).map(feature => {
     const list = rows.filter(r => r.feature === feature)
     const n = list.length || 1
     const input = list.reduce((s, r) => s + r.input_tokens + r.cache_write_tokens + r.cache_read_tokens, 0)
@@ -129,6 +164,7 @@ export async function GET(request: NextRequest) {
       fetchOptional<Deleted>((from, to) => supabase.from("deleted_accounts").select("signed_up_month, deleted_at, plan, checks, active_days, trades, platforms, prop_firm, reason, details").order("deleted_at", { ascending: false }).range(from, to)),
       fetchOptional<LlmRow>((from, to) => supabase.from("llm_usage").select("user_id, feature, input_tokens, cache_write_tokens, cache_read_tokens, output_tokens, cost_usd, created_at").gte("created_at", new Date(now - 30 * DAY).toISOString()).range(from, to))
     ])
+    const costByUser = costPerUser(llmRows)
 
     const emailById = new Map(profiles.map(p => [p.id, p.email]))
     const hasRules = new Set(rulesetRows.map(r => r.user_id))
@@ -292,7 +328,7 @@ export async function GET(request: NextRequest) {
         down: downs.length,
         recentDown: downs.slice(0, 20).map(r => ({ email: emailById.get(r.user_id) ?? null, created_at: r.created_at, snapshot: r.snapshot }))
       },
-      aiCost: aiCost(llmRows, now),
+      aiCost: { ...aiCost(llmRows, now), topUsers: topCostUsers(costByUser, profiles) },
       deleted: {
         total: deleted.length,
         last30d: deleted.filter(d => now - Date.parse(d.deleted_at) <= 30 * DAY).length,
@@ -314,7 +350,10 @@ export async function GET(request: NextRequest) {
       },
       users: profiles.map(p => {
         const a = activity.get(p.id)
+        const cost = costByUser.get(p.id)
         return {
+          ai_cost_30d: cost?.cost ?? 0,
+          ai_requests_30d: cost?.requests ?? 0,
           email: p.email,
           name: p.first_name,
           plan: p.plan ?? "free",

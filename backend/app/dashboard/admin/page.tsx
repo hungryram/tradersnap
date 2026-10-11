@@ -8,7 +8,7 @@ type Step = { label: string; count: number }
 type UserRow = {
   email: string; name: string | null; plan: string; subscription_status: string | null
   created_at: string; last_active: string | null; checks: number; checks7d: number; trades: number; has_rules: boolean
-  active_days_30d: number; group: Group; uninstalled_at: string | null; platforms: string[]; markets: string[]; prop_firm: boolean | null; experience: string | null
+  active_days_30d: number; ai_cost_30d: number; ai_requests_30d: number; group: Group; uninstalled_at: string | null; platforms: string[]; markets: string[]; prop_firm: boolean | null; experience: string | null
 }
 type Group = "power" | "casual" | "fading" | "gone" | "never"
 type SegmentRow = { value: string; users: number; active: number; paying: number }
@@ -30,6 +30,7 @@ type Stats = {
     perActiveUser7d: number | null
     features: { feature: string; requests: number; avgInput: number; avgOutput: number; cachedShare: number | null; avgCost: number; total: number }[]
     daily: { day: string; cost: number }[]
+    topUsers?: { email: string; plan: string; cost: number; requests: number; byFeature: Record<string, number>; revenue: number }[]
   }
   deleted: {
     total: number
@@ -71,7 +72,7 @@ const CHECKIN_LABELS: Record<string, string> = {
   max_trades: "Max trades reached", over_max: "Trade past the max", outside_hours: "Outside trading hours", big_win: "Big win", session_recap: "End-of-session recap"
 }
 
-type SortKey = "created_at" | "last_active" | "checks" | "checks7d" | "trades" | "active_days_30d"
+type SortKey = "created_at" | "last_active" | "checks" | "checks7d" | "trades" | "active_days_30d" | "ai_cost_30d"
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -376,12 +377,13 @@ export default function AdminPage() {
                 <option value="checks7d">Checks this week</option>
                 <option value="active_days_30d">Most active days</option>
                 <option value="trades">Most trades</option>
+                <option value="ai_cost_30d">Most AI cost (30d)</option>
               </select>
             </div>
           }
         >
           <div className="-mx-5 overflow-x-auto sm:-mx-6">
-            <table className="w-full min-w-[920px] text-sm">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-ink-muted">
                   <th className="px-5 pb-2 font-normal sm:px-6">User</th>
@@ -392,7 +394,8 @@ export default function AdminPage() {
                   <th className="pb-2 font-normal text-right" title="Days with any activity in the last 30">Days (30d)</th>
                   <th className="pb-2 font-normal text-right">Checks</th>
                   <th className="pb-2 font-normal text-right">This week</th>
-                  <th className="px-5 pb-2 font-normal text-right sm:px-6">Trades</th>
+                  <th className="pb-2 font-normal text-right">Trades</th>
+                  <th className="px-5 pb-2 font-normal text-right sm:px-6" title="Estimated AI cost in the last 30 days">AI cost (30d)</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,7 +424,10 @@ export default function AdminPage() {
                     <td className="py-2 text-right tabular-nums">{u.active_days_30d}</td>
                     <td className="py-2 text-right tabular-nums">{u.checks}</td>
                     <td className="py-2 text-right tabular-nums">{u.checks7d}</td>
-                    <td className="px-5 py-2 text-right tabular-nums sm:px-6">{u.trades}</td>
+                    <td className="py-2 text-right tabular-nums">{u.trades}</td>
+                    <td className="px-5 py-2 text-right tabular-nums sm:px-6" title={`${u.ai_requests_30d} AI requests`}>
+                      {u.ai_requests_30d ? usd(u.ai_cost_30d) : <span className="text-ink-muted">—</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -433,7 +439,7 @@ export default function AdminPage() {
   )
 }
 
-const FEATURE_LABEL: Record<string, string> = { chat: "Chat messages", analysis: "Chart checks", notes: "Pip's notes (daily)" }
+const FEATURE_LABEL: Record<string, string> = { chat: "Chat messages", analysis: "Chart checks", notes: "Pip's notes (daily)", checkin: "Check-ins", rules: "Rules reviews" }
 const usd = (v: number) => v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`
 
 function AiCostCard({ cost }: { cost: NonNullable<Stats["aiCost"]> }) {
@@ -477,6 +483,30 @@ function AiCostCard({ cost }: { cost: NonNullable<Stats["aiCost"]> }) {
               </tbody>
             </table>
           </div>
+          {cost.topUsers && cost.topUsers.length > 0 && (
+            <div className="overflow-x-auto">
+              <p className="mb-2 text-xs text-ink-muted">Most expensive users, last 30 days</p>
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-ink-muted">
+                  <tr><th className="py-1.5 font-normal">User</th><th className="font-normal">Plan</th><th className="font-normal">Requests</th><th className="font-normal">Where it went</th><th className="font-normal text-right">AI cost</th><th className="font-normal text-right">Pays</th></tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {cost.topUsers.map(u => (
+                    <tr key={u.email} className="border-t border-ink-border">
+                      <td className="py-2">{u.email}</td>
+                      <td className="capitalize">{u.plan}</td>
+                      <td>{u.requests}</td>
+                      <td className="text-xs text-ink-text">
+                        {Object.entries(u.byFeature).sort((a, b) => b[1] - a[1]).map(([f, v]) => `${FEATURE_LABEL[f] ?? f} ${usd(v)}`).join(" · ")}
+                      </td>
+                      <td className={`text-right ${u.revenue && u.cost > u.revenue ? "text-red-300" : ""}`}>{usd(u.cost)}</td>
+                      <td className="text-right text-ink-text">{u.revenue ? `$${u.revenue}/mo` : "Free"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="text-xs text-ink-muted">&quot;Cached&quot; is the share of input read from the prompt cache (billed at 5% of the normal price). Output includes Pip&apos;s thinking.</p>
         </div>
       )}
