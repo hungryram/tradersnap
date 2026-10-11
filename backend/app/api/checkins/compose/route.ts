@@ -46,10 +46,10 @@ const TASKS: Record<(typeof KINDS)[number], string> = {
   session_recap: "The end-of-session recap: state the day's numbers, say plainly whether rules were kept or which were broken (no lecturing), and ask one short reflective question.",
   loss_streak: "A warning in the moment: they just hit a losing streak. Calm and direct, like a coach putting a hand on their shoulder. If they've hit their stop rule, be clear the day is done.",
   daily_loss: "A warning in the moment: they're past their daily loss limit. Calm, firm and kind; their own rule says stop.",
-  revenge: "A warning in the moment: they opened a new trade minutes after a loss. Ask whether it's their plan or the last trade talking. No accusations.",
+  revenge: "A warning in the moment: they already opened a new position minutes after a loss (it's live now). Ask whether it's their plan or the last trade talking. No accusations.",
   max_trades: "A heads-up: that was their last allowed trade for today. Acknowledge it and say the day's done by their rule.",
-  over_max: "A warning in the moment: they're opening a trade past their daily max. Ask what's different about this one, gently.",
-  outside_hours: "A heads-up: they're trading outside the hours they set. Point it out and ask if it's worth breaking their rule.",
+  over_max: "A warning in the moment: they already opened a trade past their daily max (it's live now). Ask what's different about this one, gently.",
+  outside_hours: "A heads-up: they just opened a trade outside the hours they set. Point it out and ask if it's worth breaking their rule.",
   big_win: "After a big winning trade: congratulate them briefly, then remind them that overconfidence follows big wins.",
 }
 
@@ -62,6 +62,9 @@ Hard rules:
 - Keep every number, amount, time and limit from the plain version, written exactly the same way, as digits ("2", not "two"; "$500", not "500 dollars").
 - Never give signals, predictions or price targets, or tell them to buy or sell. You coach discipline and process, not the market.
 - Use at most one thing you know about them (a note or a pattern), only if it genuinely fits right now. Never say "according to my notes".
+- Never mention what you don't know or where your information comes from (no "no name on file", "based on your data", "my notes say").
+- Don't tell them how to respond (no "no need to answer", "reply below"); just say your piece or ask your question.
+- When a trade is already open, don't talk as if they haven't clicked yet.
 - Write only the message itself.`
 
 const WORDS: Record<string, string> = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" }
@@ -88,7 +91,9 @@ export async function POST(request: NextRequest) {
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return reply({ error: "Invalid request" }, 400)
-  const { kind, facts, timezone, dayStart } = parsed.data
+  const { kind, timezone, dayStart } = parsed.data
+  // Leave out empty facts (like a missing name) so Pip doesn't remark on them
+  const facts = Object.fromEntries(Object.entries(parsed.data.facts).filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)))
   const plain = parsed.data.fallback
 
   const { count, error: countError } = await supabase
