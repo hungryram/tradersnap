@@ -34,6 +34,15 @@
   margin: 0.75rem 0;
 }
 
+/* No extra space at the top and bottom of a message bubble */
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
 .markdown-content strong {
   font-weight: 600;
 }

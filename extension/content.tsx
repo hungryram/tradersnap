@@ -78,7 +78,7 @@ const PREVIEW_CHECKINS: CheckIn[] = [
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
 function messageMood(msg: any): PipMood {
   if (msg.type === 'checkin') return msg.level === 'warning' ? 'caution' : 'idle'
-  if (msg.type === 'error') return 'caution'
+  if (msg.type === 'error') return 'idle'
   const status = typeof msg.content === 'object' ? msg.content?.setup_status : null
   if (status === 'valid' || status === 'aligned' || status === 'pass') return 'happy'
   if (status === 'invalid' || status === 'violated' || status === 'fail') return 'caution'
@@ -87,10 +87,10 @@ function messageMood(msg: any): PipMood {
 
 // Message when today's allowance is used up (checked before taking a screenshot)
 function limitReachedText(plan: string, canBuyMore?: boolean) {
-  const more = canBuyMore ? " You can buy more to keep going today." : ""
-  return plan === 'free'
-    ? `You've used today's free allowance. It resets at midnight UTC.${more} Pro gives you about 10x more every day.`
-    : `You've used today's allowance. It resets at midnight UTC.${more}`
+  const isPaid = plan !== 'free'
+  const base = "That's today's allowance used up. It refills at midnight UTC."
+  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 10x more every day.")
+  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 10x.")
 }
 
 // Shown under "Analyze this chart" while an analysis runs
@@ -944,7 +944,7 @@ const TradingBuddyWidget = () => {
       if (!supabase_session) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: "You're not signed in.",
+          content: "I need you signed in before I can help. It only takes a few seconds.",
           requiresLogin: true,
           timestamp: new Date()
         }])
@@ -962,7 +962,7 @@ const TradingBuddyWidget = () => {
       if (!rulesetResponse.ok) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: `No active ruleset found. Please [set one in the dashboard](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules).`,
+          content: `I don't know your rules yet, so I can't check this chart against them. [Add your rules](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules) (there are templates, it takes two minutes), then try again.`,
           timestamp: new Date()
         }])
         return
@@ -1006,7 +1006,7 @@ const TradingBuddyWidget = () => {
       if (!screenshotResponse.success || !screenshotResponse.dataUrl) {
         setMessages(prev => [...prev, {
           type: 'error',
-          content: 'Failed to capture chart. Please try again.',
+          content: "I couldn't grab your chart that time. Mind trying again?",
           timestamp: new Date()
         }])
         return
@@ -1049,7 +1049,7 @@ const TradingBuddyWidget = () => {
         const errorData = await analyzeResponse.json().catch(() => ({}))
         setMessages(prev => [...prev, {
           type: 'error',
-          content: errorData.message || errorData.error || 'Analysis failed. Please try again.',
+          content: errorData.message || "Something went wrong on my end while checking your chart. Give it another try in a moment. That one didn't count against your usage.",
           timestamp: new Date(),
           requiresUpgrade: errorData.requiresUpgrade,
           canBuyMore: errorData.canBuyMore
@@ -1098,7 +1098,7 @@ const TradingBuddyWidget = () => {
       console.error('[Content] Analysis error:', error)
       setMessages(prev => [...prev, {
         type: 'error',
-        content: 'An error occurred during analysis.',
+        content: "Something went wrong on my end while checking your chart. Give it another try in a moment. That one didn't count against your usage.",
         timestamp: new Date()
       }])
     } finally {
@@ -1206,7 +1206,7 @@ const TradingBuddyWidget = () => {
         // Show error to user
         setMessages(prev => [...prev, {
           type: 'error',
-          content: "You're not signed in.",
+          content: "I need you signed in before I can help. It only takes a few seconds.",
           requiresLogin: true,
           timestamp: new Date()
         }])
@@ -1389,7 +1389,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: "You're not signed in.",
+          content: "I need you signed in before I can help. It only takes a few seconds.",
           requiresLogin: true,
           timestamp: new Date()
         }
@@ -1405,7 +1405,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Your session expired. Sign in again to continue.',
+          content: "Looks like you got signed out. Sign back in and we'll pick up right where we left off.",
           requiresLogin: true,
           timestamp: new Date()
         }
@@ -1421,7 +1421,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Your session expired. Sign in again to continue.',
+          content: "Looks like you got signed out. Sign back in and we'll pick up right where we left off.",
           requiresLogin: true,
           timestamp: new Date()
         }
@@ -1577,7 +1577,7 @@ const TradingBuddyWidget = () => {
         console.error('[Content] Empty response from chat API')
         const errorMsg = {
           type: 'error',
-          content: 'Received empty response. Please try again.',
+          content: "I lost my train of thought there. Can you send that again? It didn't count against your usage.",
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -1643,7 +1643,7 @@ const TradingBuddyWidget = () => {
         
         const errorMsg = {
           type: 'error',
-          content: 'Your session expired. Sign in again to continue.',
+          content: "Looks like you got signed out. Sign back in and we'll pick up right where we left off.",
           requiresLogin: true,
           timestamp: new Date()
         }
@@ -1651,7 +1651,7 @@ const TradingBuddyWidget = () => {
       } else {
         const errorMsg = {
           type: 'error',
-          content: `Failed to send message. ${error instanceof Error ? error.message : 'Please try again.'}`,
+          content: "I couldn't reach the server just now. Check your connection and send that again?",
           timestamp: new Date()
         }
         setMessages(prev => [...prev, errorMsg])
@@ -2389,34 +2389,39 @@ const TradingBuddyWidget = () => {
                 )}
                 
                 {msg.type === 'error' && (
-                  <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[80%] ${getTextSizeClass()}`}>
+                  // Problems are said by Pip, in his own bubble, with the next step as a button
+                  <div className={`max-w-[85%] rounded-2xl rounded-tl-sm border px-4 py-3 ${getTextSizeClass()} ${theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-200 bg-white text-slate-900'}`}>
                     <div className={`markdown-content ${theme === 'dark' ? 'dark' : ''}`} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
-                    {msg.canBuyMore && (
-                      <button
-                        onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
-                        className="mt-3 w-full border border-blue-600 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
-                      >
-                        Buy more for today
-                      </button>
-                    )}
-                    {msg.requiresUpgrade && (
-                      <button
-                        onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
-                        className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        Upgrade to Pro - $19/mo
-                      </button>
+                    {(msg.requiresLogin || msg.canBuyMore || msg.requiresUpgrade) && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {msg.requiresLogin && (
+                          <button
+                            onClick={() => window.open(process.env.PLASMO_PUBLIC_API_URL, '_blank')}
+                            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                          >
+                            Sign in
+                          </button>
+                        )}
+                        {msg.canBuyMore && (
+                          <button
+                            onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`, '_blank')}
+                            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                          >
+                            Get more for today
+                          </button>
+                        )}
+                        {msg.requiresUpgrade && (
+                          <button
+                            onClick={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account#plans`, '_blank')}
+                            className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors ${theme === 'dark' ? 'border-dark-border text-dark-body hover:bg-dark-surface' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                          >
+                            See Pro ($19/mo)
+                          </button>
+                        )}
+                      </div>
                     )}
                     {msg.requiresLogin && (
-                      <>
-                        <button
-                          onClick={() => window.open(process.env.PLASMO_PUBLIC_API_URL, '_blank')}
-                          className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                        >
-                          Sign in
-                        </button>
-                        <p className="mt-2 text-xs opacity-80">After signing in, come back here and try again.</p>
-                      </>
+                      <p className={`mt-2 text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Come back here once you're in and try again.</p>
                     )}
                   </div>
                 )}

@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
 import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
 import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
-import { CREDIT_COSTS, claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type Reservation, type UsageCost } from "@/lib/usage"
+import { CREDIT_COSTS, claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type Reservation, type UsageCost, allowanceUsedMessage } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
 const supabase = createClient(
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({
         error: "Daily usage limit reached",
         message: usage.credits
-          ? `You've used today's allowance. It resets at midnight UTC.${canBuyMore ? " You can buy more to keep going today" + (isPaid ? "." : ", or upgrade to Pro for about 10x more every day.") : isPaid ? "" : " Upgrade to Pro for about 10x more every day."}`
+          ? allowanceUsedMessage(isPaid, canBuyMore)
           : isPaid
-            ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
-            : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
+            ? `That's all ${limits.maxScreenshots} chart checks for today. They refill at midnight UTC.`
+            : `That's all ${limits.maxScreenshots} free chart checks for today. They refill at midnight UTC, or Pro gives you ${getLimits('pro').maxScreenshots} a day.`,
         limit: limits.maxScreenshots,
         current: usage.screenshots,
         requiresUpgrade: !isPaid,

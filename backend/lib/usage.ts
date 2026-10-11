@@ -163,6 +163,13 @@ export function creditStateFromProfile(profile: any, limits: UsageLimits): Credi
   return creditState(used, profile.bonus_credits ?? 0, limits)
 }
 
+// What Pip says when today's allowance is used up (same wording in chat and chart checks)
+export function allowanceUsedMessage(isPaid: boolean, canBuyMore: boolean) {
+  const base = "That's today's allowance used up. It refills at midnight UTC."
+  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 10x more every day.")
+  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 10x.")
+}
+
 export type WelcomeCredit = "welcome_analysis_used" | "welcome_chart_chat_used"
 
 // The getting-started checklist's first analysis and first "send with chart"

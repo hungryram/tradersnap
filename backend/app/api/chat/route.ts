@@ -3,7 +3,7 @@ import { APP_ORIGINS, APP_URL, SUPPORT_EMAIL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
-import { claimWelcomeCredit, consumeUsage, creditState, getLimits, refundUsage, usagePayload, type Reservation, type UsageCost } from "@/lib/usage"
+import { allowanceUsedMessage, claimWelcomeCredit, consumeUsage, creditState, getLimits, refundUsage, usagePayload, type Reservation, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
@@ -377,7 +377,7 @@ export async function POST(request: NextRequest) {
       const canBuyMore = !!process.env.STRIPE_PRICE_ID_TOPUP
       const response = NextResponse.json({
         error: "Daily usage limit reached",
-        message: `You've used today's allowance. It resets at midnight UTC.${canBuyMore ? " You can buy more to keep going today" + (isPaid ? "." : ", or upgrade to Pro for about 10x more every day.") : isPaid ? "" : " Upgrade to Pro for about 10x more every day."}`,
+        message: allowanceUsedMessage(isPaid, canBuyMore),
         limit: limits.maxMessages,
         current: quota.messages,
         requiresUpgrade: !isPaid,
@@ -391,16 +391,16 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json(messageLimitHit ? {
         error: "Daily message limit reached",
         message: isPaid
-          ? `You've reached your daily limit of ${limits.maxMessages} messages. Your limit resets at midnight UTC.`
-          : `You've used all ${limits.maxMessages} free messages today. Upgrade to Pro for ${getLimits('pro').maxMessages} messages/day and ${getLimits('pro').maxScreenshots} chart analyses.`,
+          ? `That's all ${limits.maxMessages} messages for today. They refill at midnight UTC.`
+          : `That's all ${limits.maxMessages} free messages for today. They refill at midnight UTC, or Pro gives you ${getLimits('pro').maxMessages} a day.`,
         limit: limits.maxMessages,
         current: quota.messages,
         requiresUpgrade: !isPaid
       } : {
         error: "Daily screenshot limit reached",
         message: isPaid
-          ? `You've reached your daily limit of ${limits.maxScreenshots} chart analyses. Your limit resets at midnight UTC.`
-          : `You've used all ${limits.maxScreenshots} free chart analyses today. Upgrade to Pro for ${getLimits('pro').maxScreenshots} charts/day.`,
+          ? `That's all ${limits.maxScreenshots} chart checks for today. They refill at midnight UTC.`
+          : `That's all ${limits.maxScreenshots} free chart checks for today. They refill at midnight UTC, or Pro gives you ${getLimits('pro').maxScreenshots} a day.`,
         limit: limits.maxScreenshots,
         current: quota.screenshots,
         requiresUpgrade: !isPaid
