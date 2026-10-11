@@ -276,7 +276,7 @@ async function chatOpenAI(opts: Parameters<typeof chat>[0]): Promise<ChatResult>
 // ---------------------------------------------------------------------------
 
 // A short piece of plain text from the small model, e.g. Pip's morning check-in
-export async function smallText(opts: { system: string; prompt: string; maxTokens?: number }): Promise<{ text: string | null; tokens: TokenUsage | null }> {
+export async function smallText(opts: { system: string; prompt: string; maxTokens?: number }): Promise<{ text: string | null; tokens: TokenUsage | null; stop: string | null }> {
   if (provider === "anthropic") {
     const response = await anthropic().beta.messages.create({
       model: ANTHROPIC_SMALL_MODEL,
@@ -289,16 +289,19 @@ export async function smallText(opts: { system: string; prompt: string; maxToken
       .map(block => block.text)
       .join("")
       .trim()
-    return { text: response.stop_reason === "end_turn" && text ? text : null, tokens: anthropicTokens(response) }
+    const complete = response.stop_reason === "end_turn" || response.stop_reason === "stop_sequence"
+    return { text: complete && text ? text : null, tokens: anthropicTokens(response), stop: response.stop_reason }
   }
 
   const completion = await openai().chat.completions.create({
     model: "gpt-5-mini",
     messages: [{ role: "system", content: opts.system }, { role: "user", content: opts.prompt }],
-    max_completion_tokens: opts.maxTokens ?? 400
+    // A reasoning model: keep reasoning minimal and leave room for it, or it can spend the budget and return nothing
+    reasoning_effort: "minimal",
+    max_completion_tokens: Math.max(1000, opts.maxTokens ?? 400)
   })
   const choice = completion.choices[0]
-  return { text: choice?.finish_reason === "stop" ? choice.message.content?.trim() || null : null, tokens: openaiTokens("gpt-5-mini", completion.usage) }
+  return { text: choice?.finish_reason === "stop" ? choice.message.content?.trim() || null : null, tokens: openaiTokens("gpt-5-mini", completion.usage), stop: choice?.finish_reason ?? null }
 }
 
 // One short JSON answer from the small model, e.g. updating Pip's notes
@@ -319,7 +322,8 @@ export async function smallJson<T>(opts: { system: string; prompt: string; schem
     model: "gpt-5-mini",
     messages: [{ role: "system", content: opts.system }, { role: "user", content: opts.prompt }],
     response_format: { type: "json_object" },
-    max_completion_tokens: opts.maxTokens ?? 2000
+    reasoning_effort: "low",
+    max_completion_tokens: Math.max(4000, opts.maxTokens ?? 2000)
   })
   const output = opts.schema.parse(JSON.parse(completion.choices[0].message.content || "{}"))
   return { output, tokens: openaiTokens("gpt-5-mini", completion.usage) }

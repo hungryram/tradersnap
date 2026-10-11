@@ -67,8 +67,8 @@ export const config: PlasmoCSConfig = {
 // Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
 // something and speaking up
 const CHECKIN_TYPING_MS = 1500
-// How long Pip may take to write his own morning plan or recap before the plain version is used
-const COMPOSE_TIMEOUT_MS = 6000
+// How long Pip may take to write a check-in in his own words before the plain version is used
+const COMPOSE_TIMEOUT_MS = { warning: 3000, info: 6000 }
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 // Sample check-ins for trying the delivery in development builds (widget menu)
@@ -586,7 +586,7 @@ const TradingBuddyWidget = () => {
       const { supabase_session } = await chrome.storage.local.get('supabase_session')
       if (!supabase_session?.access_token) return null
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), COMPOSE_TIMEOUT_MS)
+      const timer = setTimeout(() => controller.abort(), COMPOSE_TIMEOUT_MS[checkIn.level])
       const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/checkins/compose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
@@ -621,9 +621,9 @@ const TradingBuddyWidget = () => {
 
       setBubble(null)
       setPipTyping(true)
-      // The morning plan and recap can be written fresh by Pip; the rules-based text is the fallback
+      // Pip writes every check-in in his own words; the rules-based text is the fallback
       const [composed] = await Promise.all([
-        checkIn.compose ? composeCheckIn(checkIn) : Promise.resolve(null),
+        checkIn.kind !== 'announcement' ? composeCheckIn(checkIn) : Promise.resolve(null),
         sleep(CHECKIN_TYPING_MS)
       ])
       setPipTyping(false)
