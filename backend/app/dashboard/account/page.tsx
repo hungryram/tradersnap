@@ -33,7 +33,7 @@ const PLAN_LISTS = {
   pro: ["About 30 chart checks and 150 messages a day", "Up to 5 strategies checked at once", "Full journal, calendar and notes history", "Results per strategy", "Pip reads your journal notes", "Pip remembers 20 saved messages"],
   pro_plus: ["About 100 chart checks and 400 messages a day", "Unlimited strategies", "Everything in Pro", "Pip remembers 50 saved messages", "For full-time and multi-account traders"],
 }
-const PRICE = { pro: { month: 29, year: 249 }, pro_plus: { month: 59, year: 499 } }
+const PRICE = { pro: { month: 29, year: 249 }, pro_plus: { month: 99, year: 990 } }
 
 export default function AccountPage() {
   const [userData, setUserData] = useState<UserData | null>(null)

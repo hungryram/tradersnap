@@ -36,7 +36,7 @@ const PLANS = [
   },
   {
     name: "Pro+",
-    price: { month: 59, year: 499 },
+    price: { month: 99, year: 990 },
     note: "For full-time and multi-account traders",
     items: [
       "About 100 chart checks and 400 messages a day",

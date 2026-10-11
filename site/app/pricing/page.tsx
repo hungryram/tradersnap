@@ -5,7 +5,7 @@ import { PageHeader } from "../components/Section"
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Pip is free to start, with a 7-day Pro trial. Pro is $29 a month and Pro+ $59, or about two months free on yearly plans.",
+  description: "Pip is free to start, with a 7-day Pro trial. Pro is $29 a month and Pro+ $99, with two months free on yearly plans.",
 }
 
 export default function PricingPage() {

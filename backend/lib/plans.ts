@@ -29,7 +29,7 @@ export const PLANS: Record<Plan, PlanFeatures> = {
 // List prices in USD (shown on the site and used for MRR on the admin page)
 export const PRICES = {
   pro: { month: 29, year: 249 },
-  pro_plus: { month: 59, year: 499 },
+  pro_plus: { month: 99, year: 990 },
 } as const
 
 export const TRIAL_DAYS = 7

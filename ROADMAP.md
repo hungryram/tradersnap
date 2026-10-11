@@ -172,14 +172,14 @@ Switchover, in order:
 - Trades are tagged automatically with the strategy of a chart check made up to 20 minutes before they opened; the trader can change it in the Journal's Strategy column.
 - Journal: month calendar colored by rules kept (default) or P&L, with weekly totals and a day view; "By strategy" results; Free plan history is 7 days (enforced in GET /api/trades).
 
-## Plans: Free / Pro $29 / Pro+ $59 (October 2026)
+## Plans: Free / Pro $29 / Pro+ $99 (October 2026)
 
 All limits live in `backend/lib/plans.ts`. Every new account gets 7 days of Pro (profiles.trial_ends_at), no card.
 
 Stripe (you): create these recurring prices and set them on Vercel, then redeploy:
 - [ ] `STRIPE_PRICE_ID_PRO` = $29/month (new price; the old $19 one is retired)
 - [ ] `STRIPE_PRICE_ID_PRO_YEARLY` = $249/year
-- [ ] `STRIPE_PRICE_ID_PRO_PLUS` = $59/month
-- [ ] `STRIPE_PRICE_ID_PRO_PLUS_YEARLY` = $499/year
+- [ ] `STRIPE_PRICE_ID_PRO_PLUS` = $99/month
+- [ ] `STRIPE_PRICE_ID_PRO_PLUS_YEARLY` = $990/year
 - [ ] Billing portal: allow switching between these four prices (so Pro <-> Pro+ and monthly <-> yearly work)
 - Not built yet (don't advertise): weekly review email, multiple trading accounts, CSV export.
