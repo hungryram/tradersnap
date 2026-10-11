@@ -304,6 +304,31 @@ export async function smallText(opts: { system: string; prompt: string; maxToken
   return { text: choice?.finish_reason === "stop" ? choice.message.content?.trim() || null : null, tokens: openaiTokens("gpt-5-mini", completion.usage), stop: choice?.finish_reason ?? null }
 }
 
+// A structured answer from the main model, for jobs that need judgment but are
+// rare (e.g. reviewing a trader's rules). Low effort keeps the cost down.
+export async function mainJson<T>(opts: { system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number }): Promise<{ output: T; tokens: TokenUsage | null }> {
+  if (provider === "anthropic") {
+    const response = await anthropic().beta.messages.parse({
+      model: ANTHROPIC_MODEL,
+      max_tokens: opts.maxTokens ?? 6000,
+      output_config: { effort: "low", format: betaZodOutputFormat(opts.schema) },
+      system: opts.system,
+      messages: [{ role: "user", content: opts.prompt }]
+    })
+    if (response.parsed_output == null) throw new Error(`Output incomplete (stop_reason: ${response.stop_reason})`)
+    return { output: response.parsed_output as T, tokens: anthropicTokens(response) }
+  }
+
+  const completion = await openai().chat.completions.create({
+    model: "gpt-5.1",
+    messages: [{ role: "system", content: opts.system }, { role: "user", content: opts.prompt }],
+    response_format: { type: "json_object" },
+    max_completion_tokens: opts.maxTokens ?? 6000
+  })
+  const output = opts.schema.parse(JSON.parse(completion.choices[0].message.content || "{}"))
+  return { output, tokens: openaiTokens("gpt-5.1", completion.usage) }
+}
+
 // One short JSON answer from the small model, e.g. updating Pip's notes
 export async function smallJson<T>(opts: { system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number }): Promise<{ output: T; tokens: TokenUsage | null }> {
   if (provider === "anthropic") {

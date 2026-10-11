@@ -159,7 +159,7 @@ Switchover, in order:
 
 ## Pip's memory and AI cost tracking (October 2026)
 
-- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
+- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql` and `20261019_rules_costs.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
 - Short-term memory: the last 12+ messages, same on every plan, in a window that moves in steps of 8 so it stays cached (needs extension 1.1.0 to send `historyStart`).
 - Long-term memory: Pip's notes, updated at most once a day per trader by a small model (`ANTHROPIC_SMALL_MODEL`, default claude-haiku-5-5), only after 4+ new messages. Editable at /dashboard/memory, can be turned off.
 - Trade patterns (last 30 days, no AI) go into Pip's memory and the Memory page.

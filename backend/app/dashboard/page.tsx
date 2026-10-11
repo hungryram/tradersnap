@@ -46,7 +46,7 @@ export default function TodayPage() {
         <div className="mb-6">
           <Notice tone="warn">
             You haven't set up your trading rules yet. Your coach needs them to check your charts.{" "}
-            <a href="/onboarding" className="underline font-medium">Set up your rules</a>
+            <a href="/dashboard/rules" className="underline font-medium">Add your rules</a>
           </Notice>
         </div>
       )}

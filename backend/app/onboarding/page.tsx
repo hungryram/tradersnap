@@ -43,6 +43,7 @@ export default function OnboardingPage() {
   const [templateIndex, setTemplateIndex] = useState<number | null>(null)
   const [rulesText, setRulesText] = useState("")
   const [editingRules, setEditingRules] = useState(false)
+  const [skippedRules, setSkippedRules] = useState(false)
   const [maxTrades, setMaxTrades] = useState("3")
   const [stopAfterLosses, setStopAfterLosses] = useState("2")
   const [maxDailyLoss, setMaxDailyLoss] = useState("")
@@ -94,23 +95,27 @@ export default function OnboardingPage() {
     return lines.length ? `\n\nDAILY LIMITS:\n${lines.join("\n")}` : ""
   }
 
-  async function finish() {
+  // skipRules: save the setup answers and limits, but no ruleset yet
+  async function finish(skipRules = false) {
     if (!session) return
     setError(null)
     setSaving(true)
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
     try {
-      const template = templateIndex !== null && templateIndex >= 0 ? RULE_TEMPLATES[templateIndex] : null
-      const rulesetResponse = await fetch("/api/rulesets", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          name: template?.name ?? "My Trading Rules",
-          rules_text: (rulesText.trim() || "Follow my plan.") + limitsText(),
-          is_primary: true
+      if (!skipRules) {
+        const template = templateIndex !== null && templateIndex >= 0 ? RULE_TEMPLATES[templateIndex] : null
+        const rulesetResponse = await fetch("/api/rulesets", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            name: template?.name ?? "My Trading Rules",
+            rules_text: (rulesText.trim() || "Follow my plan.") + limitsText(),
+            is_primary: true
+          })
         })
-      })
-      if (!rulesetResponse.ok) throw new Error((await rulesetResponse.json()).error || "Couldn't save your rules")
+        if (!rulesetResponse.ok) throw new Error((await rulesetResponse.json()).error || "Couldn't save your rules")
+      }
+      setSkippedRules(skipRules)
 
       const profileResponse = await fetch("/api/me", {
         method: "PATCH",
@@ -271,7 +276,10 @@ export default function OnboardingPage() {
 
           <div className="flex justify-between">
             <button onClick={() => setStep(1)} className="text-sm text-ink-text hover:text-ink-body">Back</button>
-            <button onClick={finish} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
+            <div className="flex items-center gap-4">
+              <button onClick={() => finish(true)} disabled={saving} className="text-sm text-ink-text hover:text-ink-body">Skip for now</button>
+              <button onClick={() => finish()} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
+            </div>
           </div>
         </div>
       )}
@@ -283,6 +291,12 @@ export default function OnboardingPage() {
             <p className="text-ink-text max-w-md mx-auto">
               Open your chart and click the <span className="text-ink-body font-medium">Pip</span> button at the bottom right. Your first check takes about 15 seconds.
             </p>
+            {skippedRules && (
+              <p className="text-ink-text max-w-md mx-auto mt-3 text-sm">
+                Pip can chat and track your trades now. To check charts against your rules, add them any time on the Rules page in your dashboard, or ask
+                Pip to help you write them.
+              </p>
+            )}
           </div>
 
           {extensionVersion === null && (

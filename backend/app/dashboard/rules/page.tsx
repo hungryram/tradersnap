@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import RulesReview from "../components/RulesReview"
 import { RULE_TEMPLATES, type RuleTemplate } from "@/lib/rule-templates"
 import { api, type TradingLimits } from "@/lib/dashboard-data"
 import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
@@ -25,6 +26,7 @@ export default function RulesPage() {
   const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
   const [userPlan, setUserPlan] = useState<string>("free")
   const [showTemplates, setShowTemplates] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
 
   const [limits, setLimits] = useState<TradingLimits>(EMPTY_LIMITS)
   const [limitsSaving, setLimitsSaving] = useState(false)
@@ -54,6 +56,28 @@ export default function RulesPage() {
     setCurrentRuleset(ruleset)
     setRulesText(ruleset?.rules_text ?? "")
     setRulesetName(ruleset?.name ?? "")
+  }
+
+  // No rules yet: create the first (primary) ruleset from a template or a blank page
+  async function createFirst(template: RuleTemplate | null) {
+    setIsSaving(true)
+    setMessage(null)
+    try {
+      const data = await api("/api/rulesets", {
+        method: "POST",
+        body: JSON.stringify({
+          name: template?.name ?? "My Trading Rules",
+          rules_text: template?.rules ?? "- Write your first rule here",
+          is_primary: true
+        })
+      })
+      await load(data.ruleset?.id)
+      setMessage({ tone: "good", text: template ? `"${template.name}" added. Edit it to match how you trade, then save.` : "Write your rules below, then save. Pip can help you tighten them." })
+    } catch (err) {
+      setMessage({ tone: "bad", text: err instanceof Error ? err.message : "Couldn't create your rules." })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function applyTemplate(template: RuleTemplate) {
@@ -139,11 +163,24 @@ export default function RulesPage() {
       <PageHeader title="Rules" subtitle="Your coach checks every chart against your primary ruleset." />
 
       {!currentRuleset ? (
-        <Card>
-          <div className="py-8 text-center">
-            <p className="text-ink-text mb-4">You don't have any rules yet.</p>
-            <a href="/onboarding" className={buttonPrimary}>Set up your rules</a>
+        <Card title="Add your rules">
+          <p className="mb-4 text-sm text-ink-text">
+            Pip checks your charts against these. Start from the closest template or a blank page, then make it yours. You can also ask Pip in the
+            chat to help you write them.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {RULE_TEMPLATES.map(template => (
+              <button key={template.name} onClick={() => createFirst(template)} disabled={isSaving} className="rounded-xl border border-ink-border bg-ink-bg p-3 text-left transition-colors hover:border-ink-muted disabled:opacity-50">
+                <div className="text-sm font-medium">{template.name}</div>
+                <div className="mt-0.5 text-xs text-ink-text">{template.description.replace(/ - .*$/, "")}</div>
+              </button>
+            ))}
+            <button onClick={() => createFirst(null)} disabled={isSaving} className="rounded-xl border border-dashed border-ink-border p-3 text-left transition-colors hover:border-ink-muted disabled:opacity-50">
+              <div className="text-sm font-medium">Write my own</div>
+              <div className="mt-0.5 text-xs text-ink-text">Start from a blank page.</div>
+            </button>
           </div>
+          {message && <div className="mt-4"><Notice tone={message.tone}>{message.text}</Notice></div>}
         </Card>
       ) : (
         <div className="space-y-6">
@@ -178,10 +215,17 @@ export default function RulesPage() {
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs text-ink-text">Rules <span className="text-ink-muted">({rulesText.length}/{maxChars})</span></span>
-                  <button onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-brand-300 hover:text-brand-200">
-                    {showTemplates ? "Hide templates" : "Start from a template"}
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => { setReviewing(true); setShowTemplates(false) }} className="text-sm text-brand-300 hover:text-brand-200">
+                      Tighten with Pip
+                    </button>
+                    <button onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-brand-300 hover:text-brand-200">
+                      {showTemplates ? "Hide templates" : "Start from a template"}
+                    </button>
+                  </div>
                 </div>
+
+                {reviewing && <RulesReview rulesText={rulesText} setRulesText={setRulesText} onDone={() => setReviewing(false)} />}
 
                 {showTemplates && (
                   <div className="mb-3 grid gap-2 sm:grid-cols-2">

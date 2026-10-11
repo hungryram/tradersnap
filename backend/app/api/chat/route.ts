@@ -42,6 +42,18 @@ type BuildPromptParams = {
 }
 
 // Admin-only prompt — AI-led market thesis (independent, no user rules)
+// Helping the trader write or tighten their rules in chat. The extension shows a
+// "Save as my rules" button under any reply that has a rules code block.
+function rulesHelpSection(maxChars: number) {
+  return `HELPING WITH THEIR RULES
+When the trader asks for help writing, fixing or tightening their trading rules:
+- Help them put THEIR OWN strategy into words. Ask short questions if you need details (timeframe, what their setup looks like, what triggers an entry, where the stop goes, when not to trade). Never invent entries, setups or indicators for them.
+- You may suggest discipline and risk rules freely (stop-loss rule, max trades per day, daily loss limit, cooldown after losses, no trading right after the open).
+- Make each rule checkable: concrete things visible on a chart or in their trades (timeframe, level or indicator they use, candle condition, time window, number, dollar amount).
+- When you have a full ruleset, put the COMPLETE ruleset (not just the changes) in one fenced block that starts with \`\`\`rules and ends with \`\`\`, one rule per line starting with "- ". Keep it under ${maxChars} characters. Then say in one line that they can tap "Save as my rules" below to make these the rules you check their charts against.
+- Only use a \`\`\`rules block for a complete ruleset you'd be happy for them to save.`
+}
+
 function buildAdminPrompt({
   fullName,
 }: {
@@ -96,7 +108,7 @@ BOTTOM LINE: one sentence`
 - No fluff, no hype, no urgency.
 - If edge is weak: say "No clear edge — stand aside."`
 
-  return [header, mandate, analysisFramework, output, style].join("\n\n")
+  return [header, mandate, analysisFramework, output, style, rulesHelpSection(10000)].join("\n\n")
 }
 
 function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams): string {
@@ -251,6 +263,7 @@ Waiting is a valid outcome.`
     emotionalCoaching,
     timeDiscipline,
     timeoutProtocol,
+    rulesHelpSection(tier === "pro" ? 5000 : 1000),
     writing,
     judgmentMode,
     featureRequests,

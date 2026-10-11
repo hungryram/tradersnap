@@ -43,7 +43,9 @@ const eventSchema = z.object({
     'checkin_shown',
     'checkin_replied',
     'checkin_dismissed',
-    'checkins_mode'
+    'checkins_mode',
+    // Rules
+    'rules_saved_from_chat'
   ]),
   session_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.any()).optional()

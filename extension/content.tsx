@@ -77,6 +77,14 @@ const PREVIEW_CHECKINS: CheckIn[] = [
   { id: 'preview_urgent', kind: 'daily_loss', level: 'warning', text: "You're -$520 today, past your $500 daily loss limit. Your rule says stop here." }
 ]
 
+// A complete ruleset Pip drafted in a reply (a code block marked "rules"), or null
+function rulesFromReply(content: unknown): string | null {
+  if (typeof content !== 'string') return null
+  const match = content.match(/```rules[^\n]*\n([\s\S]*?)```/)
+  const rules = match?.[1].trim()
+  return rules && rules.length >= 10 ? rules : null
+}
+
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
 function messageMood(msg: any): PipMood {
   if (msg.type === 'checkin') return msg.level === 'warning' ? 'caution' : 'idle'
@@ -148,6 +156,8 @@ const TradingBuddyWidget = () => {
   const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
   const [bubble, setBubble] = useState<CheckIn | null>(null)
   const [pipTyping, setPipTyping] = useState(false)
+  // "Save as my rules" under replies where Pip drafted a ruleset: per message index
+  const [rulesSave, setRulesSave] = useState<Record<number, { state: 'saving' | 'saved' | 'error'; error?: string }>>({})
   // Re-render now and then so time-based moods (a fresh win) wear off
   const [, setMoodTick] = useState(0)
   useEffect(() => {
@@ -867,6 +877,26 @@ const TradingBuddyWidget = () => {
   }, [messages])
 
   // Simple markdown-to-HTML converter for chat messages
+  const saveRulesFromReply = async (index: number, rules: string) => {
+    if (!confirm('Make these your rules? They replace your current rules, and Pip checks your charts against them from now on.')) return
+    setRulesSave(prev => ({ ...prev, [index]: { state: 'saving' } }))
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      if (!supabase_session?.access_token) throw new Error('Sign in to save your rules.')
+      const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/rulesets/active`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
+        body: JSON.stringify({ rules_text: rules })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Couldn't save your rules.")
+      setRulesSave(prev => ({ ...prev, [index]: { state: 'saved' } }))
+      analytics.track('rules_saved_from_chat', {})
+    } catch (error) {
+      setRulesSave(prev => ({ ...prev, [index]: { state: 'error', error: error instanceof Error ? error.message : "Couldn't save your rules." } }))
+    }
+  }
+
   const renderMarkdown = (text: string): string => {
     const rawHtml = marked.parse(text, { breaks: true, gfm: true }) as string
     const sanitized = DOMPurify.sanitize(rawHtml, {
@@ -2525,6 +2555,27 @@ const TradingBuddyWidget = () => {
                     }`}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
+                  {(() => {
+                    const rules = rulesFromReply(msg.content)
+                    if (!rules) return null
+                    const status = rulesSave[i]
+                    return (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                        {status?.state === 'saved' ? (
+                          <span className={`text-xs ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>Saved. These are your rules now.</span>
+                        ) : (
+                          <button
+                            onClick={() => saveRulesFromReply(i, rules)}
+                            disabled={status?.state === 'saving'}
+                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            {status?.state === 'saving' ? 'Saving…' : 'Save as my rules'}
+                          </button>
+                        )}
+                        {status?.state === 'error' && <span className="text-xs text-red-400">{status.error}</span>}
+                      </div>
+                    )
+                  })()}
                   {msg.timestamp && (
                     <div className={`text-[10px] mt-0.5 text-left px-1 ${theme === 'dark' ? 'text-dark-text' : 'text-slate-400'}`}>
                       {formatMessageTime(msg.timestamp)}
