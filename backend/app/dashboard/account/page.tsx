@@ -202,6 +202,11 @@ export default function AccountPage() {
 
         <div id="plans" className="scroll-mt-8">
           <Card title="Plan">
+            {subscribed === "admin" && (
+              <div className="mb-5"><Notice tone="info">
+                You&apos;re on the Admin plan: unlimited, nothing to buy. To test checkout, sign in with a second account that isn&apos;t an admin.
+              </Notice></div>
+            )}
             {!isPro && !!user.trial_days_left && (
               <div className="mb-5"><Notice tone="info">
                 You&apos;re on a free Pro trial with {user.trial_days_left} {user.trial_days_left === 1 ? "day" : "days"} left. Nothing is charged; afterwards you move to Free unless you pick a plan.
