@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { activeStrategyLimit } from "@/lib/strategies"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -69,8 +70,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT /api/rulesets/active - Replace the primary ruleset's rules (e.g. "Save as my
-// rules" in the chat). Creates the primary ruleset if there isn't one yet.
+// PUT /api/rulesets/active { rules_text, name? } - "Save as my rules" in the chat.
+// Updates the strategy with that name, or the main one without a name; creates the
+// strategy if it doesn't exist yet. Returns which strategy was saved.
 export async function PUT(request: NextRequest) {
   const origin = request.headers.get('origin')
   const reply = (body: object, status = 200) => addCorsHeaders(NextResponse.json(body, { status }), origin)
@@ -91,13 +93,51 @@ export async function PUT(request: NextRequest) {
     return reply({ error: `These rules are ${rulesText.length} characters and your plan holds ${maxChars}. Ask Pip to shorten them.` }, 400)
   }
 
-  const { data: primary } = await supabase.from("rulesets").select("id").eq("user_id", user.id).eq("is_primary", true).maybeSingle()
-  const { error } = primary
-    ? await supabase.from("rulesets").update({ rules_text: rulesText }).eq("id", primary.id)
-    : await supabase.from("rulesets").insert({ user_id: user.id, name: "My Trading Rules", rules_text: rulesText, is_primary: true })
-  if (error) {
-    console.error("PUT /api/rulesets/active error:", error)
+  // Which strategy: the one named in Pip's draft (matched by name), otherwise the main one
+  const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : ""
+  const { data: existing, error: listError } = await supabase
+    .from("rulesets")
+    .select("id, name, is_primary")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+  if (listError) {
+    console.error("PUT /api/rulesets/active list error:", listError)
     return reply({ error: "Couldn't save your rules." }, 500)
   }
-  return reply({ success: true })
+  const all = existing ?? []
+  const target = name
+    ? all.find(r => r.name.trim().toLowerCase() === name.toLowerCase())
+    : all.find(r => r.is_primary) ?? all[0]
+
+  // Pip checks it from now on, if the plan has room for another active strategy
+  const { count: activeCount, error: activeError } = await supabase
+    .from("rulesets").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_active", true)
+  const maxActive = activeStrategyLimit(plan)
+
+  if (target) {
+    const { error } = await supabase.from("rulesets").update({ rules_text: rulesText }).eq("id", target.id)
+    if (error) {
+      console.error("PUT /api/rulesets/active update error:", error)
+      return reply({ error: "Couldn't save your rules." }, 500)
+    }
+    if (!activeError && (activeCount ?? 0) < maxActive) {
+      await supabase.from("rulesets").update({ is_active: true }).eq("id", target.id)
+    }
+    return reply({ success: true, id: target.id, name: target.name, created: false })
+  }
+
+  // A new strategy (the trader's first one becomes the main one)
+  const maxRulesets = plan === "admin" ? 999 : plan === "free" ? 3 : 20
+  if (all.length >= maxRulesets) {
+    return reply({ error: `You have ${all.length} strategies, the most your plan holds. Delete one on the Rules page, or ask Pip to update an existing one by name.` }, 403)
+  }
+  const row = { user_id: user.id, name: name || "My strategy", rules_text: rulesText, is_primary: all.length === 0 }
+  const isActive = all.length === 0 || (!activeError && (activeCount ?? 0) < maxActive)
+  let { data: created, error } = await supabase.from("rulesets").insert({ ...row, is_active: isActive }).select("id, name").single()
+  if (error?.code === "PGRST204") ({ data: created, error } = await supabase.from("rulesets").insert(row).select("id, name").single()) // before 20261020_strategies.sql
+  if (error || !created) {
+    console.error("PUT /api/rulesets/active insert error:", error)
+    return reply({ error: "Couldn't save your rules." }, 500)
+  }
+  return reply({ success: true, id: created.id, name: created.name, created: true, active: isActive })
 }

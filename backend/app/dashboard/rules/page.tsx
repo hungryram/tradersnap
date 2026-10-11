@@ -51,7 +51,8 @@ export default function RulesPage() {
       setLimits({ ...EMPTY_LIMITS, ...(me.user.trading_limits ?? {}) })
       setAlwaysRules(me.user.always_rules ?? "")
       setRulesets(data.rulesets)
-      const selected = data.rulesets.find(r => r.id === (selectId ?? currentRuleset?.id)) ?? data.rulesets.find(r => r.is_primary) ?? data.rulesets[0] ?? null
+      const fromLink = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("strategy") : null
+      const selected = data.rulesets.find(r => r.id === (selectId ?? currentRuleset?.id ?? fromLink)) ?? data.rulesets.find(r => r.is_primary) ?? data.rulesets[0] ?? null
       select(selected)
     } catch (err) {
       setMessage({ tone: "bad", text: err instanceof Error ? err.message : "Failed to load rules" })
@@ -178,6 +179,7 @@ export default function RulesPage() {
                 {rulesets.map(r => (
                   <div key={r.id} className={`flex items-center gap-2 rounded-xl border py-1.5 pl-3 pr-1.5 ${currentRuleset?.id === r.id ? "border-brand-500/60 bg-brand-500/10" : "border-ink-border"}`}>
                     <button onClick={() => select(r)} className="text-sm font-medium">{r.name}</button>
+                    {r.is_primary && <span className="rounded bg-ink-elevated px-1.5 py-0.5 text-[10px] text-ink-muted" title="Pip's chat saves here when no strategy is named">Main</span>}
                     <Switch on={isOn(r)} onClick={() => toggleActive(r)} disabled={isSaving} label={isOn(r) ? `Turn ${r.name} off` : `Turn ${r.name} on`} />
                   </div>
                 ))}

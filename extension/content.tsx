@@ -74,12 +74,13 @@ const CHECKIN_TYPING_MS = 1500
 const COMPOSE_TIMEOUT_MS = { warning: 3000, info: 6000 }
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-// A complete ruleset Pip drafted in a reply (a code block marked "rules"), or null
-function rulesFromReply(content: unknown): string | null {
+// A strategy Pip drafted in a reply: a code block opened with ```rules <strategy name>
+function rulesFromReply(content: unknown): { rules: string; name: string | null } | null {
   if (typeof content !== 'string') return null
-  const match = content.match(/```rules[^\n]*\n([\s\S]*?)```/)
-  const rules = match?.[1].trim()
-  return rules && rules.length >= 10 ? rules : null
+  const match = content.match(/```rules([^\n]*)\n([\s\S]*?)```/)
+  const rules = match?.[2].trim()
+  if (!rules || rules.length < 10) return null
+  return { rules, name: match![1].trim() || null }
 }
 
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
@@ -154,7 +155,7 @@ const TradingBuddyWidget = () => {
   const [bubble, setBubble] = useState<CheckIn | null>(null)
   const [pipTyping, setPipTyping] = useState(false)
   // "Save as my rules" under replies where Pip drafted a ruleset: per message index
-  const [rulesSave, setRulesSave] = useState<Record<number, { state: 'saving' | 'saved' | 'error'; error?: string }>>({})
+  const [rulesSave, setRulesSave] = useState<Record<number, { state: 'saving' | 'saved' | 'error'; error?: string; name?: string; id?: string; created?: boolean }>>({})
   // Re-render now and then so time-based moods (a fresh win) wear off
   const [, setMoodTick] = useState(0)
   useEffect(() => {
@@ -881,8 +882,10 @@ const TradingBuddyWidget = () => {
   }, [messages])
 
   // Simple markdown-to-HTML converter for chat messages
-  const saveRulesFromReply = async (index: number, rules: string) => {
-    if (!confirm('Make these your rules? They replace your current rules, and Pip checks your charts against them from now on.')) return
+  const saveRulesFromReply = async (index: number, rules: string, name: string | null) => {
+    if (!confirm(name
+      ? `Save these as your "${name}" strategy? If you already have a strategy with that name, these rules replace it.`
+      : 'Save these as your main strategy? They replace its current rules.')) return
     setRulesSave(prev => ({ ...prev, [index]: { state: 'saving' } }))
     try {
       const { supabase_session } = await chrome.storage.local.get('supabase_session')
@@ -890,11 +893,11 @@ const TradingBuddyWidget = () => {
       const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/rulesets/active`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
-        body: JSON.stringify({ rules_text: rules })
+        body: JSON.stringify({ rules_text: rules, name })
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || "Couldn't save your rules.")
-      setRulesSave(prev => ({ ...prev, [index]: { state: 'saved' } }))
+      setRulesSave(prev => ({ ...prev, [index]: { state: 'saved', name: data.name ?? name ?? undefined, id: data.id, created: !!data.created } }))
       analytics.track('rules_saved_from_chat', {})
     } catch (error) {
       setRulesSave(prev => ({ ...prev, [index]: { state: 'error', error: error instanceof Error ? error.message : "Couldn't save your rules." } }))
@@ -2512,20 +2515,23 @@ const TradingBuddyWidget = () => {
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
                   {(() => {
-                    const rules = rulesFromReply(msg.content)
-                    if (!rules) return null
+                    const draft = rulesFromReply(msg.content)
+                    if (!draft) return null
                     const status = rulesSave[i]
                     return (
                       <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                         {status?.state === 'saved' ? (
-                          <span className={`text-xs ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>Saved. These are your rules now.</span>
+                          <span className={`text-xs ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                            {status.created ? 'Created' : 'Saved to'} your <span className="font-semibold">{status.name ?? 'main'}</span> strategy ·{' '}
+                            <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/rules${status.id ? `?strategy=${status.id}` : ''}`} target="_blank" rel="noopener noreferrer" className="underline">View</a>
+                          </span>
                         ) : (
                           <button
-                            onClick={() => saveRulesFromReply(i, rules)}
+                            onClick={() => saveRulesFromReply(i, draft.rules, draft.name)}
                             disabled={status?.state === 'saving'}
                             className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
                           >
-                            {status?.state === 'saving' ? 'Saving…' : 'Save as my rules'}
+                            {status?.state === 'saving' ? 'Saving…' : draft.name ? `Save as my "${draft.name}" strategy` : 'Save as my rules'}
                           </button>
                         )}
                         {status?.state === 'error' && <span className="text-xs text-red-400">{status.error}</span>}

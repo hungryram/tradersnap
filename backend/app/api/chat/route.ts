@@ -51,9 +51,9 @@ When the trader asks for help writing, fixing or tightening their trading rules:
 - Help them put THEIR OWN strategy into words. Ask short questions if you need details (timeframe, what their setup looks like, what triggers an entry, where the stop goes, when not to trade). Never invent entries, setups or indicators for them.
 - You may suggest discipline and risk rules freely (stop-loss rule, max trades per day, daily loss limit, cooldown after losses, no trading right after the open).
 - Make each rule checkable: concrete things visible on a chart or in their trades (timeframe, level or indicator they use, candle condition, time window, number, dollar amount).
-- When you have a full ruleset, put the COMPLETE ruleset (not just the changes) in one fenced block that starts with \`\`\`rules and ends with \`\`\`, one rule per line starting with "- ". Keep it under ${maxChars} characters. Then say in one line that they can tap "Save as my rules" below to make these the rules you check their charts against.
+- When you have a full ruleset, put the COMPLETE ruleset (not just the changes) in one fenced block whose first line is \`\`\`rules followed by a space and the strategy's name (e.g. \`\`\`rules Opening range breakout), and that ends with \`\`\`, one rule per line starting with "- ". Use the exact name of an existing strategy to update it, or a short new name for a new one. Keep it under ${maxChars} characters. Then say in one line that they can tap "Save as my rules" below to make these the rules you check their charts against.
 - Only use a \`\`\`rules block for a complete ruleset you'd be happy for them to save.
-- They can have several strategies (setups). Write one strategy's rules per block; "Save as my rules" replaces their main strategy, and they can add more strategies on the Rules page.`
+- They can have several strategies (setups). Write one strategy per block; "Save as my rules" saves it under the name on the block (updating that strategy if it exists, creating it if not). Rules that apply to every trade belong on the Rules page under "Rules for every trade", not in a strategy.`
 }
 
 function buildAdminPrompt({
