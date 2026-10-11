@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PRICES } from "@/lib/plans"
 import { createClient } from "@supabase/supabase-js"
 import { getAdminUser } from "@/lib/admin"
 
@@ -9,7 +10,6 @@ const supabase = createClient(
 
 const DAY = 24 * 60 * 60 * 1000
 const WEEK = 7 * DAY
-const PRO_PRICE = 19
 
 // Supabase returns at most 1000 rows per request; page through the rest
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
@@ -66,14 +66,14 @@ function topCostUsers(byUser: ReturnType<typeof costPerUser>, profiles: { id: st
     .slice(0, 15)
     .map(([id, entry]) => {
       const p = byId.get(id)
-      const paying = p?.plan === "pro" && p.subscription_status === "active"
+      const paying = (p?.plan === "pro" || p?.plan === "pro_plus") && p.subscription_status === "active"
       return {
         email: p?.email ?? "(deleted account)",
         plan: p?.plan ?? "free",
         cost: entry.cost,
         requests: entry.requests,
         byFeature: entry.byFeature,
-        revenue: paying ? PRO_PRICE : 0
+        revenue: paying ? PRICES[p!.plan as "pro" | "pro_plus"].month : 0
       }
     })
 }
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
 
     const emailById = new Map(profiles.map(p => [p.id, p.email]))
     const hasRules = new Set(rulesetRows.map(r => r.user_id))
-    const isPaid = (p: Profile) => p.plan === "pro" && p.subscription_status !== "canceled"
+    const isPaid = (p: Profile) => (p.plan === "pro" || p.plan === "pro_plus") && p.subscription_status !== "canceled"
 
     // Per-user activity
     type Activity = { checks: number; checks7d: number; checkTimes: number[]; lastActive: number; trades: number; activeDays: Set<string> }
@@ -234,8 +234,11 @@ export async function GET(request: NextRequest) {
     })
 
     // Revenue
-    const proActive = profiles.filter(p => p.plan === "pro" && p.subscription_status === "active").length
-    const proPastDue = profiles.filter(p => p.plan === "pro" && p.subscription_status === "past_due").length
+    const subscribers = (status: string) => profiles.filter(p => (p.plan === "pro" || p.plan === "pro_plus") && p.subscription_status === status)
+    const proActive = subscribers("active").length
+    const proPastDue = subscribers("past_due").length
+    // Monthly list price per active subscriber (annual plans counted at the monthly price)
+    const mrr = subscribers("active").reduce((sum, p) => sum + PRICES[p.plan as "pro" | "pro_plus"].month, 0)
     const canceled = profiles.filter(p => p.subscription_status === "canceled").length
 
     // AI quality (last 30 days)
@@ -311,7 +314,7 @@ export async function GET(request: NextRequest) {
         activeThisWeek: weekly[weekly.length - 1].active,
         activeLastWeek: weekly[weekly.length - 2].active,
         paying: proActive,
-        mrr: proActive * PRO_PRICE
+        mrr
       },
       funnel: { last30d: funnelFor(recent), allTime: funnelFor(profiles) },
       groups,
@@ -322,7 +325,7 @@ export async function GET(request: NextRequest) {
       },
       weekly,
       retention: { offsets, rows: retention },
-      revenue: { active: proActive, pastDue: proPastDue, canceled, mrr: proActive * PRO_PRICE },
+      revenue: { active: proActive, pastDue: proPastDue, canceled, mrr },
       aiQuality: {
         rated: recentRatings.length,
         down: downs.length,

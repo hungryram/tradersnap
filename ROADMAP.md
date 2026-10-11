@@ -159,7 +159,7 @@ Switchover, in order:
 
 ## Pip's memory and AI cost tracking (October 2026)
 
-- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql`, `20261019_rules_costs.sql` and `20261020_strategies.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
+- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql`, `20261019_rules_costs.sql`, `20261020_strategies.sql` and `20261021_trial_and_notes.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
 - Short-term memory: the last 12+ messages, same on every plan, in a window that moves in steps of 8 so it stays cached (needs extension 1.1.0 to send `historyStart`).
 - Long-term memory: Pip's notes, updated at most once a day per trader by a small model (`ANTHROPIC_SMALL_MODEL`, default claude-haiku-5-5), only after 4+ new messages. Editable at /dashboard/memory, can be turned off.
 - Trade patterns (last 30 days, no AI) go into Pip's memory and the Memory page.
@@ -171,3 +171,15 @@ Switchover, in order:
 - Strategies (rulesets) can be on at once: Free 1, Pro 5. Chart checks get all active strategies plus "rules for every trade" (profiles.always_rules and the daily limits); the result names the strategy it matched, or says it matches none.
 - Trades are tagged automatically with the strategy of a chart check made up to 20 minutes before they opened; the trader can change it in the Journal's Strategy column.
 - Journal: month calendar colored by rules kept (default) or P&L, with weekly totals and a day view; "By strategy" results; Free plan history is 7 days (enforced in GET /api/trades).
+
+## Plans: Free / Pro $29 / Pro+ $59 (October 2026)
+
+All limits live in `backend/lib/plans.ts`. Every new account gets 7 days of Pro (profiles.trial_ends_at), no card.
+
+Stripe (you): create these recurring prices and set them on Vercel, then redeploy:
+- [ ] `STRIPE_PRICE_ID_PRO` = $29/month (new price; the old $19 one is retired)
+- [ ] `STRIPE_PRICE_ID_PRO_YEARLY` = $249/year
+- [ ] `STRIPE_PRICE_ID_PRO_PLUS` = $59/month
+- [ ] `STRIPE_PRICE_ID_PRO_PLUS_YEARLY` = $499/year
+- [ ] Billing portal: allow switching between these four prices (so Pro <-> Pro+ and monthly <-> yearly work)
+- Not built yet (don't advertise): weekly review email, multiple trading accounts, CSV export.

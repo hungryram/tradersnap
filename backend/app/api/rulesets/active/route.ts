@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { features, loadPlan } from "@/lib/plans"
 import { createClient } from "@supabase/supabase-js"
 import { activeStrategyLimit } from "@/lib/strategies"
 
@@ -86,9 +87,8 @@ export async function PUT(request: NextRequest) {
   const rulesText = typeof body?.rules_text === "string" ? body.rules_text.trim() : ""
   if (rulesText.length < 10) return reply({ error: "Those rules look empty." }, 400)
 
-  const { data: profile } = await supabase.from("profiles").select("plan").eq("id", user.id).single()
-  const plan = profile?.plan ?? "free"
-  const maxChars = plan === "admin" ? 10000 : plan === "pro" ? 5000 : 1000
+  const { plan } = await loadPlan(supabase, user.id)
+  const maxChars = features(plan).rulesChars
   if (rulesText.length > maxChars) {
     return reply({ error: `These rules are ${rulesText.length} characters and your plan holds ${maxChars}. Ask Pip to shorten them.` }, 400)
   }
@@ -127,7 +127,7 @@ export async function PUT(request: NextRequest) {
   }
 
   // A new strategy (the trader's first one becomes the main one)
-  const maxRulesets = plan === "admin" ? 999 : plan === "free" ? 3 : 20
+  const maxRulesets = features(plan).rulesets
   if (all.length >= maxRulesets) {
     return reply({ error: `You have ${all.length} strategies, the most your plan holds. Delete one on the Rules page, or ask Pip to update an existing one by name.` }, 403)
   }

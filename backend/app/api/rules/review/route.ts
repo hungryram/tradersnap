@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { mainJson } from "@/lib/llm"
@@ -59,9 +60,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Pip has reviewed your rules a lot today. Try again tomorrow." }, { status: 429 })
   }
 
-  const { data: profile } = await supabase.from("profiles").select("plan, trading_profile").eq("id", user.id).single()
-  const plan = profile?.plan ?? "free"
-  const maxChars = plan === "admin" ? 10000 : plan === "pro" ? 5000 : 1000
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const maxChars = features(effectivePlan(profile)).rulesChars
 
   try {
     const { output, tokens } = await mainJson({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { planForPriceId } from "@/lib/plans"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 import { TOPUP_UNITS } from "@/lib/usage"
@@ -15,9 +16,7 @@ const supabase = createClient(
 // Map a Stripe price to a plan using server-side config only.
 // Returns null for unknown prices so we never grant a plan we didn't sell.
 function planForPrice(price: Stripe.Price): string | null {
-  const proPriceIds = [process.env.STRIPE_PRICE_ID_PRO, process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO].filter(Boolean)
-  if (proPriceIds.includes(price.id) || price.lookup_key === "pro") return "pro"
-  return null
+  return planForPriceId(price.id, price.lookup_key)
 }
 
 // Plan changes from Stripe never touch admin accounts (admin is set manually in SQL)

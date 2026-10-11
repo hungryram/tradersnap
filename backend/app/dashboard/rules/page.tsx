@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import RulesReview from "../components/RulesReview"
 import { RULE_TEMPLATES, type RuleTemplate } from "@/lib/rule-templates"
 import { api, type TradingLimits } from "@/lib/dashboard-data"
+import { features } from "@/lib/plans"
 import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
 interface Ruleset {
@@ -15,7 +16,6 @@ interface Ruleset {
 }
 
 const EMPTY_LIMITS: TradingLimits = { max_trades_per_day: null, max_daily_loss: null, stop_after_losses: null, session_start: null, session_end: null, timezone: null }
-const ACTIVE_LIMIT: Record<string, number> = { free: 1, pro: 5, admin: 20 }
 
 // Before the strategies migration, the primary ruleset is the only active one
 const isOn = (r: Ruleset) => r.is_active ?? r.is_primary
@@ -37,9 +37,8 @@ export default function RulesPage() {
   const [alwaysSaving, setAlwaysSaving] = useState(false)
   const [alwaysMessage, setAlwaysMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
 
-  const maxChars = userPlan === "pro" || userPlan === "admin" ? 5000 : 1000
-  const maxRulesets = userPlan === "free" ? 3 : 20
-  const maxActive = ACTIVE_LIMIT[userPlan] ?? 1
+  // userPlan is the effective plan from /api/me (a trial counts as Pro)
+  const { rulesChars: maxChars, rulesets: maxRulesets, activeStrategies: maxActive } = features(userPlan)
   const activeCount = rulesets.filter(isOn).length
 
   useEffect(() => { load() }, [])
@@ -163,7 +162,7 @@ export default function RulesPage() {
         {/* Strategies */}
         <Card
           title="Your strategies"
-          action={rulesets.length > 0 ? <span className="text-xs text-ink-muted">{activeCount} of {maxActive} on{userPlan === "free" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro checks up to 5</a></> : null}</span> : undefined}
+          action={rulesets.length > 0 ? <span className="text-xs text-ink-muted">{activeCount} of {maxActive} on{userPlan === "free" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro checks up to 5</a></> : userPlan === "pro" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro+ is unlimited</a></> : null}</span> : undefined}
         >
           {rulesets.length === 0 ? (
             <>
@@ -234,8 +233,8 @@ export default function RulesPage() {
                       <button onClick={remove} disabled={isSaving} className={`${buttonDanger} sm:ml-auto`}>Delete strategy</button>
                     )}
                   </div>
-                  {rulesets.length >= maxRulesets && userPlan === "free" && (
-                    <p className="text-xs text-ink-muted">Free plan holds {maxRulesets} strategies. <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro holds 20.</a></p>
+                  {rulesets.length >= maxRulesets && userPlan !== "admin" && (
+                    <p className="text-xs text-ink-muted">Your plan holds {maxRulesets} strategies. <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">See plans</a></p>
                   )}
                 </div>
               )}

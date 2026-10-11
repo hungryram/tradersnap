@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isPaid } from "@/lib/plans"
 import Stripe from "stripe"
 import { createClient } from "@supabase/supabase-js"
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
       // A customer Stripe can't find (deleted, or created in the other test/live mode)
       // has nothing to cancel, unless our records say they're paying right now
-      const payingNow = profile.plan === "pro" && ["active", "trialing", "past_due"].includes(profile.subscription_status)
+      const payingNow = isPaid(profile.plan) && ["active", "trialing", "past_due"].includes(profile.subscription_status)
       if (error?.code === "resource_missing" && !payingNow) {
         console.warn("[Account delete] Stripe customer not found; no active plan, continuing")
       } else {

@@ -14,6 +14,8 @@ interface UserData {
     first_name: string | null
     last_name: string | null
     plan: string
+    subscribed_plan?: string
+    trial_days_left?: number
     subscription_status: string
     created_at: string
   }
@@ -26,15 +28,18 @@ interface UserData {
   }
 }
 
-const PLANS = {
-  free: ["About 15 messages and 5 chart checks a day", "1 strategy checked at a time", "Trade tracking, check-ins and daily limits", "Journal and calendar: last 7 days", "Pip remembers 3 saved messages"],
-  pro: ["About 200 messages and 50 chart checks a day", "Up to 5 strategies checked at once", "Full journal history and calendar", "Results per strategy", "Pip remembers 20 saved messages", "Longer, more detailed answers"],
+const PLAN_LISTS = {
+  free: ["About 5 chart checks and 15 messages a day", "1 strategy checked at a time", "Trade tracking, check-ins and daily limits", "Journal, calendar and notes: last 7 days", "Pip remembers 3 saved messages"],
+  pro: ["About 30 chart checks and 150 messages a day", "Up to 5 strategies checked at once", "Full journal, calendar and notes history", "Results per strategy", "Pip reads your journal notes", "Pip remembers 20 saved messages"],
+  pro_plus: ["About 100 chart checks and 400 messages a day", "Unlimited strategies", "Everything in Pro", "Pip remembers 50 saved messages", "For full-time and multi-account traders"],
 }
+const PRICE = { pro: { month: 29, year: 249 }, pro_plus: { month: 59, year: 499 } }
 
 export default function AccountPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [interval, setBillingInterval] = useState<"month" | "year">("month")
   const [editing, setEditing] = useState(false)
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -98,10 +103,10 @@ export default function AccountPage() {
     }
   }
 
-  async function upgrade() {
+  async function upgrade(plan: "pro" | "pro_plus") {
     setBusy(true)
     try {
-      const data = await api("/api/checkout", { method: "POST", body: JSON.stringify({ plan: "pro" }) })
+      const data = await api("/api/checkout", { method: "POST", body: JSON.stringify({ plan, interval }) })
       window.location.href = data.url
     } catch (err) {
       // Already subscribed: manage it instead
@@ -129,7 +134,9 @@ export default function AccountPage() {
   if (!userData) return <Loading />
 
   const { user, usage } = userData
-  const isPro = user.plan === "pro" || user.plan === "admin"
+  // What they pay for (a trial shows as Free here, with its own banner)
+  const subscribed = user.subscribed_plan ?? user.plan
+  const isPro = subscribed !== "free"
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim()
 
   return (
@@ -171,7 +178,7 @@ export default function AccountPage() {
             <dl className="grid gap-4 text-sm sm:grid-cols-3">
               <div><dt className="text-xs text-ink-muted">Name</dt><dd className="mt-0.5">{name || <span className="text-ink-muted">Not set</span>}</dd></div>
               <div><dt className="text-xs text-ink-muted">Email</dt><dd className="mt-0.5 break-all">{user.email}</dd></div>
-              <div><dt className="text-xs text-ink-muted">Plan</dt><dd className="mt-0.5">{user.plan === "admin" ? "Admin" : isPro ? "Pro" : "Free"}</dd></div>
+              <div><dt className="text-xs text-ink-muted">Plan</dt><dd className="mt-0.5">{subscribed === "admin" ? "Admin" : subscribed === "pro_plus" ? "Pro+" : subscribed === "pro" ? "Pro" : user.trial_days_left ? `Pro trial (${user.trial_days_left} ${user.trial_days_left === 1 ? "day" : "days"} left)` : "Free"}</dd></div>
             </dl>
           )}
         </Card>
@@ -195,18 +202,37 @@ export default function AccountPage() {
 
         <div id="plans" className="scroll-mt-8">
           <Card title="Plan">
-            <div className="grid gap-4 md:grid-cols-2">
-              <PlanCard name="Free" price="$0" features={PLANS.free} current={!isPro} />
-              <PlanCard
-                name="Pro"
-                price="$19"
-                was="$49"
-                badge="Launch price"
-                features={PLANS.pro}
-                current={isPro}
-                highlight
-                action={!isPro && <button onClick={upgrade} disabled={busy} className={`${buttonPrimary} w-full`}>{busy ? "Loading..." : "Upgrade to Pro"}</button>}
-              />
+            {!isPro && !!user.trial_days_left && (
+              <div className="mb-5"><Notice tone="info">
+                You&apos;re on a free Pro trial with {user.trial_days_left} {user.trial_days_left === 1 ? "day" : "days"} left. Nothing is charged; afterwards you move to Free unless you pick a plan.
+              </Notice></div>
+            )}
+            <div className="mb-4 inline-flex rounded-lg border border-ink-border p-1 text-sm">
+              {(["month", "year"] as const).map(value => (
+                <button key={value} onClick={() => setBillingInterval(value)} className={`rounded-md px-3 py-1 ${interval === value ? "bg-ink-elevated text-ink-body" : "text-ink-text hover:text-ink-body"}`}>
+                  {value === "month" ? "Monthly" : "Yearly (2 months free)"}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <PlanCard name="Free" price="$0" features={PLAN_LISTS.free} current={!isPro} />
+              {(["pro", "pro_plus"] as const).map(plan => (
+                <PlanCard
+                  key={plan}
+                  name={plan === "pro" ? "Pro" : "Pro+"}
+                  price={`$${interval === "month" ? PRICE[plan].month : Math.round(PRICE[plan].year / 12)}`}
+                  note={interval === "year" ? `billed $${PRICE[plan].year} yearly` : undefined}
+                  badge={plan === "pro" ? "Most popular" : undefined}
+                  features={PLAN_LISTS[plan]}
+                  current={subscribed === plan}
+                  highlight={plan === "pro"}
+                  action={subscribed !== plan && subscribed !== "admin" && (
+                    <button onClick={() => isPro ? openBillingPortal() : upgrade(plan)} disabled={busy} className={`${plan === "pro" ? buttonPrimary : buttonSecondary} w-full`}>
+                      {busy ? "Loading..." : isPro ? `Switch to ${plan === "pro" ? "Pro" : "Pro+"}` : `Get ${plan === "pro" ? "Pro" : "Pro+"}`}
+                    </button>
+                  )}
+                />
+              ))}
             </div>
             {isPro && user.plan !== "admin" && (
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-border pt-5">
@@ -310,8 +336,8 @@ function UsageBar({ label, used, max }: { label: string; used: number; max: numb
   )
 }
 
-function PlanCard({ name, price, was, badge, features, current, highlight = false, action }: {
-  name: string; price: string; was?: string; badge?: string; features: string[]; current: boolean; highlight?: boolean; action?: React.ReactNode
+function PlanCard({ name, price, note, badge, features, current, highlight = false, action }: {
+  name: string; price: string; note?: string; badge?: string; features: string[]; current: boolean; highlight?: boolean; action?: React.ReactNode
 }) {
   return (
     <div className={`flex flex-col rounded-xl border p-5 ${current ? "border-brand-500 bg-brand-500/5" : highlight ? "border-ink-muted" : "border-ink-border"}`}>
@@ -326,8 +352,8 @@ function PlanCard({ name, price, was, badge, features, current, highlight = fals
       <div className="mt-3 flex items-baseline gap-2">
         <span className="text-3xl font-semibold">{price}</span>
         <span className="text-sm text-ink-text">/month</span>
-        {was && <span className="text-sm text-ink-muted line-through">{was}</span>}
       </div>
+      {note && <p className="mt-0.5 text-xs text-ink-muted">{note}</p>}
       <ul className="mt-4 flex-1 space-y-2 text-sm text-ink-text">
         {features.map(f => (
           <li key={f} className="flex gap-2"><span className="text-green-400">✓</span>{f}</li>

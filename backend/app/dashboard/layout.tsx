@@ -32,6 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isAdmin, setIsAdmin] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameNotice, setRenameNotice] = useState(false)
+  const [trialDaysLeft, setTrialDaysLeft] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -46,7 +47,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!seen && session.user.created_at < RENAMED_AT) setRenameNotice(true)
       fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
         .then(response => response.ok ? response.json() : null)
-        .then(data => setIsAdmin(!!data?.user?.is_admin))
+        .then(data => {
+          setIsAdmin(!!data?.user?.is_admin)
+          setTrialDaysLeft(data?.user?.subscribed_plan === "free" ? data?.user?.trial_days_left ?? 0 : 0)
+        })
         .catch(() => {})
     })
   }, [])
@@ -155,6 +159,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <main className="md:pl-60">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
+          {trialDaysLeft > 0 && pathname !== "/dashboard/account" && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-500/10 px-4 py-2.5 text-sm">
+              <span className="text-ink-body">
+                <span className="font-semibold">Pro trial:</span> {trialDaysLeft} {trialDaysLeft === 1 ? "day" : "days"} left. Everything&apos;s unlocked; nothing is charged.
+              </span>
+              <a href="/dashboard/account#plans" className="font-medium text-brand-300 hover:text-brand-200">Keep Pro</a>
+            </div>
+          )}
           {renameNotice && (
             <div className="mb-6 flex items-center gap-4 rounded-2xl border border-brand-500/30 bg-brand-500/10 p-4" role="status">
               <Pip size={44} />

@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Terms of Service" }
 export default function Page() {
   const mail = <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
   return (
-    <Legal title="Terms of Service" updated="October 10, 2026">
+    <Legal title="Terms of Service" updated="October 11, 2026">
       <h2>1. Acceptance of these terms</h2>
       <p>
         These Terms of Service (&quot;Terms&quot;) govern your use of Pip, formerly called Snapchart: the Pip Chrome extension, the dashboard at{" "}
@@ -51,7 +51,8 @@ export default function Page() {
 
       <h2>6. Plans, usage and payments</h2>
       <ul>
-        <li><strong>Free and Pro.</strong> The Free plan and the Pro subscription each include a daily usage allowance, which resets at midnight UTC. Allowances are approximate (a chart check uses more than a message) and we may adjust them.</li>
+        <li><strong>Plans.</strong> The Free plan and the paid subscriptions (Pro and Pro+, billed monthly or yearly) each include a daily usage allowance, which resets at midnight UTC, and the features described on our pricing page. Allowances are approximate (a chart check uses more than a message) and we may adjust them.</li>
+        <li><strong>Free trial.</strong> New accounts get Pro features free for 7 days without entering payment details. Nothing is charged; when the trial ends the account moves to the Free plan unless you choose a paid plan.</li>
         <li><strong>Subscriptions.</strong> Pro renews automatically each billing period until you cancel. Cancel any time in your account&apos;s billing settings; you keep Pro until the end of the period you&apos;ve paid for. You authorize us, through Stripe, to charge your payment method for each renewal.</li>
         <li><strong>Extra usage.</strong> You can buy extra usage as a one-time purchase. It is used after your daily allowance, doesn&apos;t expire while your account is open, has no cash value, can&apos;t be transferred, and ends when your account is deleted or terminated.</li>
         <li><strong>Prices.</strong> We may change prices. For existing subscriptions we&apos;ll give at least 30 days&apos; notice before a change applies to you. Introductory or launch prices may end at any time for new purchases.</li>

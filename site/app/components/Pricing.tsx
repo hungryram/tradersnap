@@ -1,81 +1,116 @@
+"use client"
+
+import { useState } from "react"
 import { CHROME_STORE_URL } from "../links"
 
-// Keep in sync with backend/lib/usage.ts (DAILY_CREDITS) and the dashboard's account page
-const FREE = [
-  "About 5 chart checks and 15 messages with Pip a day",
-  "Automatic trade tracking",
-  "Check-ins from Pip: losing streaks, limits, revenge trades",
-  "Daily loss and trade limits",
-  "1 strategy checked at a time",
-  "Journal and calendar: last 7 days",
-]
-
-const PRO = [
-  "About 50 chart checks and 200 messages with Pip a day",
-  "Everything in Free",
-  "Up to 5 strategies, Pip matches each chart to the right one",
-  "Full journal history and calendar",
-  "Results per strategy",
-  "Pip remembers 20 saved messages, longer answers",
-]
+// Keep in sync with backend/lib/plans.ts (limits and prices) and the dashboard's account page
+const PLANS = [
+  {
+    name: "Free",
+    price: { month: 0, year: 0 },
+    note: "Starts with 7 days of Pro, no card",
+    items: [
+      "About 5 chart checks and 15 messages with Pip a day",
+      "Automatic trade tracking",
+      "Check-ins: losing streaks, limits, revenge trades",
+      "Daily loss and trade limits",
+      "1 strategy checked at a time",
+      "Journal, calendar and notes: last 7 days",
+    ],
+    cta: "Add to Chrome",
+  },
+  {
+    name: "Pro",
+    price: { month: 29, year: 249 },
+    badge: "Most popular",
+    items: [
+      "About 30 chart checks and 150 messages a day",
+      "Up to 5 strategies, Pip matches each chart to the right one",
+      "Full journal, calendar and notes history",
+      "Results per strategy",
+      "Pip reads your journal notes",
+      "Pip remembers 20 saved messages",
+    ],
+    cta: "Start your free week",
+    highlight: true,
+  },
+  {
+    name: "Pro+",
+    price: { month: 59, year: 499 },
+    note: "For full-time and multi-account traders",
+    items: [
+      "About 100 chart checks and 400 messages a day",
+      "Unlimited strategies",
+      "Everything in Pro",
+      "Pip remembers 50 saved messages",
+    ],
+    cta: "Start free, upgrade anytime",
+  },
+] as const
 
 export default function Pricing() {
-  return (
-    <div className="grid gap-5 md:grid-cols-2 max-w-4xl mx-auto">
-      <Plan
-        name="Free"
-        price="$0"
-        note="No card needed"
-        items={FREE}
-        cta="Add to Chrome"
-      />
-      <Plan
-        name="Pro"
-        price="$19"
-        was="$49"
-        badge="Launch price"
-        note="per month, cancel anytime"
-        items={PRO}
-        cta="Start free, upgrade anytime"
-        highlight
-      />
-      <p className="md:col-span-2 text-center text-sm text-ink-muted">
-        Usage resets every day at midnight UTC. Busy day? Buy extra usage on any plan. It never expires.
-      </p>
-    </div>
-  )
-}
+  const [interval, setInterval] = useState<"month" | "year">("month")
 
-function Plan({ name, price, was, badge, note, items, cta, highlight = false }: {
-  name: string; price: string; was?: string; badge?: string; note: string; items: string[]; cta: string; highlight?: boolean
-}) {
   return (
-    <div className={`relative flex flex-col rounded-2xl border p-7 ${highlight ? "border-brand-500/60 bg-brand-500/[0.07]" : "border-ink-border bg-ink-surface"}`}>
-      {badge && (
-        <span className="absolute -top-3 left-7 rounded-full bg-brand-500 px-3 py-1 text-xs font-medium text-ink-bg">{badge}</span>
-      )}
-      <h3 className="text-lg font-semibold">{name}</h3>
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-4xl font-semibold tracking-tight">{price}</span>
-        {was && <span className="text-lg text-ink-muted line-through">{was}</span>}
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-8 flex justify-center">
+        <div className="inline-flex rounded-lg border border-ink-border p-1 text-sm">
+          {(["month", "year"] as const).map(value => (
+            <button
+              key={value}
+              onClick={() => setInterval(value)}
+              className={`rounded-md px-4 py-1.5 transition-colors ${interval === value ? "bg-ink-elevated text-ink-body" : "text-ink-text hover:text-ink-body"}`}
+            >
+              {value === "month" ? "Monthly" : "Yearly · 2 months free"}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="mt-1 text-sm text-ink-muted">{note}</p>
-      <ul className="mt-6 space-y-3 text-sm text-ink-text flex-1">
-        {items.map((item) => (
-          <li key={item} className="flex gap-3">
-            <Check />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-      <a
-        href={CHROME_STORE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`mt-8 rounded-lg py-3 text-center font-medium transition-colors ${highlight ? "bg-brand-500 text-ink-bg hover:bg-brand-400" : "border border-ink-border text-ink-body hover:bg-ink-elevated"}`}
-      >
-        {cta}
-      </a>
+
+      <div className="grid gap-5 md:grid-cols-3">
+        {PLANS.map(plan => {
+          const monthly = interval === "month" ? plan.price.month : Math.round(plan.price.year / 12)
+          const highlight = "highlight" in plan && plan.highlight
+          return (
+            <div key={plan.name} className={`relative flex flex-col rounded-2xl border p-7 ${highlight ? "border-brand-500/60 bg-brand-500/[0.07]" : "border-ink-border bg-ink-surface"}`}>
+              {"badge" in plan && plan.badge && (
+                <span className="absolute -top-3 left-7 rounded-full bg-brand-500 px-3 py-1 text-xs font-medium text-ink-bg">{plan.badge}</span>
+              )}
+              <h3 className="text-lg font-semibold">{plan.name}</h3>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-4xl font-semibold tracking-tight">${monthly}</span>
+                {plan.price.month > 0 && <span className="text-sm text-ink-text">/month</span>}
+              </div>
+              <p className="mt-1 h-5 text-sm text-ink-muted">
+                {plan.price.month === 0
+                  ? ""
+                  : interval === "year" ? `Billed $${plan.price.year} yearly` : "Cancel anytime"}
+              </p>
+              {"note" in plan && plan.note && <p className="mt-2 text-sm text-brand-300">{plan.note}</p>}
+              <ul className="mt-6 flex-1 space-y-3 text-sm text-ink-text">
+                {plan.items.map(item => (
+                  <li key={item} className="flex gap-3">
+                    <Check />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={CHROME_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`mt-8 rounded-lg py-3 text-center font-medium transition-colors ${highlight ? "bg-brand-500 text-ink-bg hover:bg-brand-400" : "border border-ink-border text-ink-body hover:bg-ink-elevated"}`}
+              >
+                {plan.cta}
+              </a>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="mt-6 text-center text-sm text-ink-muted">
+        Every new account gets 7 days of Pro, free, no card. Usage resets daily at midnight UTC. Busy day? Buy extra usage on any plan; it never expires.
+      </p>
     </div>
   )
 }

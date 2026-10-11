@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { effectivePlan, isPaid as isPaidPlan } from "@/lib/plans"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, trading_limits')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -86,6 +87,8 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({ error: "Profile not found" }, { status: 404 })
       return addCorsHeaders(response, origin)
     }
+    // Limits follow the effective plan (a Free account in its trial gets Pro)
+    profile.plan = effectivePlan(profile)
 
     // 3. Parse and validate request body
     const body = await request.json()
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
     const usage = await consumeUsage(supabase, user.id, screenshotCost, limits)
 
     if (!usage.allowed) {
-      const isPaid = profile.plan === 'pro' || profile.plan === 'admin'
+      const isPaid = isPaidPlan(profile.plan)
       const canBuyMore = !!process.env.STRIPE_PRICE_ID_TOPUP
       const response = NextResponse.json({
         error: "Daily usage limit reached",

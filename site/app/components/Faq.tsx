@@ -33,10 +33,10 @@ export const FAQ: FaqGroup[] = [
   {
     title: "Plans and usage",
     items: [
-      { q: "What's free?", a: "Free includes about 5 chart checks and 15 messages with Pip a day, automatic trade tracking, check-ins, daily limits, one strategy, and the journal and calendar for your last 7 days. No card needed." },
-      { q: "What do I get with Pro?", a: "About 10 times more chart checks and messages every day, up to 5 strategies at once (Pip works out which one each chart fits), your full journal history with results per strategy, and Pip remembering more of what you save." },
+      { q: "What's free?", a: "Free includes about 5 chart checks and 15 messages with Pip a day, automatic trade tracking, check-ins, daily limits, one strategy, and the journal, calendar and notes for your last 7 days. Every new account starts with 7 days of Pro, free, with no card needed." },
+      { q: "What do I get with Pro?", a: "About 30 chart checks and 150 messages a day, up to 5 strategies at once (Pip works out which one each chart fits), your full journal, calendar and notes history with results per strategy, and Pip reading your journal notes. Pro+ raises that to about 100 checks and 400 messages a day with unlimited strategies, for full-time and multi-account traders." },
       { q: "How does usage work?", a: "You get a daily allowance, shown as a percentage. A chart check uses more of it than a message. It resets every day at midnight UTC." },
-      { q: "What if I run out?", a: "Wait for the daily reset, upgrade to Pro for about 10 times more every day, or buy extra usage on any plan. Extra usage is used after your daily allowance and never expires." },
+      { q: "What if I run out?", a: "Wait for the daily reset, move to a bigger plan (Pro is about 7 times Free, Pro+ about 20 times), or buy extra usage on any plan. Extra usage is used after your daily allowance and never expires." },
       { q: "How do I cancel Pro?", a: "Go to Account, then Manage billing. You keep Pro until the end of the period you paid for." },
     ],
   },

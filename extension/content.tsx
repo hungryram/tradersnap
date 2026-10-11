@@ -97,8 +97,8 @@ function messageMood(msg: any): PipMood {
 function limitReachedText(plan: string, canBuyMore?: boolean) {
   const isPaid = plan !== 'free'
   const base = "That's today's allowance used up. It refills at midnight UTC."
-  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 10x more every day.")
-  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 10x.")
+  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 7x more every day.")
+  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 7x.")
 }
 
 // Shown under "Analyze this chart" while an analysis runs

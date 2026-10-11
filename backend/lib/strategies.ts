@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { features } from "./plans"
 
 // A trader can have several strategies (rulesets) active at once. Pip checks a
 // chart against all of them and says which one fits; rules that apply to every
@@ -6,9 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type Strategy = { id: string; name: string; rules_text: string; is_primary: boolean; is_active: boolean }
 
-// How many strategies can be active at once, per plan
-export const ACTIVE_STRATEGY_LIMIT: Record<string, number> = { free: 1, pro: 5, admin: 20 }
-export const activeStrategyLimit = (plan?: string | null) => ACTIVE_STRATEGY_LIMIT[plan ?? "free"] ?? 1
+// How many strategies can be active at once (pass the effective plan)
+export const activeStrategyLimit = (plan?: string | null) => features(plan).activeStrategies
 
 type Limits = {
   max_trades_per_day?: number | null

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { activeStrategyLimit } from "@/lib/strategies"
@@ -74,12 +75,12 @@ export async function POST(request: NextRequest) {
     // Get user's plan
     const { data: profile } = await supabase
       .from("profiles")
-      .select("plan")
+      .select("*")
       .eq("id", user.id)
       .single()
 
-    const userPlan = profile?.plan || "free"
-    const maxRulesLength = userPlan === "admin" ? 10000 : userPlan === "pro" ? 5000 : 1000
+    const userPlan = effectivePlan(profile)
+    const maxRulesLength = features(userPlan).rulesChars
 
     // Check ruleset limit
     const { count } = await supabase
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       .select("*", { count: 'exact', head: true })
       .eq("user_id", user.id)
 
-    const limit = profile?.plan === "admin" ? 999 : profile?.plan === "free" ? 3 : 20
+    const limit = features(userPlan).rulesets
     if (count !== null && count >= limit) {
       return NextResponse.json(
         { error: `Ruleset limit reached (${limit} max). Upgrade your plan to create more.` },

@@ -28,8 +28,22 @@ export async function loadNotes(supabase: SupabaseClient, userId: string): Promi
   return (data ?? []) as PipNote[]
 }
 
+export type JournalNote = { day: string; text: string }
+
+// The trader's most recent journal notes (paid plans; Free notes aren't read by Pip)
+export async function loadJournalNotes(supabase: SupabaseClient, userId: string, limit = 5): Promise<JournalNote[]> {
+  const { data, error } = await supabase
+    .from("journal_notes")
+    .select("day, text")
+    .eq("user_id", userId)
+    .order("day", { ascending: false })
+    .limit(limit)
+  if (error) return [] // table missing until 20261021_trial_and_notes.sql runs
+  return (data ?? []) as JournalNote[]
+}
+
 // The memory block Pip sees (cached with the system prompt)
-export function memoryContext(notes: PipNote[], patterns: string[]): string | null {
+export function memoryContext(notes: PipNote[], patterns: string[], journal: JournalNote[] = []): string | null {
   const parts: string[] = []
   if (notes.length) {
     parts.push(`PIP'S NOTES ABOUT THIS TRADER (what you've learned from past conversations; lines marked "trader" were written by them and override yours):
@@ -42,6 +56,12 @@ Use these the way a coach who knows someone would: naturally, when relevant. Don
 ${patterns.map(p => `- ${p}`).join("\n")}
 
 Bring a pattern up when it's relevant to the moment (for example a re-entry right after a loss), framed as their own data, never as a prediction.`)
+  }
+  if (journal.length) {
+    parts.push(`THEIR JOURNAL NOTES (what they wrote about recent trading days, newest first):
+${journal.map(j => `- ${j.day}: ${j.text.length > 400 ? j.text.slice(0, 399) + "…" : j.text}`).join("\n")}
+
+Refer to these when it helps, like a coach who read their journal. Don't quote them back at length.`)
   }
   return parts.length ? parts.join("\n\n") : null
 }

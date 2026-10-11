@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isPaid, priceIdFor, type Interval } from "@/lib/plans"
 import { APP_URL } from "@/lib/urls"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
@@ -29,18 +30,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    // { kind: "topup" } buys a one-time pack of usage; anything else is the Pro subscription.
-    // Price and plan are decided server-side; never trust the client for either.
+    // { kind: "topup" } buys a one-time pack of usage; otherwise { plan: "pro" | "pro_plus",
+    // interval: "month" | "year" } picks a subscription. The price itself comes from server config.
     const body = await request.json().catch(() => ({}))
     const isTopup = body?.kind === "topup"
-    const priceId = isTopup
-      ? process.env.STRIPE_PRICE_ID_TOPUP
-      : process.env.STRIPE_PRICE_ID_PRO || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO
-    const plan = "pro"
+    const plan: "pro" | "pro_plus" = body?.plan === "pro_plus" ? "pro_plus" : "pro"
+    const interval: Interval = body?.interval === "year" ? "year" : "month"
+    const priceId = isTopup ? process.env.STRIPE_PRICE_ID_TOPUP : priceIdFor(plan, interval)
 
     if (!priceId) {
-      console.error(`Checkout error: ${isTopup ? "STRIPE_PRICE_ID_TOPUP" : "STRIPE_PRICE_ID_PRO"} is not configured`)
-      return NextResponse.json({ error: isTopup ? "Buying more isn't available yet" : "Checkout unavailable" }, { status: isTopup ? 400 : 500 })
+      console.error(`Checkout error: no Stripe price configured for ${isTopup ? "top-up" : `${plan}/${interval}`}`)
+      return NextResponse.json({ error: isTopup ? "Buying more isn't available yet" : "That plan isn't available yet" }, { status: 400 })
     }
 
     // Get user's profile to check for existing Stripe customer
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     // Prevent duplicate subscriptions - redirect to billing portal if already subscribed
-    if (!isTopup && profile?.plan === "pro" && profile?.subscription_status === "active") {
+    if (!isTopup && isPaid(profile?.plan) && profile?.plan !== "admin" && profile?.subscription_status === "active") {
       return NextResponse.json(
         { error: "Already subscribed", redirectToPortal: true },
         { status: 400 }

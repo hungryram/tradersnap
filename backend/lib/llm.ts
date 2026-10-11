@@ -4,6 +4,7 @@ import OpenAI from "openai"
 import sharp from "sharp"
 import type { z } from "zod"
 import type { LlmUsage as TokenUsage } from "./llm-cost"
+import { isPaid } from "./plans"
 
 // Provider layer for /api/analyze and /api/chat. Routes build prompts; this file
 // owns which model runs them. Set AI_PROVIDER=anthropic to switch to Claude.
@@ -71,7 +72,7 @@ function openaiTokens(model: string, usage: OpenAI.CompletionUsage | undefined):
   return { model, inputTokens: usage.prompt_tokens - cached, cacheWriteTokens: 0, cacheReadTokens: cached, outputTokens: usage.completion_tokens }
 }
 
-const isPaidPlan = (plan?: string | null) => plan === "pro" || plan === "admin"
+const isPaidPlan = (plan?: string | null) => isPaid(plan)
 
 // ---------------------------------------------------------------------------
 // Chart analysis (structured JSON)
@@ -118,7 +119,7 @@ export async function analyzeChart(opts: {
       {
         role: "user",
         content: [
-          { type: "image_url", image_url: { url: opts.image, detail: opts.plan === "pro" ? "high" : "auto" } },
+          { type: "image_url", image_url: { url: opts.image, detail: isPaid(opts.plan) ? "high" : "auto" } },
           { type: "text", text: opts.prompt }
         ]
       }
@@ -236,7 +237,7 @@ async function chatOpenAI(opts: Parameters<typeof chat>[0]): Promise<ChatResult>
   }
 
   const model = isPaidPlan(opts.plan) ? "gpt-5.1" : "gpt-5-mini"
-  const maxTokens = opts.plan === "admin" ? 4000 : opts.plan === "pro" ? 3000 : 2000
+  const maxTokens = opts.plan === "admin" ? 4000 : isPaid(opts.plan) ? 3000 : 2000
 
   // Some models (like gpt-5-mini) don't support custom temperature
   const completionParams: any = {

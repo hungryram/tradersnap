@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { loadPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase-client"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { getLimits } from "@/lib/usage"
@@ -56,8 +57,7 @@ export async function POST(req: NextRequest) {
     const adminClient = createAdminClient()
 
     // Saves count against the plan's limit (what Pip keeps in mind in every chat)
-    const { data: profile } = await adminClient.from("profiles").select("plan").eq("id", user.id).single()
-    const plan = profile?.plan ?? "free"
+    const { plan } = await loadPlan(adminClient, user.id)
     const limit = getLimits(plan).maxFavoritesInContext
     const countSaved = async () => {
       const { count } = await adminClient

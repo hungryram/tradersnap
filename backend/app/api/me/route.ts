@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { effectivePlan, inTrial, trialDaysLeft } from "@/lib/plans"
 import { APP_ORIGINS, APP_URL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -130,8 +131,9 @@ export async function GET(request: NextRequest) {
       .eq("is_primary", true)
       .single()
 
-    // Get current usage from profile (new daily tracking system)
-    const planLimits = getLimits(profile.plan)
+    // The plan whose limits apply now: a Free account inside its trial gets Pro
+    const plan = effectivePlan(profile)
+    const planLimits = getLimits(plan)
     const limits = {
       maxMessages: planLimits.maxMessages,
       maxScreenshots: planLimits.maxScreenshots,
@@ -161,7 +163,10 @@ export async function GET(request: NextRequest) {
         trading_profile: profile.trading_profile ?? null,
         trading_limits: profile.trading_limits ?? null,
         always_rules: profile.always_rules ?? null,
-        plan: profile.plan,
+        plan,                                   // effective plan (limits and features)
+        subscribed_plan: profile.plan || "free", // what they pay for
+        trial_ends_at: inTrial(profile) ? profile.trial_ends_at : null,
+        trial_days_left: trialDaysLeft(profile),
         is_admin: profile.plan === "admin" && isAdminEmail(user.email),
         subscription_status: profile.subscription_status,
         created_at: profile.created_at

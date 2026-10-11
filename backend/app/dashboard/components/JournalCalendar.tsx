@@ -1,24 +1,31 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { loadTradeWindow, pnlOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { api, loadTradeWindow, pnlOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
-import { Card, money } from "./ui"
+import { Card, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
 
 type ColorBy = "discipline" | "pnl"
-type Day = { key: string; date: Date; trades: Trade[]; net: number; broken: string[]; locked: boolean }
+type Day = { key: string; date: Date; trades: Trade[]; net: number; broken: string[]; locked: boolean; future: boolean }
+
+// Notes for a month: day (YYYY-MM-DD) -> text
+async function loadMonthNotes(from: string, to: string, today: string): Promise<Record<string, string>> {
+  const data = await api<{ notes: { day: string; text: string }[] }>(`/api/journal-notes?from=${from}&to=${to}&today=${today}`)
+  return Object.fromEntries((data.notes ?? []).map(n => [n.day, n.text]))
+}
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Month calendar of trading days: trades and P&L per day, plus whether the day's
 // rules were kept. Colors by discipline by default; P&L is one click away.
-export default function JournalCalendar({ limits, strategies, onStrategyChange, load = loadTradeWindow }: {
+export default function JournalCalendar({ limits, strategies, onStrategyChange, load = loadTradeWindow, loadNotes = loadMonthNotes }: {
   limits: TradingLimits | null
   strategies: StrategyOption[]
   onStrategyChange: (tradeId: string, strategyId: string | null) => void
-  // Where a month's trades come from (replaceable for previews)
+  // Where a month's trades and notes come from (replaceable for previews)
   load?: typeof loadTradeWindow
+  loadNotes?: typeof loadMonthNotes
 }) {
   const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [data, setData] = useState<{ trades: Trade[]; historyFrom: string | null } | null>(null)
@@ -28,13 +35,36 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
     try { return (localStorage.getItem("journal_color_by") as ColorBy) || "discipline" } catch { return "discipline" }
   })
   const tracksRules = hasLimits(limits)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [draft, setDraft] = useState("")
+  const [noteState, setNoteState] = useState<"idle" | "saving" | "saved" | string>("idle")
 
   useEffect(() => {
     setData(null)
     setSelected(null)
     const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
     load(month, next).then(setData).catch(err => setError(err instanceof Error ? err.message : "Couldn't load trades"))
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    loadNotes(dayKeyOf(month.toISOString()), dayKeyOf(last.toISOString()), dayKeyOf(new Date().toISOString())).then(setNotes).catch(() => setNotes({}))
   }, [month])
+
+  // Opening a day loads its note into the editor
+  useEffect(() => {
+    setDraft(selected ? notes[selected] ?? "" : "")
+    setNoteState("idle")
+  }, [selected])
+
+  async function saveNote() {
+    if (!selected) return
+    setNoteState("saving")
+    try {
+      await api("/api/journal-notes", { method: "PUT", body: JSON.stringify({ day: selected, text: draft, today: dayKeyOf(new Date().toISOString()) }) })
+      setNotes(n => { const next = { ...n }; if (draft.trim()) next[selected] = draft.trim(); else delete next[selected]; return next })
+      setNoteState("saved")
+    } catch (err) {
+      setNoteState(err instanceof Error ? err.message : "Couldn't save the note.")
+    }
+  }
 
   const pickColor = (value: ColorBy) => {
     setColorBy(value)
@@ -63,7 +93,8 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
           key, date, trades,
           net: trades.reduce((s, t) => s + pnlOf(t), 0),
           broken: brokenRules(trades, limits),
-          locked: lockedBefore !== null && endOfDay <= lockedBefore
+          locked: lockedBefore !== null && endOfDay <= lockedBefore,
+          future: date.getTime() > Date.now()
         })
         cursor.setDate(cursor.getDate() + 1)
       }
@@ -135,6 +166,8 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
               ...week.map(day => {
                 const inMonth = day.date.getMonth() === month.getMonth()
                 const traded = day.trades.length > 0
+                const openable = inMonth && !day.locked && !day.future
+                const hasNote = !!notes[day.key]
                 const tone = !traded || day.locked ? "border-ink-border/60 bg-transparent"
                   : colorBy === "pnl"
                     ? day.net > 0 ? "border-green-500/30 bg-green-500/10" : day.net < 0 ? "border-red-500/30 bg-red-500/10" : "border-ink-border bg-ink-elevated/40"
@@ -143,28 +176,33 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
                 return (
                   <button
                     key={day.key}
-                    onClick={() => traded && !day.locked && setSelected(selected === day.key ? null : day.key)}
-                    disabled={!traded || day.locked}
-                    className={`relative h-20 rounded-lg border p-1.5 text-left transition-colors ${tone} ${!inMonth ? "invisible" : ""} ${selected === day.key ? "ring-2 ring-brand-400" : ""} ${traded && !day.locked ? "hover:border-ink-muted" : "cursor-default"}`}
+                    onClick={() => openable && setSelected(selected === day.key ? null : day.key)}
+                    disabled={!openable}
+                    className={`relative h-20 rounded-lg border p-1.5 text-left transition-colors ${tone} ${!inMonth ? "invisible" : ""} ${selected === day.key ? "ring-2 ring-brand-400" : ""} ${openable ? "hover:border-ink-muted" : "cursor-default"}`}
                   >
                     <span className={`absolute left-1.5 top-1.5 text-[11px] leading-4 ${day.key === today ? "rounded bg-brand-500 px-1 font-semibold text-ink-bg" : "text-ink-muted"}`}>{day.date.getDate()}</span>
                     {day.locked ? (
                       <span className="absolute inset-0 flex items-center justify-center text-ink-muted" title="Pro keeps your full history">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
                       </span>
-                    ) : traded && (
+                    ) : (traded || hasNote) && (
                       <>
-                        {tracksRules && (
+                        {hasNote && (
+                          <span className={`absolute top-1.5 text-ink-muted ${tracksRules && traded ? "right-6" : "right-1.5"}`} title="You wrote a note">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M4 4h16v12H8l-4 4z" /></svg>
+                          </span>
+                        )}
+                        {tracksRules && traded && (
                           <span className="absolute right-1.5 top-1.5" title={day.broken.length ? day.broken.join("\n") : "No rules broken"}>
                             {day.broken.length
                               ? <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-ink-bg">{day.broken.length}</span>
                               : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-brand-300" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
                           </span>
                         )}
-                        <span className="absolute bottom-1.5 left-1.5 right-1.5">
+                        {traded && <span className="absolute bottom-1.5 left-1.5 right-1.5">
                           <span className="block text-[11px] text-ink-text">{day.trades.length} {day.trades.length === 1 ? "trade" : "trades"}</span>
                           <span className={`block text-xs font-medium tabular-nums ${day.net > 0 ? "text-green-400" : day.net < 0 ? "text-red-400" : "text-ink-text"}`}>{money(day.net)}</span>
-                        </span>
+                        </span>}
                       </>
                     )}
                   </button>
@@ -187,14 +225,35 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
         <div className="mt-5 border-t border-ink-border pt-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
-            <span className="text-sm text-ink-text">{selectedDay.trades.length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>
+            {selectedDay.trades.length > 0 && <span className="text-sm text-ink-text">{selectedDay.trades.length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>}
           </div>
-          {tracksRules && (
+          {selectedDay.trades.length > 0 && tracksRules && (
             selectedDay.broken.length
               ? <ul className="mb-4 space-y-1 text-sm text-amber-200">{selectedDay.broken.map(b => <li key={b}>• {b}</li>)}</ul>
               : <p className="mb-4 text-sm text-brand-300">No rules broken. That&apos;s the win.</p>
           )}
-          <TradeTable trades={selectedDay.trades} strategies={strategies} onStrategyChange={onStrategyChange} />
+          {selectedDay.trades.length > 0
+            ? <TradeTable trades={selectedDay.trades} strategies={strategies} onStrategyChange={onStrategyChange} />
+            : <p className="mb-2 text-sm text-ink-muted">No trades this day.</p>}
+
+          <div className="mt-5">
+            <label className="mb-1.5 block text-xs text-ink-text">Your notes for the day</label>
+            <textarea
+              value={draft}
+              onChange={e => { setDraft(e.target.value); setNoteState("idle") }}
+              maxLength={4000}
+              rows={4}
+              placeholder="How did it go? What did you feel before your worst trade? What will you do differently tomorrow?"
+              className={inputClass}
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <button onClick={saveNote} disabled={noteState === "saving" || draft === (notes[selectedDay.key] ?? "")} className={buttonPrimary}>
+                {noteState === "saving" ? "Saving..." : "Save note"}
+              </button>
+              {noteState === "saved" && <span className="text-xs text-brand-300">Saved.</span>}
+              {noteState !== "idle" && noteState !== "saving" && noteState !== "saved" && <span className="text-xs text-red-300">{noteState}</span>}
+            </div>
+          </div>
         </div>
       )}
     </Card>

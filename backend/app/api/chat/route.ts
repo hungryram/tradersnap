@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { effectivePlan, features, isPaid } from "@/lib/plans"
 import { APP_ORIGINS, APP_URL, SUPPORT_EMAIL } from "@/lib/urls"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -6,7 +7,7 @@ import { chat as llmChat, provider as llmProvider } from "@/lib/llm"
 import { allowanceUsedMessage, claimWelcomeCredit, consumeUsage, creditState, getLimits, refundUsage, usagePayload, type Reservation, type UsageCost } from "@/lib/usage"
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
-import { loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
+import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
 import { loadTradePatterns } from "@/lib/trade-patterns"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
@@ -114,7 +115,7 @@ BOTTOM LINE: one sentence`
 }
 
 function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams): string {
-  const tier: PlanTier = profile?.plan === "admin" ? "admin" : profile?.plan === "pro" ? "pro" : "free"
+  const tier: PlanTier = profile?.plan === "admin" ? "admin" : isPaid(profile?.plan) ? "pro" : "free"
 
   // Admin tier gets a completely different prompt with market thesis analysis
   if (tier === "admin") {
@@ -355,7 +356,7 @@ export async function POST(request: NextRequest) {
     // 2. Fetch user profile with usage data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('plan, first_name, last_name, total_tokens_used, total_input_tokens, total_output_tokens')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -365,6 +366,9 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
+    // Limits, model and prompt follow the effective plan (a Free account in its trial gets Pro)
+    profile.plan = effectivePlan(profile)
+
     // 3. Parse request
     const body = await request.json()
     
@@ -372,7 +376,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Define usage limits based on plan
     const limits = getLimits(profile.plan)
-    const isPaid = profile.plan === 'pro' || profile.plan === 'admin'
+    const paidPlan = isPaid(profile.plan)
 
     // A context image is only free if it carries a valid token from /api/analyze.
     // Without one, drop the image instead of charging (keeps older extension versions working).
@@ -392,10 +396,10 @@ export async function POST(request: NextRequest) {
       const canBuyMore = !!process.env.STRIPE_PRICE_ID_TOPUP
       const response = NextResponse.json({
         error: "Daily usage limit reached",
-        message: allowanceUsedMessage(isPaid, canBuyMore),
+        message: allowanceUsedMessage(paidPlan, canBuyMore),
         limit: limits.maxMessages,
         current: quota.messages,
-        requiresUpgrade: !isPaid,
+        requiresUpgrade: !paidPlan,
         canBuyMore
       }, { status: 429 })
       return addCorsHeaders(response, origin)
@@ -405,20 +409,20 @@ export async function POST(request: NextRequest) {
       const messageLimitHit = quota.messages >= limits.maxMessages
       const response = NextResponse.json(messageLimitHit ? {
         error: "Daily message limit reached",
-        message: isPaid
+        message: paidPlan
           ? `That's all ${limits.maxMessages} messages for today. They refill at midnight UTC.`
           : `That's all ${limits.maxMessages} free messages for today. They refill at midnight UTC, or Pro gives you ${getLimits('pro').maxMessages} a day.`,
         limit: limits.maxMessages,
         current: quota.messages,
-        requiresUpgrade: !isPaid
+        requiresUpgrade: !paidPlan
       } : {
         error: "Daily screenshot limit reached",
-        message: isPaid
+        message: paidPlan
           ? `That's all ${limits.maxScreenshots} chart checks for today. They refill at midnight UTC.`
           : `That's all ${limits.maxScreenshots} free chart checks for today. They refill at midnight UTC, or Pro gives you ${getLimits('pro').maxScreenshots} a day.`,
         limit: limits.maxScreenshots,
         current: quota.screenshots,
-        requiresUpgrade: !isPaid
+        requiresUpgrade: !paidPlan
       }, { status: 429 })
       return addCorsHeaders(response, origin)
     }
@@ -485,13 +489,15 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Skipped entirely when the trader has turned memory off.
     const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits').eq('id', user.id).single()
     const memoryOn = memorySettings?.memory_enabled !== false
-    const [notes, patterns] = memoryOn
+    const [notes, patterns, journal] = memoryOn
       ? await Promise.all([
           loadNotes(supabase, user.id),
-          loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone)
+          loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone),
+          // Pip reads journal notes on paid plans
+          features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id) : Promise.resolve([])
         ])
-      : [[], []]
-    const memory = [favoritedContext, memoryContext(notes, patterns)].filter(Boolean).join('\n\n') || null
+      : [[], [], []]
+    const memory = [favoritedContext, memoryContext(notes, patterns, journal)].filter(Boolean).join('\n\n') || null
 
     // Recent conversation, the same size on every plan (see historyWindow)
     const fullHistory = validatedRequest.conversationHistory ?? []
@@ -531,7 +537,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       })
       // Provide helpful message based on why response failed
       if (result.finishReason === 'length') {
-        aiResponse = profile.plan === 'pro'
+        aiResponse = isPaid(profile.plan)
           ? "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? I'm here to help!"
           : "My response got a bit long! 📝 Could you ask me something more specific, or break your question into smaller parts? (Pro users get longer responses for more detailed analysis)"
       } else if (result.finishReason === 'refusal') {

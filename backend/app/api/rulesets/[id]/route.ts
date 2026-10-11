@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { activeStrategyLimit } from "@/lib/strategies"
@@ -80,12 +81,12 @@ export async function PATCH(
     // Get user's plan
     const { data: profile } = await supabase
       .from("profiles")
-      .select("plan")
+      .select("*")
       .eq("id", user.id)
       .single()
 
-    const userPlan = profile?.plan || "free"
-    const maxRulesLength = userPlan === "admin" ? 10000 : userPlan === "pro" ? 5000 : 1000
+    const userPlan = effectivePlan(profile)
+    const maxRulesLength = features(userPlan).rulesChars
 
     const body = await request.json()
     const validated = updateRulesetSchema.parse(body)

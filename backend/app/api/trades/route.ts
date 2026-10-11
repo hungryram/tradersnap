@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { features, loadPlan } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 
@@ -48,8 +49,6 @@ const tradeSchema = z.object({
 
 type TradeRow = { realized_pnl: number | null; closed_at: string }
 
-// Free plan journal history (days); Pro sees everything
-const FREE_HISTORY_DAYS = 7
 // A chart check this long before a trade opened tags the trade with its strategy
 const TAG_WINDOW_MS = 20 * 60 * 1000
 
@@ -142,7 +141,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET /api/trades?since=<ISO>&until=<ISO>&limit=<n> — trades closed in a window (the extension
-// sends local midnight), newest first. The Free plan's history stops FREE_HISTORY_DAYS back.
+// sends local midnight), newest first. History is limited by the plan (lib/plans historyDays).
 export async function GET(request: NextRequest) {
   const origin = request.headers.get("origin")
 
@@ -162,10 +161,9 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 1000) : 200
 
     // Free plan: history only goes back FREE_HISTORY_DAYS (local midnight that many days ago, roughly)
-    const { data: profile } = await supabase.from("profiles").select("plan").eq("id", user.id).single()
-    const historyFrom = profile?.plan === "free" || !profile?.plan
-      ? new Date(Date.now() - FREE_HISTORY_DAYS * 24 * 60 * 60 * 1000)
-      : null
+    const { plan } = await loadPlan(supabase, user.id)
+    const historyDays = features(plan).historyDays
+    const historyFrom = historyDays ? new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000) : null
     const from = historyFrom && historyFrom > since ? historyFrom : since
 
     const columns = "id, platform, account, symbol, side, qty, entry_price, exit_price, fill_count, realized_pnl, pnl_source, opened_at, closed_at"

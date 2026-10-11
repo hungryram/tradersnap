@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { features } from "./plans"
 
 // ---------------------------------------------------------------------------
 // Usage is one daily allowance of units. Users see a percentage ("62% used,
@@ -11,11 +12,7 @@ export const CREDIT_COSTS = {
   analysis: 5      // "Analyze this chart"
 }
 
-export const DAILY_CREDITS = {
-  free: 40,   // about 5 chart checks + 15 messages
-  pro: 450,   // about 50 chart checks + 200 messages
-  admin: 1_000_000
-}
+// Daily allowances per plan live in lib/plans (PLANS[plan].dailyCredits)
 
 // A top-up pack (Stripe price STRIPE_PRICE_ID_TOPUP)
 export const TOPUP_UNITS = Number(process.env.TOPUP_UNITS) || 100
@@ -27,10 +24,19 @@ export type UsageLimits = {
   dailyCredits: number
 }
 
+// Pass the effective plan (lib/plans effectivePlan), so a trial gets Pro's limits.
+// maxMessages/maxScreenshots are the old per-type caps, used only before 20261016_credits.sql.
+const LEGACY_CAPS: Record<string, { messages: number; screenshots: number }> = {
+  free: { messages: 15, screenshots: 5 },
+  pro: { messages: 150, screenshots: 30 },
+  pro_plus: { messages: 400, screenshots: 100 },
+  admin: { messages: 999999, screenshots: 999999 },
+}
+
 export function getLimits(plan?: string | null): UsageLimits {
-  if (plan === "admin") return { maxMessages: 999999, maxScreenshots: 999999, maxFavoritesInContext: 100, dailyCredits: DAILY_CREDITS.admin }
-  if (plan === "pro") return { maxMessages: 200, maxScreenshots: 50, maxFavoritesInContext: 20, dailyCredits: DAILY_CREDITS.pro }
-  return { maxMessages: 15, maxScreenshots: 5, maxFavoritesInContext: 3, dailyCredits: DAILY_CREDITS.free }
+  const f = features(plan)
+  const caps = LEGACY_CAPS[plan ?? "free"] ?? LEGACY_CAPS.free
+  return { maxMessages: caps.messages, maxScreenshots: caps.screenshots, maxFavoritesInContext: f.favorites, dailyCredits: f.dailyCredits }
 }
 
 // units: explicit cost (analysis); otherwise a message, plus extra for a new chart screenshot
@@ -166,8 +172,8 @@ export function creditStateFromProfile(profile: any, limits: UsageLimits): Credi
 // What Pip says when today's allowance is used up (same wording in chat and chart checks)
 export function allowanceUsedMessage(isPaid: boolean, canBuyMore: boolean) {
   const base = "That's today's allowance used up. It refills at midnight UTC."
-  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 10x more every day.")
-  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 10x.")
+  if (canBuyMore) return base + (isPaid ? " Want to keep going? You can grab extra usage for today." : " Want to keep going? Grab extra usage for today, or go Pro for about 7x more every day.")
+  return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 7x.")
 }
 
 export type WelcomeCredit = "welcome_analysis_used" | "welcome_chart_chat_used"
