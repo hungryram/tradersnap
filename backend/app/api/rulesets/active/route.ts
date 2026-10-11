@@ -93,7 +93,7 @@ export async function PUT(request: NextRequest) {
 
   const { data: primary } = await supabase.from("rulesets").select("id").eq("user_id", user.id).eq("is_primary", true).maybeSingle()
   const { error } = primary
-    ? await supabase.from("rulesets").update({ rules_text: rulesText, updated_at: new Date().toISOString() }).eq("id", primary.id)
+    ? await supabase.from("rulesets").update({ rules_text: rulesText }).eq("id", primary.id)
     : await supabase.from("rulesets").insert({ user_id: user.id, name: "My Trading Rules", rules_text: rulesText, is_primary: true })
   if (error) {
     console.error("PUT /api/rulesets/active error:", error)
