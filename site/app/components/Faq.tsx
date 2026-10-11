@@ -19,6 +19,7 @@ export const FAQ: FaqGroup[] = [
     items: [
       { q: "Which platforms does it work with?", a: "Pip's chart checks and chat work on any chart you open in Chrome, including TradingView, Tradovate and Topstep. Automatic trade tracking works on TradingView today, with more platforms on the way." },
       { q: "Do I need to write rules first?", a: "No. Setup gives you templates to start from, and you can edit them any time. Your rules and daily limits are what make Pip personal, so it's worth the two minutes." },
+      { q: "I trade more than one setup. Does Pip handle that?", a: "Yes. Write each setup as its own strategy, plus the rules that apply to every trade. Pip checks each chart against whichever strategy fits, tells you which one it matched (or that it matches none), and your journal shows results per strategy." },
       { q: "How does Pip know my trades?", a: "He reads the Order history in TradingView's trading panel, in your own browser, while you trade. There's no broker login and no API keys. Keep the trading panel open (it can be small) and Pip logs each trade and its result." },
     ],
   },
@@ -32,7 +33,8 @@ export const FAQ: FaqGroup[] = [
   {
     title: "Plans and usage",
     items: [
-      { q: "What's free?", a: "Free includes about 5 chart checks and 15 messages with Pip a day, automatic trade tracking, the journal, check-ins and daily limits. No card needed." },
+      { q: "What's free?", a: "Free includes about 5 chart checks and 15 messages with Pip a day, automatic trade tracking, check-ins, daily limits, one strategy, and the journal and calendar for your last 7 days. No card needed." },
+      { q: "What do I get with Pro?", a: "About 10 times more chart checks and messages every day, up to 5 strategies at once (Pip works out which one each chart fits), your full journal history with results per strategy, and Pip remembering more of what you save." },
       { q: "How does usage work?", a: "You get a daily allowance, shown as a percentage. A chart check uses more of it than a message. It resets every day at midnight UTC." },
       { q: "What if I run out?", a: "Wait for the daily reset, upgrade to Pro for about 10 times more every day, or buy extra usage on any plan. Extra usage is used after your daily allowance and never expires." },
       { q: "How do I cancel Pro?", a: "Go to Account, then Manage billing. You keep Pro until the end of the period you paid for." },

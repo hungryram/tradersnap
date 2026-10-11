@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { formatDay, loadTrades, pnlOf, startOfLocalDay, summarize, tickerOf, type Trade } from "@/lib/dashboard-data"
+import { api, formatDay, loadStrategyOptions, loadTradeWindow, pnlOf, startOfLocalDay, summarize, tickerOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { Card, Loading, Notice, PageHeader, Stat, money } from "../components/ui"
 import TradeTable from "../components/TradeTable"
+import JournalCalendar from "../components/JournalCalendar"
 
 const RANGES = [7, 30, 90] as const
 const REENTRY_MINUTES = 15
@@ -13,19 +14,35 @@ export default function JournalPage() {
   const [trades, setTrades] = useState<Trade[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [historyFrom, setHistoryFrom] = useState<string | null>(null)
+  const [limits, setLimits] = useState<TradingLimits | null>(null)
+  const [strategies, setStrategies] = useState<StrategyOption[]>([])
+
+  useEffect(() => {
+    api("/api/me").then(me => setLimits(me.user?.trading_limits ?? null)).catch(() => {})
+    loadStrategyOptions().then(setStrategies).catch(() => {})
+  }, [])
 
   useEffect(() => {
     setTrades(null)
-    loadTrades(startOfLocalDay(days - 1), 1000).then(setTrades).catch(err => setError(err.message))
+    loadTradeWindow(startOfLocalDay(days - 1), null)
+      .then(({ trades, historyFrom }) => { setTrades(trades); setHistoryFrom(historyFrom) })
+      .catch(err => setError(err.message))
   }, [days])
 
-  const view = useMemo(() => (trades ? analyze(trades) : null), [trades])
+  const view = useMemo(() => (trades ? analyze(trades, strategies) : null), [trades, strategies])
+
+  // Tag a trade with a strategy (or clear it); the table shows the choice right away
+  const setStrategy = (tradeId: string, strategyId: string | null) => {
+    setTrades(list => list && list.map(t => t.id === tradeId ? { ...t, strategy_id: strategyId, strategy_source: strategyId ? "user" : null } : t))
+    api("/api/trades", { method: "PATCH", body: JSON.stringify({ id: tradeId, strategy_id: strategyId }) }).catch(() => {})
+  }
 
   return (
     <>
       <PageHeader
         title="Journal"
-        subtitle="Every trade Pip detected, and what the numbers say about your habits."
+        subtitle="Every trade Pip detected, which rules you kept, and what the numbers say about your habits."
         actions={
           <div className="inline-flex rounded-lg border border-ink-border p-1">
             {RANGES.map(range => (
@@ -42,6 +59,19 @@ export default function JournalPage() {
       />
 
       {error && <Notice tone="bad">Couldn't load trades: {error}</Notice>}
+
+      <div className="mb-6">
+        <JournalCalendar limits={limits} strategies={strategies} onStrategyChange={setStrategy} />
+      </div>
+
+      {historyFrom && days > 7 && (
+        <div className="mb-6">
+          <Notice tone="info">
+            Showing your last 7 days. The Free plan keeps a week of history;{" "}
+            <a href="/dashboard/account#plans" className="underline">Pro keeps all of it</a>, so your stats cover months, not days.
+          </Notice>
+        </div>
+      )}
       {!error && (!trades || !view) && <Loading />}
 
       {trades && view && trades.length === 0 && (
@@ -91,6 +121,38 @@ export default function JournalPage() {
             </Card>
           </div>
 
+          {view.byStrategy.length > 0 && (
+            <Card title="By strategy">
+              <div className="-mx-5 overflow-x-auto sm:-mx-6">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-ink-muted">
+                      <th className="px-5 pb-2 font-normal sm:px-6">Strategy</th>
+                      <th className="pb-2 text-right font-normal">Trades</th>
+                      <th className="pb-2 text-right font-normal">Win rate</th>
+                      <th className="pb-2 text-right font-normal">Avg win / loss</th>
+                      <th className="px-5 pb-2 text-right font-normal sm:px-6">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    {view.byStrategy.map(row => (
+                      <tr key={row.name} className="border-t border-ink-border/70">
+                        <td className={`px-5 py-2.5 sm:px-6 ${row.untagged ? "text-ink-muted" : "font-medium"}`}>{row.name}</td>
+                        <td className="py-2.5 text-right">{row.stats.count}</td>
+                        <td className="py-2.5 text-right">{row.stats.winRate !== null ? `${Math.round(row.stats.winRate * 100)}%` : "—"}</td>
+                        <td className="py-2.5 text-right text-ink-text">{row.stats.avgWin !== null ? money(row.stats.avgWin) : "—"} / {row.stats.avgLoss !== null ? money(row.stats.avgLoss) : "—"}</td>
+                        <td className={`px-5 py-2.5 text-right font-medium sm:px-6 ${row.stats.net > 0 ? "text-green-400" : row.stats.net < 0 ? "text-red-400" : "text-ink-text"}`}>{money(row.stats.net)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-ink-muted">
+                Trades are tagged with the strategy Pip matched in your chart check right before them. Fix or add a tag in the Strategy column below.
+              </p>
+            </Card>
+          )}
+
           {view.bySymbol.length > 1 && (
             <Card title="By symbol">
               <BarList rows={view.bySymbol} empty="—" />
@@ -102,7 +164,7 @@ export default function JournalPage() {
               {showAll ? "Show fewer" : `Show all ${trades.length}`}
             </button>
           )}>
-            <TradeTable trades={showAll ? trades : trades.slice(0, 25)} showDate />
+            <TradeTable trades={showAll ? trades : trades.slice(0, 25)} showDate strategies={strategies} onStrategyChange={setStrategy} />
           </Card>
         </div>
       )}
@@ -112,7 +174,7 @@ export default function JournalPage() {
 
 type Row = { label: string; value: number; detail: string }
 
-function analyze(trades: Trade[]) {
+function analyze(trades: Trade[], strategies: StrategyOption[]) {
   const group = (keyOf: (t: Trade) => string, order: (a: string, b: string) => number) => {
     const groups = new Map<string, Trade[]>()
     for (const t of trades) {
@@ -153,7 +215,22 @@ function analyze(trades: Trade[]) {
     ;(quick ? reentries : rest).push(t)
   })
 
-  return { stats: summarize(trades), byDay, byHour, bySymbol, reentry: summarize(reentries), rest: summarize(rest) }
+  // Results per strategy (most trades first), untagged trades last
+  const names = new Map(strategies.map(st => [st.id, st.name]))
+  const byStrategy = strategies.length === 0 ? [] : [
+    ...group(t => (t.strategy_id && names.has(t.strategy_id) ? t.strategy_id : ""), (a, b) => a.localeCompare(b))
+      .filter(({ key }) => key)
+      .map(({ key, list }) => ({ name: names.get(key)!, stats: summarize(list), untagged: false }))
+      .sort((a, b) => b.stats.count - a.stats.count),
+    ...(() => {
+      const untagged = trades.filter(t => !t.strategy_id || !names.has(t.strategy_id))
+      return untagged.length ? [{ name: "Untagged", stats: summarize(untagged), untagged: true }] : []
+    })()
+  ]
+  // Only worth a card once at least one trade is tagged
+  const anyTagged = byStrategy.some(row => !row.untagged)
+
+  return { stats: summarize(trades), byDay, byHour, bySymbol, byStrategy: anyTagged ? byStrategy : [], reentry: summarize(reentries), rest: summarize(rest) }
 }
 
 function BarList({ rows, empty }: { rows: Row[]; empty: string }) {

@@ -159,9 +159,15 @@ Switchover, in order:
 
 ## Pip's memory and AI cost tracking (October 2026)
 
-- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql` and `20261019_rules_costs.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
+- [ ] Run `backend/supabase/migrations/20261017_memory_and_costs.sql` and then `20261018_checkin_costs.sql`, `20261019_rules_costs.sql` and `20261020_strategies.sql` (pip_notes, memory settings, llm_usage). Until then memory and cost tracking stay off quietly; chat works as before.
 - Short-term memory: the last 12+ messages, same on every plan, in a window that moves in steps of 8 so it stays cached (needs extension 1.1.0 to send `historyStart`).
 - Long-term memory: Pip's notes, updated at most once a day per trader by a small model (`ANTHROPIC_SMALL_MODEL`, default claude-haiku-5-5), only after 4+ new messages. Editable at /dashboard/memory, can be turned off.
 - Trade patterns (last 30 days, no AI) go into Pip's memory and the Memory page.
 - Cost controls: prompt and memory cached for 1 hour, recent chat for 5 minutes; plain chat thinks at `low` effort, chat with a chart at `medium` (`ANTHROPIC_CHAT_EFFORT`, `ANTHROPIC_CHAT_IMAGE_EFFORT`).
 - Every AI request is logged with tokens and an estimated cost; see "AI cost" on the admin page. Prices live in `backend/lib/llm-cost.ts`.
+
+## Strategies, tagging and the journal calendar (October 2026)
+
+- Strategies (rulesets) can be on at once: Free 1, Pro 5. Chart checks get all active strategies plus "rules for every trade" (profiles.always_rules and the daily limits); the result names the strategy it matched, or says it matches none.
+- Trades are tagged automatically with the strategy of a chart check made up to 20 minutes before they opened; the trader can change it in the Journal's Strategy column.
+- Journal: month calendar colored by rules kept (default) or P&L, with weekly totals and a day view; "By strategy" results; Free plan history is 7 days (enforced in GET /api/trades).

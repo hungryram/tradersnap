@@ -27,8 +27,8 @@ interface UserData {
 }
 
 const PLANS = {
-  free: ["15 coach messages a day", "5 chart checks a day", "Trade tracking and journal", "Coach remembers 3 saved messages", "3 rulesets"],
-  pro: ["200 coach messages a day", "50 chart checks a day", "Trade tracking and journal", "Coach remembers 20 saved messages", "20 rulesets", "Longer, more detailed answers"],
+  free: ["About 15 messages and 5 chart checks a day", "1 strategy checked at a time", "Trade tracking, check-ins and daily limits", "Journal and calendar: last 7 days", "Pip remembers 3 saved messages"],
+  pro: ["About 200 messages and 50 chart checks a day", "Up to 5 strategies checked at once", "Full journal history and calendar", "Results per strategy", "Pip remembers 20 saved messages", "Longer, more detailed answers"],
 }
 
 export default function AccountPage() {

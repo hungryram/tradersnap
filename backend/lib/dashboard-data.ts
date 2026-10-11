@@ -16,6 +16,8 @@ export type Trade = {
   pnl_source: string
   opened_at: string | null
   closed_at: string
+  strategy_id?: string | null
+  strategy_source?: "auto" | "user" | null
 }
 
 export type TradingLimits = {
@@ -74,6 +76,21 @@ export function startOfLocalDay(daysAgo = 0) {
 export async function loadTrades(since: Date, limit = 200): Promise<Trade[]> {
   const data = await api<{ trades: Trade[] }>(`/api/trades?since=${encodeURIComponent(since.toISOString())}&limit=${limit}`)
   return data.trades ?? []
+}
+
+// Trades closed in [since, until), plus where the Free plan's history starts (null on Pro)
+export async function loadTradeWindow(since: Date, until: Date | null, limit = 1000): Promise<{ trades: Trade[]; historyFrom: string | null }> {
+  const params = new URLSearchParams({ since: since.toISOString(), limit: String(limit) })
+  if (until) params.set("until", until.toISOString())
+  const data = await api<{ trades: Trade[]; historyFrom?: string | null }>(`/api/trades?${params}`)
+  return { trades: data.trades ?? [], historyFrom: data.historyFrom ?? null }
+}
+
+export type StrategyOption = { id: string; name: string }
+
+export async function loadStrategyOptions(): Promise<StrategyOption[]> {
+  const data = await api<{ rulesets: StrategyOption[] }>("/api/rulesets")
+  return (data.rulesets ?? []).map(r => ({ id: r.id, name: r.name }))
 }
 
 export const pnlOf = (trade: Trade) => Number(trade.realized_pnl ?? 0)

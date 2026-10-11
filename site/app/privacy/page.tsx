@@ -47,7 +47,7 @@ export default function Page() {
       <p>
         When <strong>Auto-detect trades</strong> is on, the extension reads the order history and open positions shown in TradingView&apos;s trading panel,
         inside your browser. From that it records each trade: the symbol, side, quantity, entry and exit prices, fill times, order IDs, commissions, the
-        calculated profit or loss, and the account name or number exactly as the panel displays it. This is sent to our servers so Pip can coach you
+        calculated profit or loss, the account name or number exactly as the panel displays it, and which of your strategies it was (from your chart check just before it, or as you set it). This is sent to our servers so Pip can coach you
         and show your journal. We don&apos;t connect to your broker, never see your broker credentials, and can&apos;t place or change orders. You can turn
         Auto-detect trades off in the extension menu at any time.
       </p>
