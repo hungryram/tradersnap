@@ -27,7 +27,7 @@ const supabase = createBrowserClient(
 export const config: PlasmoCSConfig = {
   matches: [
     // Admin dashboard (for session testing)
-    "https://app.tradewithpip.ai/*",
+    "https://admin.tradewithpip.ai/*",
     "https://admin.snapchartapp.com/*",
     // Trading platforms
     "*://*.tradingview.com/*",

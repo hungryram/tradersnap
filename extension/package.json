@@ -52,7 +52,7 @@
           "assets/icon128.png"
         ],
         "matches": [
-          "https://app.tradewithpip.ai/*",
+          "https://admin.tradewithpip.ai/*",
           "https://admin.snapchartapp.com/*",
           "https://www.tradingview.com/*",
           "https://tradingview.com/*",
@@ -93,7 +93,7 @@
     ],
     "externally_connectable": {
       "matches": [
-        "https://app.tradewithpip.ai/*",
+        "https://admin.tradewithpip.ai/*",
         "https://admin.snapchartapp.com/*",
         "http://localhost/*"
       ]
