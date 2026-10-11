@@ -64,6 +64,18 @@ export const config: PlasmoCSConfig = {
 // Instead of inline script injection, we'll check localStorage directly from content script
 // This runs in extension context but can still access the page's localStorage via chrome APIs
 
+// Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
+// something and speaking up. Urgent warnings skip the pause.
+const CHECKIN_TYPING_MS = 1500
+const URGENT_CHECKINS = new Set(['daily_loss', 'over_max'])
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// Sample check-ins for trying the delivery in development builds (widget menu)
+const PREVIEW_CHECKINS: CheckIn[] = [
+  { id: 'preview_info', kind: 'revenge', level: 'warning', text: "You're back in 2 minutes after a -$180 loss. Was this setup on your plan, or is it the last trade talking?" },
+  { id: 'preview_urgent', kind: 'daily_loss', level: 'warning', text: "You're -$520 today, past your $500 daily loss limit. Your rule says stop here." }
+]
+
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
 function messageMood(msg: any): PipMood {
   if (msg.type === 'checkin') return msg.level === 'warning' ? 'caution' : 'idle'
@@ -134,6 +146,7 @@ const TradingBuddyWidget = () => {
   const [checkinsMode, setCheckinsMode] = useState<'on' | 'warnings' | 'off'>('on')
   const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
   const [bubble, setBubble] = useState<CheckIn | null>(null)
+  const [pipTyping, setPipTyping] = useState(false)
   // Re-render now and then so time-based moods (a fresh win) wear off
   const [, setMoodTick] = useState(0)
   useEffect(() => {
@@ -564,15 +577,24 @@ const TradingBuddyWidget = () => {
     return true
   }
 
-  const deliverCheckIns = async (candidates: (CheckIn | null)[]) => {
+  const deliverCheckIns = async (candidates: (CheckIn | null)[], options: { preview?: boolean } = {}) => {
     for (const checkIn of candidates) {
       if (!checkIn) continue
-      const mode = checkinsModeRef.current
-      if (mode === 'off' || (mode === 'warnings' && checkIn.level !== 'warning')) continue
-      // Gentle messages at most every 5 minutes; warnings always get through
-      if (checkIn.level === 'info' && Date.now() - lastInfoAtRef.current < 5 * 60_000) continue
-      if (!(await claimCheckIn(checkIn.id))) continue
-      if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
+      if (!options.preview) {
+        const mode = checkinsModeRef.current
+        if (mode === 'off' || (mode === 'warnings' && checkIn.level !== 'warning')) continue
+        // Gentle messages at most every 5 minutes; warnings always get through
+        if (checkIn.level === 'info' && Date.now() - lastInfoAtRef.current < 5 * 60_000) continue
+        if (!(await claimCheckIn(checkIn.id))) continue
+        if (checkIn.level === 'info') lastInfoAtRef.current = Date.now()
+      }
+
+      if (!URGENT_CHECKINS.has(checkIn.kind)) {
+        setBubble(null)
+        setPipTyping(true)
+        await sleep(CHECKIN_TYPING_MS)
+        setPipTyping(false)
+      }
 
       setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, timestamp: new Date() }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
@@ -1837,7 +1859,7 @@ const TradingBuddyWidget = () => {
   const lastTrade = tradesToday.reduce<CoachTrade | null>((latest, t) => !latest || t.closed_at > latest.closed_at ? t : latest, null)
   const freshWin = !!(lastTrade && (lastTrade.realized_pnl ?? 0) > 0 && Date.now() - new Date(lastTrade.closed_at).getTime() < 3 * 60 * 1000)
   const lastMessage = messages[messages.length - 1]
-  const headerMood: PipMood = busy ? 'thinking' : lastMessage && lastMessage.type !== 'user' ? messageMood(lastMessage) : 'idle'
+  const headerMood: PipMood = busy || pipTyping ? 'thinking' : lastMessage && lastMessage.type !== 'user' ? messageMood(lastMessage) : 'idle'
 
   if (!isOpen) {
     const losingStreak = !!(autoDetectTrades && tradeStats && tradeStats.lossStreak >= 2)
@@ -1848,7 +1870,7 @@ const TradingBuddyWidget = () => {
       losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null
     ].filter(Boolean).join('\n')
     const warned = unreadCheckins.some(c => c.level === 'warning')
-    const launcherMood: PipMood = busy ? 'thinking' : warned || losingStreak ? 'caution' : freshWin ? 'happy' : 'idle'
+    const launcherMood: PipMood = busy || pipTyping ? 'thinking' : warned || losingStreak ? 'caution' : freshWin ? 'happy' : 'idle'
     return (
       <div
         data-snapchart-widget
@@ -1880,6 +1902,22 @@ const TradingBuddyWidget = () => {
             <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold">{tradeStats!.lossStreak}L</span>
           )}
         </button>
+
+        {pipTyping && !bubble && (
+          <div
+            className={`absolute flex items-center gap-1 rounded-2xl border px-3 py-2.5 shadow-xl ${
+              launcherPos.bottom > window.innerHeight - 220 ? 'top-full mt-3' : 'bottom-full mb-3'
+            } ${window.innerWidth - launcherPos.right < 300 ? 'left-0' : 'right-0'} ${
+              theme === 'dark' ? 'border-dark-border bg-dark-surface text-dark-text' : 'border-slate-200 bg-white text-slate-400'
+            }`}
+            role="status"
+            aria-label="Pip is typing"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-[bounce_1.4s_ease-in-out_infinite]" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+          </div>
+        )}
 
         {bubble && (
           <div
@@ -2138,6 +2176,29 @@ const TradingBuddyWidget = () => {
                   >
                     Clear Chat
                   </button>
+                )}
+                {process.env.NODE_ENV === 'development' && (
+                  <>
+                    <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
+                    <div className={`px-4 pb-1 text-[10px] font-semibold uppercase tracking-wide ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>Dev: preview check-in</div>
+                    {[
+                      { label: 'With typing (widget closes)', checkIn: PREVIEW_CHECKINS[0] },
+                      { label: 'Urgent, no typing (widget closes)', checkIn: PREVIEW_CHECKINS[1] }
+                    ].map(({ label, checkIn }) => (
+                      <button
+                        key={checkIn.id}
+                        onClick={() => {
+                          setShowMenu(false)
+                          setIsOpen(false)
+                          // Give the launcher a moment to appear, then deliver as if it just happened
+                          setTimeout(() => deliverCheckIns([{ ...checkIn, id: `${checkIn.id}_${Date.now()}` }], { preview: true }), 800)
+                        }}
+                        className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </>
                 )}
                 <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                 <button
@@ -2653,7 +2714,7 @@ const TradingBuddyWidget = () => {
             </button>
           )}
           
-          {(isAnalyzing || isSending) && (
+          {(isAnalyzing || isSending || pipTyping) && (
             <div className="flex justify-start">
               <div className="mr-2 mt-0.5 shrink-0"><Pip mood="thinking" size={26} /></div>
               <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
