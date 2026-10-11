@@ -1,156 +1,45 @@
-# Chrome Extension Permissions Justification
+# Chrome Web Store: permissions and data (Pip 1.1.0)
 
-## Extension Purpose
-Trading Buddy is an AI-powered trading psychology coach that helps traders analyze their chart setups against their own trading rules. It provides real-time feedback and coaching to build disciplined trading habits.
+Paste-ready answers for the Privacy practices tab. Keep in sync with `package.json` (manifest) and the privacy policy at https://tradewithpip.ai/privacy.
 
-## Required Permissions & Justification
+## Single purpose
 
-### 1. `activeTab`
-**Purpose:** Access to the currently active tab when user interacts with the extension
+Pip is an AI trading-discipline coach that sits on the trader's chart: it checks a chart against the trader's own written rules when they ask, tracks their trades from the trading panel, and reminds them of their own limits (losing streaks, max trades, daily loss). It does not give trading signals or place trades.
 
-**How it's used:**
-- Provides context about which tab user is on
-- Enables screenshot capture workflow
-- Only active when user clicks extension elements
+## Permissions
 
-**Why necessary:** 
-- Required for user-initiated actions
-- Provides minimal access (only current tab, only when user interacts)
+**activeTab**
+Used when the trader opens Pip with the keyboard shortcut or the toolbar button, so Pip can capture the chart in the tab they're on when they ask for a chart check.
 
-### 2. `tabs`
-**Purpose:** Capture screenshots of trading charts using `chrome.tabs.captureVisibleTab()`
+**tabs**
+`chrome.tabs.captureVisibleTab` takes the chart screenshot when the trader clicks "Analyze this chart" or sends a message with their chart. Also used to open the dashboard (sign in, rules, account) in a new tab and to send an open dashboard tab to its sign-out page. Screenshots are never taken automatically.
 
-**How it's used:**
-- User opens extension widget on a trading chart page (e.g., TradingView)
-- User clicks "Analyze Chart" button in the widget
-- Extension calls `chrome.tabs.captureVisibleTab()` to screenshot current tab
-- Screenshot is sent to our backend API for AI analysis
-- User receives feedback based on their personal trading rules
+**storage**
+Keeps the sign-in session, recent chat, settings (theme, check-in preference, widget position) and today's check-in state in the browser.
 
-**Why necessary:** 
-- **Core functionality** - analyzing chart images is the primary purpose
-- `activeTab` alone is insufficient for programmatic screenshot capture
-- Only captures when user explicitly clicks "Analyze Chart" or "Send with chart"
-- No background or automatic screenshots
-- Screenshots are temporary (sent to API, not permanently stored)
+**alarms**
+Refreshes the sign-in session in the background (about once a minute while it's close to expiring) so the trader isn't signed out mid-session.
 
-**Important:** Without this permission, the extension cannot capture charts and loses its core value proposition.
+**Host permission (`<all_urls>`)**
+`chrome.tabs.captureVisibleTab` requires the `<all_urls>` host permission (or activeTab from a toolbar click); traders start chart checks from the widget on the page, so activeTab alone doesn't cover it. The content script itself only runs on the listed trading and charting sites (TradingView, Tradovate, TopstepX, brokers and exchanges) and on our dashboard; Pip doesn't read or change other websites.
 
-### 3. `storage`
-**Purpose:** Store user preferences and chat history locally
+**externally_connectable** (admin.tradewithpip.ai, admin.snapchartapp.com)
+Lets the Pip dashboard hand the trader's sign-in to the extension after they log in on the website, and sign it out.
 
-**What we store:**
-- User's theme preference (light/dark mode)
-- Chat message history (stored locally, not uploaded)
-- Supabase session token (for authentication)
-- Usage consent flags
+**Remote code:** none. All code ships in the package; the extension only calls our API (admin.tradewithpip.ai) for data.
 
-**Data handling:**
-- All data stored locally in chrome.storage.local
-- Session tokens only used to authenticate with OUR backend (admin.tradersnap.com)
-- No third-party data collected or stored
-- Users can clear data anytime via extension menu
+## Data usage (what to tick)
 
-### 4. `scripting`
-**Purpose:** Inject chat widget overlay onto trading chart pages
+- **Personally identifiable information:** email address, optional first name (account).
+- **Authentication information:** sign-in session tokens.
+- **Personal communications:** messages the trader sends to Pip and Pip's replies.
+- **Financial and payment information:** trade history detected from the trading panel (symbol, size, prices, profit or loss). Payments are handled by Stripe on the website, not the extension.
+- **User activity:** feature usage events (chart checks, messages, check-ins shown).
+- **Website content:** chart screenshots, only when the trader asks for a chart check.
 
-**How it's used:**
-- Injects content script (chat widget UI) onto pages user visits
-- Widget is a floating chat interface for AI coaching
-- Does NOT modify page content or automate any actions
-- Purely additive UI element that can be closed/minimized
+Not collected: health, location, web browsing history.
 
-**Why necessary:**
-- Provides the coaching interface users interact with
-- Non-intrusive overlay that doesn't affect page functionality
-
-### 5. Host Permissions: `<all_urls>`
-
-**Why this broad permission is necessary:**
-
-Chrome's `chrome.tabs.captureVisibleTab()` API has a strict requirement:
-- When called from content script actions (user clicking button in widget), it requires `<all_urls>` permission
-- `activeTab` alone is insufficient because it only works for popup/icon interactions, not content script buttons
-- This is a Chrome API limitation, not our choice
-
-**What we actually do with this access:**
-- **Screenshot capture ONLY** - When user clicks "Analyze Chart" in the widget
-- Widget injection on pages user visits (provides the chat interface)
-- Read session from admin.tradersnap.com localStorage (our own domain for auth sync)
-
-**What we DO NOT do:**
-- ❌ Read any cookies, passwords, or credentials from any site
-- ❌ Access TradingView account data or trading history
-- ❌ Modify page content or automate any actions
-- ❌ Track browsing history
-- ❌ Collect data from non-trading pages
-- ❌ Run in background when widget is closed
-
-**Real-world usage:**
-- Extension is primarily used on TradingView and our admin site
-- Users explicitly open the widget when they want coaching
-- Widget can be closed/minimized anytime
-- Zero impact on pages where user doesn't use the extension
-
-**Similar extensions with this permission:**
-- Loom (screen recording)
-- Awesome Screenshot
-- Nimbus Screenshot
-- Any extension that captures screenshots from content scripts
-
-**Alternative we considered:**
-We tried using specific domain permissions (`https://*.tradingview.com/*`) but Chrome's API requires `<all_urls>` for programmatic screenshot capture from content scripts. This is not a security oversight—it's how the Chrome API is designed.
-
-## Data Privacy
-
-### What data leaves the user's device:
-1. **Chart screenshots** - Sent to our backend API (admin.tradersnap.com/api/analyze) for AI analysis
-   - User explicitly requests each analysis
-   - Screenshots not permanently stored
-   - Used only for immediate AI processing
-
-2. **Chat messages** - Sent to our backend API for AI coaching responses
-   - User types each message intentionally
-   - Conversation context used to provide relevant coaching
-
-3. **Authentication tokens** - Standard OAuth tokens from Supabase
-   - Industry-standard auth (same as millions of web apps)
-   - Only authenticates with OUR backend, never third parties
-
-### What data NEVER leaves the device:
-- User's trading rules (stored locally)
-- Chat history (stored in chrome.storage)
-- User preferences (theme, position, size)
-- Browser cookies from other sites
-
-## No Malicious Behavior
-
-**We DO NOT:**
-- ❌ Automate actions on any website
-- ❌ Modify page content beyond our widget
-- ❌ Access or exfiltrate third-party credentials
-- ❌ Track browsing history
-- ❌ Inject ads or affiliate links
-- ❌ Mine cryptocurrency or use computing resources
-- ❌ Redirect users or change default search engines
-
-**We DO:**
-- ✅ Provide legitimate AI coaching service
-- ✅ Only act on explicit user requests
-- ✅ Maintain transparent data practices
-- ✅ Follow Chrome Web Store policies
-- ✅ Respect user privacy
-
-## Open Source & Transparency
-
-- Source code available at: https://github.com/hungryram/tradersnap
-- Built with Plasmo framework (standard React-based extension framework)
-- No obfuscation or hidden functionality
-- Minified code is normal React production build output
-
-## Contact
-
-For questions about permissions or data handling:
-- Email: support@tradersnap.com
-- Privacy Policy: https://admin.tradersnap.com/privacy
-- Website: https://admin.tradersnap.com
+Certify:
+- Data is not sold to third parties.
+- Data is not used or transferred for purposes unrelated to the extension's single purpose.
+- Data is not used or transferred to determine creditworthiness or for lending.

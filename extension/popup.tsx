@@ -94,16 +94,8 @@ function IndexPopup() {
       try {
         const tabs = await chrome.tabs.query({ url: `${process.env.PLASMO_PUBLIC_API_URL}/*` })
         if (tabs.length > 0 && tabs[0].id) {
-          console.log('[Popup] Found admin tab, injecting sign-out script...')
-          await chrome.scripting.executeScript({
-            target: { tabId: tabs[0].id },
-            func: () => {
-              // Clear localStorage
-              localStorage.removeItem('trading_buddy_session')
-              // Redirect to trigger Supabase sign out
-              window.location.href = '/?signout=true'
-            }
-          })
+          // Send the open dashboard tab to its sign-out URL (no script injection needed)
+          await chrome.tabs.update(tabs[0].id, { url: `${process.env.PLASMO_PUBLIC_API_URL}/?signout=true` })
         } else {
           console.log('[Popup] No admin tab, opening one to trigger sign out...')
           // Create a visible tab to sign out (Chrome reviewers prefer visible navigation)
