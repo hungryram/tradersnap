@@ -174,7 +174,15 @@ const TradingBuddyWidget = () => {
   const [timeoutEndTime, setTimeoutEndTime] = useState<number | null>(null)
   const [timeoutReason, setTimeoutReason] = useState<string>('')
   const [, setForceUpdate] = useState(0) // Force re-render for countdown
-  const [glowingMessageId, setGlowingMessageId] = useState<string | null>(null)
+  // Saved messages are what Pip always remembers; the toast confirms a save and shows the count
+  const [savedCount, setSavedCount] = useState<{ used: number; limit: number } | null>(null)
+  const [saveToast, setSaveToast] = useState<{ text: string; tone: 'good' | 'limit' } | null>(null)
+  const saveToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showSaveToast = (text: string, tone: 'good' | 'limit') => {
+    setSaveToast({ text, tone })
+    if (saveToastTimer.current) clearTimeout(saveToastTimer.current)
+    saveToastTimer.current = setTimeout(() => setSaveToast(null), tone === 'limit' ? 7000 : 3500)
+  }
   // First-run checklist; null until loaded from storage
   const [gettingStarted, setGettingStarted] = useState<{ analyzed?: boolean, chatted?: boolean, chartChatted?: boolean, dismissed?: boolean, autoOpened?: boolean, completed?: boolean } | null>(null)
   const [tabId] = useState(() => `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
@@ -369,6 +377,7 @@ const TradingBuddyWidget = () => {
             setTradingLimits(meData.user?.trading_limits ?? null)
             firstNameRef.current = meData.user?.first_name ?? null
             setLimitsLoaded(true)
+            if (meData.usage?.favorites) setSavedCount({ used: meData.usage.favorites.used, limit: meData.usage.favorites.limit })
             if (meData.usage) {
               setCurrentUsage({
                 messages: meData.usage.messages.used,
@@ -1300,32 +1309,25 @@ const TradingBuddyWidget = () => {
         skipNextScrollRef.current = true
 
         // Update local state
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId 
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId
             ? { ...msg, isFavorited: willBeFavorited }
             : msg
         ))
-        
-        // Trigger glow animation only when favoriting (not unfavoriting)
-        if (willBeFavorited) {
-          setGlowingMessageId(messageId)
-          setTimeout(() => setGlowingMessageId(null), 800) // Clear after animation
-        }
+
+        const data = await response.json().catch(() => ({}))
+        const counts = typeof data.used === 'number' && typeof data.limit === 'number' ? { used: data.used, limit: data.limit } : null
+        if (counts) setSavedCount(counts)
+        showSaveToast(
+          willBeFavorited
+            ? `Saved. I'll keep this in mind from now on.${counts ? ` (${counts.used} of ${counts.limit})` : ''}`
+            : `Removed. I won't use this one anymore.${counts ? ` (${counts.used} of ${counts.limit})` : ''}`,
+          'good'
+        )
       } else if (response.status === 429) {
-        const errorData = await response.json()
-        // Add upgrade link to the error message if it mentions upgrading
-        let errorMessage = errorData.error || 'You have reached your favorites limit.'
-        if (errorMessage.includes('Upgrade to Pro')) {
-          errorMessage = errorMessage.replace(
-            'Upgrade to Pro',
-            `[Upgrade to Pro](${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account)`
-          )
-        }
-        setMessages(prev => [...prev, {
-          type: 'error',
-          content: errorMessage,
-          timestamp: new Date()
-        }])
+        const data = await response.json().catch(() => ({}))
+        if (typeof data.used === 'number' && typeof data.limit === 'number') setSavedCount({ used: data.used, limit: data.limit })
+        showSaveToast(data.error || "You've used all your saves. Remove one in Saved to make room.", 'limit')
       } else {
         console.error('[Content] Failed to toggle favorite:', response.status)
         const errorText = await response.text()
@@ -2195,7 +2197,7 @@ const TradingBuddyWidget = () => {
                 {messages.length > 0 && (
                   <button
                     onClick={async () => {
-                      if (confirm('Clear all chat messages? This will reset the conversation but keep your trading rules and favorites.')) {
+                      if (confirm('Clear all chat messages? This will reset the conversation but keep your rules and everything you saved for Pip.')) {
                         try {
                           // Clear from Supabase
                           if (session?.access_token) {
@@ -2378,20 +2380,6 @@ const TradingBuddyWidget = () => {
 
           {messages.map((msg, i) => (
             <div key={i} className="relative group">
-              {/* Favorite Star Button */}
-              {msg.id && (
-                <button
-                  onClick={() => toggleFavorite(msg.id, msg.isFavorited)}
-                  className={`absolute ${msg.type === 'user' ? 'right-0' : 'left-0'} top-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
-                    theme === 'dark' ? 'hover:bg-dark-elevated' : 'hover:bg-slate-200'
-                  }`}
-                  title={msg.isFavorited ? 'Unfavorite' : 'Favorite'}
-                >
-                  <span className="text-lg">
-                    {msg.isFavorited ? '⭐' : '☆'}
-                  </span>
-                </button>
-              )}
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.type !== 'user' && (
                   <div className="mr-2 mt-0.5 shrink-0">
@@ -2401,9 +2389,7 @@ const TradingBuddyWidget = () => {
                 {msg.type === 'user' && (
                   <div className="max-w-[80%]">
                     <div className={`${theme === 'dark' ? 'bg-dark-bubble text-dark-body' : 'bg-slate-200 text-slate-900'} px-4 py-2 rounded-2xl rounded-tr-sm ${getTextSizeClass()} transition-all ${
-                      msg.isFavorited ? 'border-l-4 border-amber-400' : ''
-                    } ${
-                      glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
+                      ''
                     }`}>
                       {msg.content}
                     </div>
@@ -2521,9 +2507,7 @@ const TradingBuddyWidget = () => {
                   <div 
 
                     className={`markdown-content ${theme === 'dark' ? 'dark' : ''} px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} shadow-sm transition-all ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-body' : 'bg-white border border-slate-200 text-slate-900'} ${
-                      msg.isFavorited ? 'border-l-4 !border-l-amber-400' : ''
-                    } ${
-                      glowingMessageId === msg.id ? 'animate-[borderGlow_0.8s_ease-in-out]' : ''
+                      ''
                     }`}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
@@ -2753,6 +2737,24 @@ const TradingBuddyWidget = () => {
                 </div>
               )}
               </div>
+              {msg.id && (msg.type === 'user' || msg.type === 'assistant') && (
+                <div className={`mt-1 flex ${msg.type === 'user' ? 'justify-end' : 'pl-[34px]'}`}>
+                  <button
+                    onClick={() => toggleFavorite(msg.id, msg.isFavorited)}
+                    title={msg.isFavorited ? 'Pip remembers this in every chat. Click to remove.' : 'Save this so Pip remembers it in every chat'}
+                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] transition-all ${
+                      msg.isFavorited
+                        ? theme === 'dark' ? 'text-blue-300 hover:bg-dark-elevated' : 'text-blue-700 hover:bg-slate-100'
+                        : `opacity-0 group-hover:opacity-100 focus:opacity-100 ${theme === 'dark' ? 'text-dark-text hover:bg-dark-elevated hover:text-dark-body' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`
+                    }`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill={msg.isFavorited ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M6 3h12v18l-6-4-6 4z" />
+                    </svg>
+                    {msg.isFavorited ? 'Saved · Pip remembers this' : 'Save for Pip'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 
@@ -2792,7 +2794,26 @@ const TradingBuddyWidget = () => {
         </div>
 
         {/* Actions */}
-        <div className={`p-3 space-y-1.5 ${theme === 'dark' ? 'border-t border-dark-border bg-dark-bg' : 'border-t border-slate-200 bg-white'}`}>
+        <div className={`relative p-3 space-y-1.5 ${theme === 'dark' ? 'border-t border-dark-border bg-dark-bg' : 'border-t border-slate-200 bg-white'}`}>
+          {saveToast && (
+            <div
+              role="status"
+              className={`absolute inset-x-3 bottom-full mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg ${
+                saveToast.tone === 'limit'
+                  ? theme === 'dark' ? 'border-amber-500/40 bg-dark-surface text-amber-100' : 'border-amber-300 bg-amber-50 text-amber-900'
+                  : theme === 'dark' ? 'border-dark-border bg-dark-surface text-dark-body' : 'border-slate-200 bg-white text-slate-800'
+              }`}
+            >
+              <Pip size={20} mood={saveToast.tone === 'limit' ? 'caution' : 'happy'} animated={false} />
+              <div className="flex-1 leading-snug">
+                {saveToast.text}
+                {saveToast.tone === 'limit' && (
+                  <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/saved-messages`} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Manage saved</a>
+                )}
+              </div>
+              <button onClick={() => setSaveToast(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">&times;</button>
+            </div>
+          )}
           {/* Timeout Timer (replaces input when active) */}
           {isTimedOut && timeoutEndTime ? (
             <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-dark-surface border border-dark-border' : 'bg-amber-50 border border-amber-200'}`}>

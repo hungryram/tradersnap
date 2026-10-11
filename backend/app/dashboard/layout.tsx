@@ -11,7 +11,7 @@ const MAIN_NAV = [
   { href: "/dashboard", label: "Today", icon: SunIcon },
   { href: "/dashboard/journal", label: "Journal", icon: BookIcon },
   { href: "/dashboard/rules", label: "Rules", icon: ListIcon },
-  { href: "/dashboard/saved-messages", label: "Saved", icon: StarIcon },
+  { href: "/dashboard/saved-messages", label: "Saved for Pip", icon: StarIcon },
   { href: "/dashboard/memory", label: "Memory", icon: MemoryIcon },
   { href: "/dashboard/account", label: "Account", icon: UserIcon },
 ]

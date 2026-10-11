@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-client"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { getLimits } from "@/lib/usage"
 
 export const runtime = "nodejs"
 
@@ -54,40 +55,26 @@ export async function POST(req: NextRequest) {
     // Use admin client to bypass RLS (we manually check user_id for security)
     const adminClient = createAdminClient()
 
-    // If favoriting (not unfavoriting), check limits
+    // Saves count against the plan's limit (what Pip keeps in mind in every chat)
+    const { data: profile } = await adminClient.from("profiles").select("plan").eq("id", user.id).single()
+    const plan = profile?.plan ?? "free"
+    const limit = getLimits(plan).maxFavoritesInContext
+    const countSaved = async () => {
+      const { count } = await adminClient
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_favorited", true)
+      return count ?? 0
+    }
+
     if (isFavorited) {
-      // Get user profile to check plan
-      const { data: profile, error: profileError } = await adminClient
-        .from("profiles")
-        .select("plan")
-        .eq("id", user.id)
-        .single()
-
-      if (profile) {
-        // Count current favorites
-        const { count, error: countError } = await adminClient
-          .from("chat_messages")
-          .select("*", { count: 'exact', head: true })
-          .eq("user_id", user.id)
-          .eq("is_favorited", true)
-
-        if (countError) {
-          console.error("[Favorite API] Error counting favorites:", countError)
-        } else if (count !== null) {
-          const limit = profile.plan === 'pro' ? 20 : 3
-          
-          if (count >= limit) {
-            const message = profile.plan === 'pro' 
-              ? "You've reached the maximum of 20 saved messages."
-              : "Free plan limited to 3 saved messages. Upgrade to Pro for 20 saved messages."
-            
-            const response = NextResponse.json(
-              { error: message },
-              { status: 429 }
-            )
-            return addCorsHeaders(response, origin)
-          }
-        }
+      const used = await countSaved()
+      if (used >= limit) {
+        const message = plan === "free"
+          ? `You've saved ${limit} of ${limit}. Remove one to make room, or go Pro to save up to ${getLimits("pro").maxFavoritesInContext}.`
+          : `You've saved ${limit} of ${limit}. Remove one to make room for this.`
+        return addCorsHeaders(NextResponse.json({ error: message, used, limit }, { status: 429 }), origin)
       }
     }
 
@@ -112,7 +99,7 @@ export async function POST(req: NextRequest) {
       console.warn("[Favorite API] No rows updated - message not found or not owned by user")
     }
 
-    const response = NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true, used: await countSaved(), limit })
     return addCorsHeaders(response, origin)
   } catch (error) {
     console.error("[Favorite API] Error:", error)

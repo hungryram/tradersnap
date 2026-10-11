@@ -244,9 +244,10 @@ export default function SavedMessagesPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Saved Messages</h1>
-            <p className="text-ink-text text-sm">
-              Messages you've favorited from your chats with Pip. Save important insights for easy access.
+            <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">Saved for Pip</h1>
+            <p className="text-ink-text text-sm max-w-xl">
+              Pip keeps these in mind in every conversation: your rules of thumb, lessons, things you never want to repeat. Save a message in the chat
+              with <span className="text-ink-body">Save for Pip</span> under it.
             </p>
           </div>
           <div className="text-right">
@@ -254,7 +255,7 @@ export default function SavedMessagesPage() {
               {messages.length}/{favoritesLimit}
             </div>
             <div className="text-xs text-ink-muted">
-              {userPlan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+              saved{userPlan === 'free' ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro saves 20</a></> : null}
             </div>
           </div>
         </div>
@@ -278,12 +279,11 @@ export default function SavedMessagesPage() {
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="text-center py-12 bg-ink-surface rounded-lg border border-ink-border">
-            <div className="text-4xl mb-4">⭐</div>
             <p className="text-ink-text mb-2">
-              {searchTerm ? "No messages match your search" : "No saved messages yet"}
+              {searchTerm ? "No saved messages match your search." : "Nothing saved yet."}
             </p>
-            <p className="text-ink-muted text-sm">
-              {!searchTerm && "Star messages in the chat to save them here"}
+            <p className="text-ink-muted text-sm max-w-md mx-auto">
+              {!searchTerm && "Hover over any message in the chat and click Save for Pip. Pip will remember it in every conversation after that."}
             </p>
           </div>
         ) : (
@@ -308,7 +308,7 @@ export default function SavedMessagesPage() {
                         ? 'bg-brand-500/15 text-brand-300' 
                         : 'bg-green-500/15 text-green-300'
                     }`}>
-                      {msg.role === 'user' ? 'You' : 'Coach'}
+                      {msg.role === 'user' ? 'You' : 'Pip'}
                     </span>
                     <span className="text-xs text-ink-muted">
                       {new Date(msg.created_at).toLocaleDateString('en-US', {
@@ -320,17 +320,17 @@ export default function SavedMessagesPage() {
                       })}
                     </span>
                     {!isActiveInAI && (
-                      <span className="px-2 py-0.5 rounded text-xs bg-ink-elevated text-ink-text">
-                        Not sent to AI
+                      <span className="px-2 py-0.5 rounded text-xs bg-ink-elevated text-ink-text" title="Pip uses your most recent saves up to your plan's limit">
+                        Over your limit, Pip isn't using this
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => unfavoriteMessage(msg.id)}
-                    className="text-ink-muted hover:text-red-600 transition-colors"
-                    title="Unfavorite"
+                    className="rounded-md px-2 py-1 text-xs text-ink-muted transition-colors hover:bg-red-500/10 hover:text-red-300"
+                    title="Pip will stop using this message"
                   >
-                    ⭐
+                    Remove
                   </button>
                 </div>
                 <div className="text-ink-body">
