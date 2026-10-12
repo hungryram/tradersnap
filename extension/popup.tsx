@@ -158,9 +158,10 @@ function IndexPopup() {
           </div>
           
           <div className="text-xs text-dark-text space-y-1">
-            <p>Keyboard shortcuts when chatbox is open:</p>
-            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Alt + A</span> - Analyze chart</p>
-            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Alt + Enter</span> - Send with chart</p>
+            <p>Keyboard shortcuts:</p>
+            <p><span className="font-mono bg-dark-surface px-1 rounded">Alt + Shift + S</span> - Open or close Pip</p>
+            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Alt + A</span> - Check this setup (chat open)</p>
+            <p><span className="font-mono bg-dark-surface px-1 rounded">Ctrl + Enter</span> - Send with your chart (Cmd + Enter on Mac)</p>
           </div>
 
           <button 
