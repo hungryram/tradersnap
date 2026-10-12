@@ -2872,11 +2872,11 @@ const TradingBuddyWidget = () => {
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
                     e.stopPropagation()
-                    // Enter sends, Shift+Enter starts a new line; Ctrl+Alt+Enter always includes the chart
+                    // Enter sends, Shift+Enter starts a new line; Ctrl+Enter (Cmd+Enter on Mac) sends with the chart
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       if (inputText.trim() && !isSending && !isAnalyzing) {
-                        handleSendMessage(inputText, attachChart || (e.ctrlKey && e.altKey))
+                        handleSendMessage(inputText, attachChart || e.ctrlKey || e.metaKey)
                         setAttachChart(false)
                       }
                     }
@@ -2891,7 +2891,7 @@ const TradingBuddyWidget = () => {
                   <button
                     onClick={() => setAttachChart(!attachChart)}
                     aria-pressed={attachChart}
-                    title="Send a screenshot of your chart with this message, to ask about what's on screen"
+                    title="Send a screenshot of your chart with this message. Shortcut: Ctrl+Enter (Cmd+Enter on Mac) sends with the chart"
                     className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       attachChart
                         ? 'border-blue-500 bg-blue-500/15 text-blue-400'
