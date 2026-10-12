@@ -10,8 +10,8 @@ export default function ContactPage() {
       <PageHeader title="Contact us" intro="Questions, feedback or need a hand? We'd love to hear from you." />
       <div className="mx-auto grid max-w-4xl gap-5 px-4 sm:px-6 md:grid-cols-3">
         <Card title="Email" text="We usually reply within 24 to 48 hours." href={`mailto:${SUPPORT_EMAIL}`} link={SUPPORT_EMAIL} />
-        <Card title="Found a bug?" text="Tell us what happened and which platform you were on." href={`mailto:${SUPPORT_EMAIL}?subject=Bug%20report`} link="Report a bug" />
-        <Card title="Have an idea?" text="Tell us what would make Pip more useful to you." href={`mailto:${SUPPORT_EMAIL}?subject=Idea%20for%20Pip`} link="Share an idea" />
+        <Card title="Found a bug?" text="Tell us what happened and which platform you were on." href="/feedback?type=bug" link="Report a bug" />
+        <Card title="Have an idea?" text="Tell us what would make Pip more useful to you." href="/feedback?type=idea" link="Share an idea" />
       </div>
     </>
   )

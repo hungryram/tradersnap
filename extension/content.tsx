@@ -2372,7 +2372,7 @@ const TradingBuddyWidget = () => {
                 <div className={`border-t my-2 ${theme === 'dark' ? 'border-dark-border' : 'border-slate-200'}`} />
                 <button
                   onClick={() => {
-                    window.open('mailto:help@snapchartapp.com?subject=Pip%20feedback', '_blank')
+                    window.open(`https://tradewithpip.ai/feedback?from=extension&v=${encodeURIComponent(chrome.runtime.getManifest().version)}`, '_blank')
                     setShowMenu(false)
                   }}
                   className={`w-full text-left px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}

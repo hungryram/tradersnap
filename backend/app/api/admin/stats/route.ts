@@ -24,6 +24,16 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
 }
 
 // Optional tables (migrations that may not have run yet) shouldn't break the page
+// Feedback and bug reports from the website form (quietly empty before 20261025_feedback.sql)
+async function loadUserFeedback() {
+  const { data, count } = await supabase
+    .from("feedback")
+    .select("kind, message, email, source, extension_version, created_at", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .limit(15)
+  return { total: count ?? 0, recent: data ?? [] }
+}
+
 async function fetchOptional<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
   try {
     return await fetchAll(build)
@@ -337,6 +347,7 @@ export async function GET(request: NextRequest) {
         last30d: deleted.filter(d => now - Date.parse(d.deleted_at) <= 30 * DAY).length,
         recent: deleted.slice(0, 15)
       },
+      feedback: await loadUserFeedback(),
       uninstall: {
         known30d: profiles.filter(p => p.uninstalled_at && now - Date.parse(p.uninstalled_at) <= 30 * DAY).length,
         recentKnown: profiles

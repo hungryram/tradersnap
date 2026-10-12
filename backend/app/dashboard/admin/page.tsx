@@ -37,6 +37,7 @@ type Stats = {
     last30d: number
     recent: { signed_up_month: string | null; deleted_at: string; plan: string | null; checks: number; active_days: number; trades: number; platforms: string[] | null; prop_firm: boolean | null; reason: string | null; details: string | null }[]
   }
+  feedback: { total: number; recent: { kind: string; message: string; email: string | null; source: string | null; extension_version: string | null; created_at: string }[] }
   uninstall: {
     known30d: number
     recentKnown: { email: string; uninstalled_at: string; reason: string | null; details: string | null; checks: number }[]
@@ -283,6 +284,24 @@ export default function AdminPage() {
             )}
           </Card>
         </div>
+
+        <Card title={`Feedback and bug reports (${stats.feedback.total})`}>
+          {stats.feedback.recent.length === 0 ? (
+            <p className="text-sm text-ink-muted">Nothing yet. People reach the form from the extension menu and the contact page.</p>
+          ) : (
+            <ul className="space-y-3">
+              {stats.feedback.recent.map((f, i) => (
+                <li key={i} className="text-sm">
+                  <div className="text-xs text-ink-muted">
+                    <span className={`mr-2 rounded px-1.5 py-0.5 text-[10px] ${f.kind === "bug" ? "bg-red-500/15 text-red-300" : "bg-brand-500/15 text-brand-300"}`}>{f.kind}</span>
+                    {shortDate(f.created_at)}{f.email ? ` · ${f.email}` : ""}{f.extension_version ? ` · v${f.extension_version}` : ""}
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-ink-body">{f.message}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         <Card title="Coach check-ins (last 30 days)">
           {stats.checkins.kinds.length === 0 ? (

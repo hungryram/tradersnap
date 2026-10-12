@@ -32,7 +32,7 @@ export default function Page() {
         <li><strong>Setup answers:</strong> the markets and platforms you trade, whether you trade with a prop firm, and your experience level.</li>
         <li><strong>Your rules and limits:</strong> your rulesets and daily limits (such as max trades, max daily loss, losses in a row and trading hours).</li>
         <li><strong>Conversations:</strong> the messages you send Pip and Pip&apos;s replies, messages you save, and your ratings of Pip&apos;s answers.</li>
-        <li><strong>Feedback:</strong> anything you tell us when you uninstall the extension or delete your account, and messages you send to support.</li>
+        <li><strong>Feedback:</strong> anything you tell us when you uninstall the extension or delete your account, and messages you send to support, and anything you send through the feedback or bug-report form on this site (your message, and your email only if you add one).</li>
         <li><strong>Notes for Pip:</strong> anything you add on the Memory page of your dashboard.</li>
         <li><strong>Journal notes:</strong> what you write about your trading days in the journal calendar.</li>
       </ul>
