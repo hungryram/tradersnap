@@ -95,6 +95,15 @@ export function startTopstepTracking(options: {
   const names = new Map<number, string>()
   const reported = new Set<string>()
   let loaded = false
+  // Open positions by TopstepX position id; null until the page's open-positions list has loaded
+  let open: Map<number, { symbol: string; qty: number }> | null = null
+  const reportPositions = () => {
+    if (!open || !options.onPositions) return
+    const bySymbol = new Map<string, number>()
+    for (const { symbol, qty } of open.values()) bySymbol.set(symbol, (bySymbol.get(symbol) ?? 0) + qty)
+    options.onPositions(bySymbol)
+  }
+  const symbolOf = (p: any) => String(p.contractDisplayName ?? p.symbolName ?? p.contractId ?? "?")
   let flushTimer: ReturnType<typeof setTimeout> | undefined
 
   options.onStatus("loading")
@@ -113,6 +122,22 @@ export function startTopstepTracking(options: {
     const { kind, payload } = event.data
     if (kind === "accounts" && Array.isArray(payload)) {
       for (const a of payload) if (typeof a?.accountId === "number") names.set(a.accountId, String(a.nickname || a.accountName))
+    }
+    // The page's list of open positions (positive size: long, negative: short). The first report is the
+    // baseline, so positions that were already open when the page loaded don't count as new.
+    if (kind === "positions" && Array.isArray(payload)) {
+      open = new Map()
+      for (const p of payload) if (typeof p?.id === "number" && p.positionSize) open.set(p.id, { symbol: symbolOf(p), qty: p.positionSize })
+      reportPositions()
+    }
+    // A live position update: action 0 created, 1 changed, 2 deleted (closed)
+    if (kind === "position" && payload?.position && typeof payload.position.id === "number") {
+      const { action, position } = payload
+      // No open-positions list seen (the page loaded before Pip): assume nothing was open, so this isn't mistaken for the baseline
+      if (!open) { open = new Map(); reportPositions() }
+      if (action === 2 || !position.positionSize) open.delete(position.id)
+      else open.set(position.id, { symbol: symbolOf(position), qty: position.positionSize })
+      reportPositions()
     }
     if (kind === "trades" && Array.isArray(payload)) {
       loaded = true

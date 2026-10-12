@@ -18,6 +18,10 @@ const isTrade = (x: any) =>
   !!x && typeof x === "object" && typeof x.id === "number" && typeof x.accountId === "number" &&
   "pnL" in x && "entryPrice" in x && "exitPrice" in x && "positionSize" in x && "createdAt" in x
 
+const isPosition = (x: any) =>
+  !!x && typeof x === "object" && typeof x.id === "number" && typeof x.accountId === "number" &&
+  typeof x.positionSize === "number" && "averagePrice" in x
+
 const isAccount = (x: any) => !!x && typeof x === "object" && typeof x.accountId === "number" && typeof x.accountName === "string"
 
 // Only the fields Pip needs leave the page script
@@ -25,6 +29,11 @@ const pickTrade = (t: any) => ({
   id: t.id, accountId: t.accountId, contractId: t.contractId, contractDisplayName: t.contractDisplayName,
   createdAt: t.createdAt, exitedAt: t.exitedAt, entryPrice: t.entryPrice, exitPrice: t.exitPrice,
   fees: t.fees, pnL: t.pnL, positionSize: t.positionSize, voided: t.voided
+})
+
+const pickPosition = (p: any) => ({
+  id: p.id, accountId: p.accountId, contractId: p.contractId, contractDisplayName: p.contractDisplayName,
+  symbolName: p.symbolName, positionSize: p.positionSize
 })
 
 function scan(value: any, trades: any[], accounts: any[], depth = 0) {
@@ -40,13 +49,15 @@ function handle(url: string, data: unknown) {
     const trades: any[] = []
     const accounts: any[] = []
     scan(data, trades, accounts)
+    // The open-positions list is sent even when empty: it says what was already open when the page loaded
+    if (/\/Position\/all\//.test(url) && Array.isArray(data)) post("positions", data.filter(isPosition).map(pickPosition))
     if (accounts.length) post("accounts", accounts)
     // The closed-trades list is sent even when empty, so Pip knows the history has loaded
     if (trades.length || /\/Trade\/id\//.test(url)) post("trades", trades)
   } catch { /* never break the page */ }
 }
 
-const WATCHED = /userapi\.topstepx\.com\/(Trade|TradingAccount)/
+const WATCHED = /userapi\.topstepx\.com\/(Trade|TradingAccount|Position)/
 
 // fetch
 const originalFetch = window.fetch
@@ -80,10 +91,16 @@ window.WebSocket = new Proxy(OriginalWebSocket, {
       socket.addEventListener("message", event => {
         if (typeof event.data !== "string") return
         for (const part of event.data.split("\u001e")) {
-          if (!part || !part.includes("pnL")) continue // only frames that carry trade records
+          if (!part || !(part.includes("pnL") || part.includes("RealTimePosition"))) continue // only frames about trades and positions
           try {
             const message = JSON.parse(part)
-            if (message?.type === 1) handle("hub", message.arguments)
+            if (message?.type !== 1) continue
+            if (message.target === "RealTimePosition") {
+              // { action: 0 created | 1 changed | 2 deleted, data: position }
+              for (const arg of message.arguments ?? []) if (isPosition(arg?.data)) post("position", { action: arg.action, position: pickPosition(arg.data) })
+            } else {
+              handle("hub", message.arguments)
+            }
           } catch { /* partial frame */ }
         }
       })
