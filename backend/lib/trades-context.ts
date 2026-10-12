@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { markCopies } from "./copy-trades"
+import { prepareTrades } from "./copy-trades"
 
 type TradeRow = {
   symbol: string | null
@@ -9,6 +9,7 @@ type TradeRow = {
   kind?: string
   account?: string | null
   opened_at?: string | null
+  platform?: string | null
   entry_price: number | null
   exit_price: number | null
   fill_count: number | null
@@ -28,7 +29,7 @@ export async function buildTradesContext(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("trades")
-    .select("symbol, side, qty, source, kind, account, opened_at, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
+    .select("symbol, side, qty, source, kind, account, opened_at, platform, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
     .eq("user_id", userId)
     .gte("closed_at", since.toISOString())
     .order("closed_at", { ascending: true })
@@ -39,7 +40,7 @@ export async function buildTradesContext(
   if (error) {
     const retry = await supabase
       .from("trades")
-      .select("symbol, side, qty, account, opened_at, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
+      .select("symbol, side, qty, account, opened_at, platform, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
       .eq("user_id", userId)
       .gte("closed_at", since.toISOString())
       .order("closed_at", { ascending: true })
@@ -49,7 +50,7 @@ export async function buildTradesContext(
   }
 
   // A trade copied to several accounts is listed once (with its accounts), and counts once
-  const marked = markCopies<TradeRow>((rows ?? []) as unknown as TradeRow[])
+  const marked = prepareTrades<TradeRow>((rows ?? []) as unknown as TradeRow[])
   const trades = marked.filter(t => !t.is_copy)
   const accountsToday = new Set(marked.map(t => t.account).filter(Boolean))
   if (marked.length === 0) {
@@ -90,9 +91,20 @@ export async function buildTradesContext(
     return `${n}. ${time(t.closed_at)} ${(t.symbol ?? "?").split(":").pop()} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${accounts}${estimated}${fills}`
   })
 
+  // Limits (max trades, losses in a row, daily loss) apply to each account separately, so give Pip each account's own numbers
+  const accountLines = [...accountsToday].map(a => {
+    const own = marked.filter(t => t.account === a && t.kind !== "day_total")
+    let run = 0
+    for (let i = own.length - 1; i >= 0 && pnl(own[i]) < 0; i--) run++
+    return `- account ${String(a).replace(/^[a-z]+:/i, "")}: ${own.length} trades, net ${money(own.reduce((sum, t) => sum + pnl(t), 0))}${run >= 2 ? `, ${run} losses in a row` : ""}`
+  })
+  const perAccount = accountLines.length > 1
+    ? `\nPER ACCOUNT (the trader's limits apply to each account on its own; judge each limit against the account's numbers, not the total):\n${accountLines.join("\n")}\n`
+    : ""
+
   return `TODAY'S TRADES (auto-detected from the trader's platform, plus any results the trader reported and logged; times in their local time):
 ${real.length} trades, ${wins} wins, ${losses} losses, net ${money(net)}${accountsToday.size > 1 ? ` across ${accountsToday.size} accounts (a trade copied to several accounts counts as one trade; the net adds up every account)` : ""}${streak >= 2 ? `, ${streak} losses in a row right now` : ""}.
 ${lines.join("\n")}
-
+${perAccount}
 Use these when they ask about their day or when it bears on the rules (max trades, max losses, trading window). Trades made with the trading panel closed or on other platforms may be missing.`
 }

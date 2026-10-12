@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { disciplineStreak, markChecked } from "@/lib/trade-insights"
-import { markCopies } from "@/lib/copy-trades"
+import { prepareTrades } from "@/lib/copy-trades"
 import { features, loadPlan } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Whether each trade had a chart check first, and (on request) the discipline streak
-    const trades = markCopies(await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null; account: string | null; symbol: string | null; side: string | null })[]))
+    const trades = prepareTrades(await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null; account: string | null; symbol: string | null; side: string | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null })[]))
     const params = request.nextUrl.searchParams
     const streak = params.get("streak") ? await disciplineStreak(supabase, user.id, params.get("tz") || undefined) : undefined
     // Trades the trader typed in have no entry time, so they can't be "checked first" or not

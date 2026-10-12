@@ -170,3 +170,20 @@ export function holdTime(trade: Trade) {
   if (minutes < 60) return `${minutes}m`
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
+
+// Each account has its own limits, so with several accounts the limit bars follow the account closest to each
+// limit: the one with the most trades, the longest losing run and the biggest loss
+export function limitView(trades: Trade[]) {
+  const accounts = accountsOf(trades)
+  const all = summarize(trades)
+  if (accounts.length <= 1) return { accounts: accounts.length, count: all.count, lossStreak: all.lossStreak, loss: Math.max(0, -all.net), net: all.net, perAccount: false }
+  const per = accounts.map(a => summarize(forAccount(trades, a)))
+  return {
+    accounts: accounts.length,
+    count: Math.max(...per.map(p => p.count)),
+    lossStreak: Math.max(...per.map(p => p.lossStreak)),
+    loss: Math.max(...per.map(p => Math.max(0, -p.net))),
+    net: all.net,
+    perAccount: true
+  }
+}

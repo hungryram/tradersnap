@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { markCopies } from "./copy-trades"
+import { prepareTrades } from "./copy-trades"
 
 // Two things Pip tells traders from their own data:
 // - whether each trade was checked first (a chart check shortly before it opened)
@@ -64,6 +64,13 @@ function dayBroken(trades: { opened_at: string | null; closed_at: string; realiz
   return false
 }
 
+// Each account has its own limits (an eval's loss limit is per account), so a day is broken if any one account broke a rule
+function dayBrokenByAccount(rows: (Parameters<typeof dayBroken>[0][number] & { account?: string | null })[], limits: NonNullable<Limits>, timeZone: string) {
+  const accounts = [...new Set(rows.filter(t => t.kind !== "day_total").map(t => t.account).filter((a): a is string => !!a))]
+  if (accounts.length <= 1) return dayBroken(rows, limits, timeZone)
+  return accounts.some(a => dayBroken(rows.filter(t => t.account === a).map(t => ({ ...t, is_copy: false, group_pnl: undefined })), limits, timeZone))
+}
+
 export type Streak = { days: number; brokenToday: boolean } | null
 
 // Trading days in a row (most recent first) with no daily rule broken. Days without
@@ -78,10 +85,10 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
 
   const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
   const load = (cols: string) => supabase.from("trades").select(cols).eq("user_id", userId).gte("closed_at", since).order("closed_at", { ascending: false }).limit(3000)
-  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind, account, symbol, side")
-  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl, account, symbol, side")) // before 20261024_day_totals.sql
-  type DayRow = { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string; account: string | null; symbol: string | null; side: string | null; is_copy?: boolean; group_pnl?: number }
-  const rows = markCopies((data ?? []) as unknown as DayRow[])
+  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind, account, symbol, side, platform, qty, entry_price, exit_price")
+  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl, account, symbol, side, platform, qty, entry_price, exit_price")) // before 20261024_day_totals.sql
+  type DayRow = { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string; account: string | null; symbol: string | null; side: string | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null; is_copy?: boolean; group_pnl?: number }
+  const rows = prepareTrades((data ?? []) as unknown as DayRow[])
   const byDay = new Map<string, DayRow[]>()
   for (const t of rows) {
     const day = localParts(t.closed_at, tz).day
@@ -92,8 +99,8 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
 
   let count = 0
   for (const day of days) {
-    if (dayBroken(byDay.get(day)!, limits, tz)) break
+    if (dayBrokenByAccount(byDay.get(day)!, limits, tz)) break
     count++
   }
-  return { days: count, brokenToday: days[0] === today && dayBroken(byDay.get(today)!, limits, tz) }
+  return { days: count, brokenToday: days[0] === today && dayBrokenByAccount(byDay.get(today)!, limits, tz) }
 }

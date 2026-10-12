@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api, startOfLocalDay, summarize, type Trade, type TradingLimits, loadTodayWithStreak, type Streak } from "@/lib/dashboard-data"
+import { api, startOfLocalDay, summarize, type Trade, type TradingLimits, loadTodayWithStreak, type Streak, limitView } from "@/lib/dashboard-data"
 import Pip, { type PipMood } from "../components/Pip"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"
@@ -29,6 +29,8 @@ export default function TodayPage() {
   if (!me || !trades) return <Loading />
 
   const stats = summarize(trades)
+  // With several accounts the limits are checked per account (the bars show the account closest to each limit)
+  const scope = limitView(trades)
   const limits = me.user.trading_limits
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
@@ -41,7 +43,7 @@ export default function TodayPage() {
         actions={<a href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer" className={buttonPrimary}>Open TradingView</a>}
       />
 
-      <PipSays {...pipLine(stats, limits)} />
+      <PipSays {...pipLine(stats, limits, scope)} />
 
       {!me.ruleset && (
         <div className="mb-6">
@@ -68,15 +70,16 @@ export default function TodayPage() {
         <Stat
           label="Trades today"
           value={limits?.max_trades_per_day ? `${stats.count} / ${limits.max_trades_per_day}` : stats.count}
-          tone={limits?.max_trades_per_day && stats.count >= limits.max_trades_per_day ? "warn" : "default"}
+          hint={scope.perAccount ? `Busiest account: ${scope.count}${limits?.max_trades_per_day ? ` / ${limits.max_trades_per_day}` : ""}` : undefined}
+          tone={limits?.max_trades_per_day && scope.count >= limits.max_trades_per_day ? "warn" : "default"}
         />
         <Stat label="Net P&L" value={stats.count ? money(stats.net) : "—"} tone={stats.net > 0 ? "good" : stats.net < 0 ? "bad" : "default"} />
         <Stat label="Wins / losses" value={stats.count ? `${stats.wins} / ${stats.losses}` : "—"} hint={stats.winRate !== null ? `${Math.round(stats.winRate * 100)}% win rate` : undefined} />
         <Stat
           label="Losing streak"
-          value={stats.lossStreak}
-          tone={limits?.stop_after_losses && stats.lossStreak >= limits.stop_after_losses ? "bad" : stats.lossStreak >= 2 ? "warn" : "default"}
-          hint={stats.lossStreak >= 2 ? "Consider a break" : undefined}
+          value={scope.lossStreak}
+          tone={limits?.stop_after_losses && scope.lossStreak >= limits.stop_after_losses ? "bad" : scope.lossStreak >= 2 ? "warn" : "default"}
+          hint={scope.lossStreak >= 2 ? "Consider a break" : undefined}
         />
       </div>
 
@@ -100,9 +103,9 @@ export default function TodayPage() {
           <Card title="Your limits" action={<a href="/dashboard/rules#limits" className="text-sm text-brand-300 hover:text-brand-200">Edit</a>}>
             {limits && (limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || limits.session_start) ? (
               <div className="space-y-4">
-                {limits.max_trades_per_day ? <LimitBar label="Trades" used={stats.count} max={limits.max_trades_per_day} /> : null}
-                {limits.stop_after_losses ? <LimitBar label="Losses in a row" used={stats.lossStreak} max={limits.stop_after_losses} /> : null}
-                {limits.max_daily_loss ? <LimitBar label="Daily loss" used={Math.max(0, -stats.net)} max={limits.max_daily_loss} format={v => `$${v.toFixed(0)}`} /> : null}
+                {limits.max_trades_per_day ? <LimitBar label={scope.perAccount ? "Trades (busiest account)" : "Trades"} used={scope.count} max={limits.max_trades_per_day} /> : null}
+                {limits.stop_after_losses ? <LimitBar label="Losses in a row" used={scope.lossStreak} max={limits.stop_after_losses} /> : null}
+                {limits.max_daily_loss ? <LimitBar label={scope.perAccount ? "Daily loss (worst account)" : "Daily loss"} used={scope.loss} max={limits.max_daily_loss} format={v => `$${v.toFixed(0)}`} /> : null}
                 {limits.session_start && limits.session_end ? <SessionWindow start={limits.session_start} end={limits.session_end} /> : null}
               </div>
             ) : (
@@ -169,10 +172,10 @@ function SessionWindow({ start, end }: { start: string; end: string }) {
 }
 
 // Pip's one-line read of the day, with a face to match
-function pipLine(stats: ReturnType<typeof summarize>, limits: TradingLimits | null): { mood: PipMood; text: string } {
-  const hitTrades = !!limits?.max_trades_per_day && stats.count >= limits.max_trades_per_day
-  const hitStreak = !!limits?.stop_after_losses && stats.lossStreak >= limits.stop_after_losses
-  const hitLoss = !!limits?.max_daily_loss && -stats.net >= limits.max_daily_loss
+function pipLine(stats: ReturnType<typeof summarize>, limits: TradingLimits | null, scope: ReturnType<typeof limitView>): { mood: PipMood; text: string } {
+  const hitTrades = !!limits?.max_trades_per_day && scope.count >= limits.max_trades_per_day
+  const hitStreak = !!limits?.stop_after_losses && scope.lossStreak >= limits.stop_after_losses
+  const hitLoss = !!limits?.max_daily_loss && scope.loss >= limits.max_daily_loss
   if (hitLoss || hitStreak || hitTrades) {
     return { mood: "caution", text: "You've hit one of your limits for today. Your plan says you're done. Close the platform and come back fresh tomorrow." }
   }

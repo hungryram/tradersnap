@@ -1,4 +1,4 @@
-import type { Trade, TradingLimits } from "./dashboard-data"
+import { accountLabel, accountsOf, type Trade, type TradingLimits } from "./dashboard-data"
 
 // Which of the trader's daily limits a day's trades broke. Same checks as Pip's
 // end-of-session recap in the extension (lib/coach/checkins.ts).
@@ -13,7 +13,19 @@ export function dayKeyOf(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
+// Each account has its own limits (an eval's loss limit is per account), so with several accounts each one is
+// checked on its own and the messages say which account broke what
 export function brokenRules(dayTrades: Trade[], limits: TradingLimits | null): string[] {
+  const accounts = accountsOf(dayTrades.filter(t => t.kind !== "day_total"))
+  if (accounts.length > 1) {
+    return accounts.flatMap(a =>
+      brokenRulesFor(dayTrades.filter(t => t.account === a).map(t => ({ ...t, is_copy: false, group_pnl: undefined })), limits).map(m => `${accountLabel(a)}: ${m}`)
+    )
+  }
+  return brokenRulesFor(dayTrades, limits)
+}
+
+function brokenRulesFor(dayTrades: Trade[], limits: TradingLimits | null): string[] {
   if (!limits || dayTrades.length === 0) return []
   // Day-total entries count in the day's P&L but are not trades
   const trades = dayTrades.filter(t => t.kind !== "day_total" && !t.is_copy).sort((a, b) => a.closed_at.localeCompare(b.closed_at))

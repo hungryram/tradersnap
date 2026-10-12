@@ -27,6 +27,7 @@ export type CoachTrade = {
   realized_pnl: number | null
   opened_at: string | null
   closed_at: string
+  account?: string | null
   is_copy?: boolean // copied to several accounts: only the first of the group counts as a trade
   copies?: number
   group_pnl?: number // profit and loss of the whole group
@@ -75,9 +76,33 @@ function sorted(trades: CoachTrade[]) {
     .sort((a, b) => a.closed_at.localeCompare(b.closed_at))
 }
 
+// Each account has its own limits (an eval's loss limit is per account). With several accounts, judge the one
+// that traded most recently (copy trading mirrors it on the others), or the busiest one for the day's recap.
+function scopeOf(ctx: CoachContext, busiest = false): { trades: CoachTrade[]; net: number; label: string | null } {
+  const real = ctx.trades.filter(t => t.kind !== "day_total")
+  const accounts = [...new Set(real.map(t => t.account).filter((a): a is string => !!a))]
+  if (accounts.length <= 1) return { trades: sorted(ctx.trades), net: ctx.trades.reduce((sum, t) => sum + pnlOf(t), 0), label: null }
+  const account = busiest
+    ? accounts.map(a => ({ a, n: real.filter(t => t.account === a).length })).sort((x, y) => y.n - x.n)[0].a
+    : [...real].sort((x, y) => y.closed_at.localeCompare(x.closed_at))[0].account!
+  const own = ctx.trades.filter(t => t.account === account)
+  return {
+    trades: own.filter(t => t.kind !== "day_total").sort((a, b) => a.closed_at.localeCompare(b.closed_at)),
+    net: own.reduce((sum, t) => sum + pnlOf(t), 0),
+    label: account.replace(/^[a-z]+:/i, "")
+  }
+}
+
+// Say which account a limit message is about, when there's more than one
+function withAccount(out: CheckIn[], label: string | null, kinds: string[]) {
+  if (label) for (const c of out) if (kinds.includes(c.kind)) c.text += ` (account ${label})`
+  return out
+}
+
+// Trades already in time order (oldest first)
 function lossStreak(trades: CoachTrade[]) {
   let streak = 0
-  for (const t of sorted(trades).reverse()) {
+  for (const t of [...trades].reverse()) {
     if (pnlOf(t) < 0) streak++
     else break
   }
@@ -138,8 +163,13 @@ export function morningPlan(ctx: CoachContext): CheckIn {
 
 // After a trade closes (or today's trades load)
 export function afterTrades(ctx: CoachContext): CheckIn[] {
+  const scope = scopeOf(ctx)
+  return withAccount(afterTradesFor(ctx, scope), scope.label, ["loss_streak", "max_trades", "over_max", "daily_loss"])
+}
+
+function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): CheckIn[] {
   const day = dayKey(ctx.now)
-  const trades = sorted(ctx.trades)
+  const trades = scope.trades
   if (trades.length === 0) return []
   const l = ctx.limits
   const out: CheckIn[] = []
@@ -199,7 +229,7 @@ export function afterTrades(ctx: CoachContext): CheckIn[] {
   }
 
   // Daily loss limit
-  const net = ctx.trades.reduce((sum, t) => sum + pnlOf(t), 0)
+  const net = scope.net
   if (l?.max_daily_loss && net <= -l.max_daily_loss) {
     const id = `${day}:daily_loss`
     out.push({
@@ -256,8 +286,13 @@ export function afterTrades(ctx: CoachContext): CheckIn[] {
 
 // A new position just opened (seen live in the trading panel)
 export function onPositionOpened(ctx: CoachContext, openedAt: Date): CheckIn[] {
+  const scope = scopeOf(ctx)
+  return withAccount(onPositionOpenedFor(ctx, openedAt, scope), scope.label, ["over_max"])
+}
+
+function onPositionOpenedFor(ctx: CoachContext, openedAt: Date, scope: ReturnType<typeof scopeOf>): CheckIn[] {
   const day = dayKey(ctx.now)
-  const trades = sorted(ctx.trades)
+  const trades = scope.trades
   const l = ctx.limits
   const out: CheckIn[] = []
 
@@ -320,7 +355,8 @@ export function onPositionOpened(ctx: CoachContext, openedAt: Date): CheckIn[] {
 
 // End of the session: their window closed (or 4pm without one), they traded, and they're flat
 export function sessionRecap(ctx: CoachContext, hasOpenPositions: boolean): CheckIn | null {
-  const trades = sorted(ctx.trades)
+  const scope = scopeOf(ctx, true)
+  const trades = scope.trades
   if (trades.length === 0 || hasOpenPositions) return null
   const l = ctx.limits
   const end = l?.session_end ? toMinutes(l.session_end) : 16 * 60
@@ -330,7 +366,7 @@ export function sessionRecap(ctx: CoachContext, hasOpenPositions: boolean): Chec
 
   const wins = trades.filter(t => pnlOf(t) > 0).length
   const losses = trades.filter(t => pnlOf(t) < 0).length
-  const net = ctx.trades.reduce((sum, t) => sum + pnlOf(t), 0)
+  const net = scope.net
 
   const broken: string[] = []
   if (l?.max_trades_per_day && trades.length > l.max_trades_per_day) broken.push(`took ${trades.length} trades (limit ${l.max_trades_per_day})`)

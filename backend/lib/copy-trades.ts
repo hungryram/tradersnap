@@ -2,9 +2,9 @@
 // one decision, so they count once toward trade counts, win rates, loss streaks and the max-trades limit.
 // Profit and loss still adds up across every account: nothing is dropped, only the counting changes.
 //
-// A copy is a trade on a different account, same instrument and direction, opened within a few seconds.
+// A copy is a trade on a different account, same instrument and direction, opened within 15 seconds.
 
-const WINDOW_MS = 10_000
+const WINDOW_MS = 15_000
 
 type CopyCandidate = {
   account?: string | null
@@ -68,3 +68,48 @@ export function markCopies<T extends CopyCandidate>(trades: T[]): (T & CopyMark)
 // The trades that count: one per decision, no day-total entries
 export const countable = <T extends { is_copy?: boolean; kind?: string }>(trades: T[]) =>
   trades.filter(t => t.kind !== "day_total" && !t.is_copy)
+
+// ---- The same trade seen twice
+// A trader can have one account open on two platforms at once (for example Tradovate through TradingView and
+// the Tradovate site). Each platform records the trade under its own IDs, so it would be counted twice.
+// Two trades are the same one when they are on different platforms, belong to the same account, and match on
+// instrument, direction, size, both prices and both times.
+
+type DuplicateCandidate = CopyCandidate & {
+  platform?: string | null
+  qty?: number | null
+  entry_price?: number | null
+  exit_price?: number | null
+}
+
+const accountKey = (account?: string | null) => (account ?? "").replace(/^[^:]*:/, "").toLowerCase()
+function sameAccount(a?: string | null, b?: string | null) {
+  const x = accountKey(a), y = accountKey(b)
+  return !!x && !!y && (x === y || x.includes(y) || y.includes(x))
+}
+const near = (a: number | null | undefined, b: number | null | undefined) => a != null && b != null && Math.abs(Number(a) - Number(b)) < 1e-6
+
+export function dropDuplicates<T extends DuplicateCandidate>(trades: T[]): T[] {
+  const sameTrade = (a: T, b: T) =>
+    !!a.platform && !!b.platform && a.platform !== b.platform &&
+    !!a.symbol && !!b.symbol && instrumentOf(a.symbol) === instrumentOf(b.symbol) &&
+    a.side === b.side && near(a.qty, b.qty) && near(a.entry_price, b.entry_price) && near(a.exit_price, b.exit_price) &&
+    sameAccount(a.account, b.account) &&
+    Math.abs(Date.parse(a.closed_at) - Date.parse(b.closed_at)) <= 3000 &&
+    (!a.opened_at || !b.opened_at || Math.abs(Date.parse(a.opened_at) - Date.parse(b.opened_at)) <= 3000)
+
+  const kept: T[] = []
+  const byTime = [...trades].sort((a, b) => Date.parse(a.closed_at) - Date.parse(b.closed_at))
+  for (const t of byTime) {
+    const i = kept.findIndex(k => k.kind !== "day_total" && t.kind !== "day_total" && sameTrade(k, t))
+    if (i === -1) kept.push(t)
+    // Prefer the platform's own data over what was read from TradingView's panel
+    else if (kept[i].platform === "tradingview" && t.platform !== "tradingview") kept[i] = t
+  }
+  // Same order as it came in
+  const keptSet = new Set(kept)
+  return trades.filter(t => keptSet.has(t))
+}
+
+// What every part of the app does with a list of trades before counting: drop duplicates, then mark copies
+export const prepareTrades = <T extends DuplicateCandidate>(trades: T[]) => markCopies(dropDuplicates(trades))
