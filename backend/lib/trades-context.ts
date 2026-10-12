@@ -5,6 +5,7 @@ type TradeRow = {
   side: "long" | "short" | null
   qty: number | null
   source?: string
+  kind?: string
   entry_price: number | null
   exit_price: number | null
   fill_count: number | null
@@ -24,7 +25,7 @@ export async function buildTradesContext(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("trades")
-    .select("symbol, side, qty, source, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
+    .select("symbol, side, qty, source, kind, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
     .eq("user_id", userId)
     .gte("closed_at", since.toISOString())
     .order("closed_at", { ascending: true })
@@ -50,11 +51,13 @@ export async function buildTradesContext(
   }
 
   const pnl = (t: TradeRow) => Number(t.realized_pnl ?? 0)
-  const wins = trades.filter(t => pnl(t) > 0).length
-  const losses = trades.filter(t => pnl(t) < 0).length
+  // A day-total entry counts in net P&L but is not a trade
+  const real = trades.filter(t => t.kind !== "day_total")
+  const wins = real.filter(t => pnl(t) > 0).length
+  const losses = real.filter(t => pnl(t) < 0).length
   const net = trades.reduce((sum, t) => sum + pnl(t), 0)
   let streak = 0
-  for (let i = trades.length - 1; i >= 0 && pnl(trades[i]) < 0; i--) streak++
+  for (let i = real.length - 1; i >= 0 && pnl(real[i]) < 0; i--) streak++
 
   const time = (iso: string) => {
     try {
@@ -71,12 +74,13 @@ export async function buildTradesContext(
     const n = trades.length - shown.length + i + 1
     const fills = t.fill_count && t.fill_count > 2 ? `, ${t.fill_count} fills` : ""
     const estimated = t.pnl_source === "estimated" ? " (estimated)" : ""
+    if (t.kind === "day_total") return `${n}. ${time(t.closed_at)} adjustment so the journal matches the day total the trader reported (not a trade): ${money(pnl(t))}`
     if (t.source === "manual") return `${n}. ${time(t.closed_at)} ${t.symbol ? t.symbol.split(":").pop() + " " : ""}reported by the trader: ${money(pnl(t))}`
     return `${n}. ${time(t.closed_at)} ${(t.symbol ?? "?").split(":").pop()} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${estimated}${fills}`
   })
 
   return `TODAY'S TRADES (auto-detected from the trader's platform, plus any results the trader reported and logged; times in their local time):
-${trades.length} trades, ${wins} wins, ${losses} losses, net ${money(net)}${streak >= 2 ? `, ${streak} losses in a row right now` : ""}.
+${real.length} trades, ${wins} wins, ${losses} losses, net ${money(net)}${streak >= 2 ? `, ${streak} losses in a row right now` : ""}.
 ${lines.join("\n")}
 
 Use these when they ask about their day or when it bears on the rules (max trades, max losses, trading window). Trades made with the trading panel closed or on other platforms may be missing.`

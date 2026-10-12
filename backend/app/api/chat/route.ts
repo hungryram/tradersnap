@@ -11,7 +11,7 @@ import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@
 import { loadTradePatterns } from "@/lib/trade-patterns"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
-import { alreadyLogged, detectTradeClaim } from "@/lib/trade-claims"
+import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims"
 
 // Recent conversation sent with each message. The window starts on a multiple
 // of HISTORY_STEP, so it holds still for a few exchanges and stays cached,
@@ -554,9 +554,19 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // "I just made 200": offer to log it (the trader confirms in the widget; nothing is saved here)
     const { claim, tokens: claimTokens } = await claimCheck
-    const tradeProposal = claim && !responseFailed && !(await alreadyLogged(supabase, user.id, claim.amount))
-      ? { id: crypto.randomUUID(), amount: claim.amount, symbol: claim.symbol, strategies: strategies.map(st => ({ id: st.id, name: st.name })) }
-      : null
+    let tradeProposal: { id: string; kind: string; amount: number; symbol: string | null; logged_net: number; logged_count: number; strategies: { id: string; name: string }[] } | null = null
+    if (claim && !responseFailed) {
+      const today = await loggedToday(supabase, user.id, dayStart)
+      // A day total the journal already adds up to needs nothing; a single trade the platform already logged neither
+      const covered = claim.kind === 'day_total' ? Math.abs(claim.amount - today.net) < 0.5 : await alreadyLogged(supabase, user.id, claim.amount)
+      if (!covered) {
+        tradeProposal = {
+          id: crypto.randomUUID(), kind: claim.kind, amount: claim.amount, symbol: claim.symbol,
+          logged_net: today.net, logged_count: today.count,
+          strategies: strategies.map(st => ({ id: st.id, name: st.name }))
+        }
+      }
+    }
 
     // Cost tracking, and the once-a-day notes update, after the reply is sent
     after(async () => {

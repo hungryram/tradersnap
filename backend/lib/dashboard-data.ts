@@ -9,6 +9,7 @@ export type Trade = {
   symbol: string | null
   side: "long" | "short" | null
   qty: number | null
+  kind?: "trade" | "day_total" // "day_total": an adjustment so the day matches the total the trader reported; not a trade
   source?: "auto" | "manual" // "manual": the trader reported it in chat, so there is no entry or exit
   entry_price: number | null
   exit_price: number | null
@@ -106,10 +107,14 @@ export async function loadStrategyOptions(): Promise<StrategyOption[]> {
 
 export const pnlOf = (trade: Trade) => Number(trade.realized_pnl ?? 0)
 
-export function summarize(trades: Trade[]) {
+// Day-total entries count in P&L but are not trades
+export const realTrades = (trades: Trade[]) => trades.filter(t => t.kind !== "day_total")
+
+export function summarize(all: Trade[]) {
+  const trades = realTrades(all)
   const wins = trades.filter(t => pnlOf(t) > 0)
   const losses = trades.filter(t => pnlOf(t) < 0)
-  const net = trades.reduce((sum, t) => sum + pnlOf(t), 0)
+  const net = all.reduce((sum, t) => sum + pnlOf(t), 0)
   const grossWin = wins.reduce((sum, t) => sum + pnlOf(t), 0)
   const grossLoss = Math.abs(losses.reduce((sum, t) => sum + pnlOf(t), 0))
   // trades come newest first

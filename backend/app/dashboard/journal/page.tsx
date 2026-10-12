@@ -196,7 +196,9 @@ export default function JournalPage() {
 
 type Row = { label: string; value: number; detail: string }
 
-function analyze(trades: Trade[], strategies: StrategyOption[]) {
+function analyze(allTrades: Trade[], strategies: StrategyOption[]) {
+  // Day-total entries count in net P&L (the headline stats) but are not trades, so they stay out of every breakdown
+  const trades = allTrades.filter(t => t.kind !== "day_total")
   const group = (keyOf: (t: Trade) => string, order: (a: string, b: string) => number) => {
     const groups = new Map<string, Trade[]>()
     for (const t of trades) {
@@ -253,7 +255,7 @@ function analyze(trades: Trade[], strategies: StrategyOption[]) {
   const anyTagged = byStrategy.some(row => !row.untagged)
 
   return {
-    stats: summarize(trades), byDay, byHour, bySymbol, byStrategy: anyTagged ? byStrategy : [], reentry: summarize(reentries), rest: summarize(rest),
+    stats: summarize(allTrades), byDay, byHour, bySymbol, byStrategy: anyTagged ? byStrategy : [], reentry: summarize(reentries), rest: summarize(rest),
     checkedFirst: summarize(trades.filter(t => t.checked)),
     notChecked: summarize(trades.filter(t => t.checked === false)),
   }

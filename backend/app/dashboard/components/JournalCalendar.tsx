@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { api, loadTradeWindow, pnlOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { api, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
 import { Card, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
@@ -105,7 +105,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
     return {
       weeks,
       totals: {
-        trades: tradingDays.reduce((s, d) => s + d.trades.length, 0),
+        trades: tradingDays.reduce((s, d) => s + realTrades(d.trades).length, 0),
         net: tradingDays.reduce((s, d) => s + d.net, 0),
         days: tradingDays.length,
         keptDays: tradingDays.filter(d => d.broken.length === 0).length,
@@ -200,7 +200,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
                           </span>
                         )}
                         {traded && <span className="absolute bottom-1.5 left-1.5 right-1.5">
-                          <span className="block text-[11px] text-ink-text">{day.trades.length} {day.trades.length === 1 ? "trade" : "trades"}</span>
+                          <span className="block text-[11px] text-ink-text">{realTrades(day.trades).length} {realTrades(day.trades).length === 1 ? "trade" : "trades"}</span>
                           <span className={`block text-xs font-medium tabular-nums ${day.net > 0 ? "text-green-400" : day.net < 0 ? "text-red-400" : "text-ink-text"}`}>{money(day.net)}</span>
                         </span>}
                       </>
@@ -211,7 +211,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
               <div key={`week-${w}`} className="flex h-20 flex-col justify-center rounded-lg bg-ink-elevated/40 px-2 text-right">
                 {weekTrades.length > 0 ? (
                   <>
-                    <span className="text-[11px] text-ink-muted">{weekTrades.length} trades</span>
+                    <span className="text-[11px] text-ink-muted">{realTrades(weekTrades).length} trades</span>
                     <span className={`text-xs font-medium tabular-nums ${weekNet > 0 ? "text-green-400" : weekNet < 0 ? "text-red-400" : "text-ink-text"}`}>{money(weekNet)}</span>
                   </>
                 ) : <span className="text-[11px] text-ink-muted">—</span>}
@@ -225,7 +225,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
         <div className="mt-5 border-t border-ink-border pt-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
-            {selectedDay.trades.length > 0 && <span className="text-sm text-ink-text">{selectedDay.trades.length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>}
+            {selectedDay.trades.length > 0 && <span className="text-sm text-ink-text">{realTrades(selectedDay.trades).length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>}
           </div>
           {selectedDay.trades.length > 0 && tracksRules && (
             selectedDay.broken.length

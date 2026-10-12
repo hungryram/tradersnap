@@ -45,15 +45,17 @@ function localParts(iso: string, timeZone: string) {
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
 
 // Same checks as the journal calendar and Pip's recap, in the trader's timezone
-function dayBroken(trades: { opened_at: string | null; closed_at: string; realized_pnl: number | null }[], limits: NonNullable<Limits>, timeZone: string) {
-  const sorted = [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+function dayBroken(trades: { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string }[], limits: NonNullable<Limits>, timeZone: string) {
+  const all = [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  // A day-total entry counts in the day's P&L but is not a trade
+  const sorted = all.filter(t => t.kind !== "day_total")
   const pnl = (t: { realized_pnl: number | null }) => Number(t.realized_pnl ?? 0)
   if (limits.max_trades_per_day && sorted.length > limits.max_trades_per_day) return true
   if (limits.stop_after_losses) {
     let streak = 0
     for (const t of sorted) { streak = pnl(t) < 0 ? streak + 1 : 0; if (streak > limits.stop_after_losses) return true }
   }
-  if (limits.max_daily_loss && sorted.reduce((s, t) => s + pnl(t), 0) < -limits.max_daily_loss) return true
+  if (limits.max_daily_loss && all.reduce((s, t) => s + pnl(t), 0) < -limits.max_daily_loss) return true
   if (limits.session_start && limits.session_end) {
     const start = minutesOf(limits.session_start), end = minutesOf(limits.session_end)
     if (sorted.some(t => { const m = localParts(t.opened_at ?? t.closed_at, timeZone).minutes; return m < start || m >= end })) return true
@@ -73,15 +75,14 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
   const limits = profile?.trading_limits as Limits
   if (!limits || !(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || (limits.session_start && limits.session_end))) return null
 
-  const { data } = await supabase
-    .from("trades")
-    .select("opened_at, closed_at, realized_pnl")
-    .eq("user_id", userId)
-    .gte("closed_at", new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString())
-    .order("closed_at", { ascending: false })
-    .limit(3000)
-  const byDay = new Map<string, NonNullable<typeof data>>()
-  for (const t of data ?? []) {
+  const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
+  const load = (cols: string) => supabase.from("trades").select(cols).eq("user_id", userId).gte("closed_at", since).order("closed_at", { ascending: false }).limit(3000)
+  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind")
+  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl")) // before 20261024_day_totals.sql
+  type DayRow = { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string }
+  const rows = (data ?? []) as unknown as DayRow[]
+  const byDay = new Map<string, DayRow[]>()
+  for (const t of rows) {
     const day = localParts(t.closed_at, tz).day
     byDay.set(day, [...(byDay.get(day) ?? []), t])
   }

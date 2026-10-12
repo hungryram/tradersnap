@@ -21,10 +21,13 @@ const answersLogRequest = (message: string, recent: string) => BARE_AMOUNT.test(
 const claimSchema = z.object({
   reported_trade: z.boolean(),
   amount: z.number().nullable(),
-  symbol: z.string().nullable()
+  symbol: z.string().nullable(),
+  kind: z.enum(["trade", "day_total", "unclear"])
 })
 
-export type TradeClaim = { amount: number; symbol: string | null }
+// trade: one position. day_total: their running total for the day. unclear: could be either.
+export type ClaimKind = "trade" | "day_total" | "unclear"
+export type TradeClaim = { amount: number; symbol: string | null; kind: ClaimKind }
 
 // `recent` is the last couple of turns of the conversation, as plain text
 export async function detectTradeClaim(message: string, recent = ""): Promise<{ claim: TradeClaim | null; tokens: TokenUsage | null }> {
@@ -36,6 +39,7 @@ reported_trade is true only when they state a result that already happened with 
 It is false for: questions, hypotheticals ("if I make 200"), goals ("I want to make 500"), plans, account sizes, prices, stop distances, and results in points, ticks or percent with no dollar amount.
 amount is the signed dollar result: positive for a gain, negative for a loss. Use null when reported_trade is false.
 symbol is the ticker if they named one (like NQ, ES, AAPL), else null.
+kind says what the amount covers: "trade" for one position ("made 200 on that NQ long", "that last trade lost 150"), "day_total" when it is their running total for the day or session ("up 381 total for the day", "I'm green 400 today", "down 600 on the day"), and "unclear" when it could be either ("I'm up 381", "made 200 today" with no sign they traded once). Set kind to "trade" when reported_trade is false.
 If the message is only an amount, it answers a question about a trade the trader asked to log. Use the recent conversation to decide: a loser, loss or stop-out is negative, a winner is positive. If you can't tell the sign, reported_trade is false.`,
       prompt: recent ? `Recent conversation:\n${recent}\n\nLatest message from the trader: ${message}` : message,
       schema: claimSchema,
@@ -45,7 +49,7 @@ If the message is only an amount, it answers a question about a trade the trader
       return { claim: null, tokens }
     }
     const symbol = output.symbol?.replace(/[^A-Za-z0-9:._!-]/g, "").slice(0, 20).toUpperCase() || null
-    return { claim: { amount: Math.round(output.amount * 100) / 100, symbol }, tokens }
+    return { claim: { amount: Math.round(output.amount * 100) / 100, symbol, kind: output.kind }, tokens }
   } catch (error) {
     console.error("[Trade claim] Detection failed:", error)
     return { claim: null, tokens: null }
@@ -64,4 +68,20 @@ export async function alreadyLogged(supabase: SupabaseClient, userId: string, am
     .limit(50)
   const tolerance = Math.max(1, Math.abs(amount) * 0.02)
   return (data ?? []).some(t => t.realized_pnl !== null && Math.abs(Number(t.realized_pnl) - amount) <= tolerance)
+}
+
+// What the journal already holds for today: the net (day-total entries included) and the number of real trades
+export async function loggedToday(supabase: SupabaseClient, userId: string, dayStart: Date): Promise<{ net: number; count: number }> {
+  let { data, error }: { data: unknown[] | null; error: unknown } = await supabase
+    .from("trades")
+    .select("realized_pnl, kind")
+    .eq("user_id", userId)
+    .gte("closed_at", dayStart.toISOString())
+    .limit(500)
+  if (error) ({ data, error } = await supabase.from("trades").select("realized_pnl").eq("user_id", userId).gte("closed_at", dayStart.toISOString()).limit(500)) // before 20261024_day_totals.sql
+  const rows = (data ?? []) as { realized_pnl: number | null; kind?: string }[]
+  return {
+    net: Math.round(rows.reduce((sum, t) => sum + Number(t.realized_pnl ?? 0), 0) * 100) / 100,
+    count: rows.filter(t => t.kind !== "day_total").length
+  }
 }

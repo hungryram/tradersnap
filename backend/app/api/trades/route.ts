@@ -48,7 +48,7 @@ const tradeSchema = z.object({
   closed_at: z.string().datetime()
 })
 
-type TradeRow = { realized_pnl: number | null; closed_at: string; source?: string }
+type TradeRow = { realized_pnl: number | null; closed_at: string; source?: string; kind?: string }
 
 // A chart check this long before a trade opened tags the trade with its strategy
 const TAG_WINDOW_MS = 20 * 60 * 1000
@@ -89,13 +89,14 @@ async function autoTagTrades(userId: string) {
 }
 
 // Counts, net PnL and the current losing streak (most recent trades first)
-function summarize(trades: TradeRow[]) {
+// Day-total entries count in net P&L but are not trades
+function summarize(all: TradeRow[]) {
+  const trades = all.filter(t => t.kind !== "day_total")
   let wins = 0
   let losses = 0
-  let net = 0
+  let net = all.reduce((sum, t) => sum + Number(t.realized_pnl ?? 0), 0)
   for (const trade of trades) {
     const pnl = Number(trade.realized_pnl ?? 0)
-    net += pnl
     if (pnl > 0) wins++
     else if (pnl < 0) losses++
   }
@@ -173,7 +174,8 @@ export async function GET(request: NextRequest) {
       if (until) q = q.lt("closed_at", until.toISOString())
       return q.order("closed_at", { ascending: false }).limit(limit)
     }
-    let { data, error } = await query(`${columns}, strategy_id, strategy_source, source`)
+    let { data, error } = await query(`${columns}, strategy_id, strategy_source, source, kind`)
+    if (error) ({ data, error } = await query(`${columns}, strategy_id, strategy_source, source`)) // before 20261024_day_totals.sql
     if (error) ({ data, error } = await query(`${columns}, strategy_id, strategy_source`)) // before 20261022_manual_trades.sql
     if (error) ({ data, error } = await query(columns)) // before 20261020_strategies.sql
 

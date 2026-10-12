@@ -52,7 +52,9 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
                 </td>
                 <td className="py-2.5 font-medium">
                   {tickerOf(trade.symbol)}
-                  {trade.source === "manual" && <span className="ml-2 rounded-full border border-ink-border px-1.5 py-0.5 text-[10px] font-normal text-ink-muted" title="You told Pip about this one, so it has no entry or exit">manual</span>}
+                  {trade.source === "manual" && (trade.kind === "day_total"
+                    ? <span className="ml-2 rounded-full border border-ink-border px-1.5 py-0.5 text-[10px] font-normal text-ink-muted" title="An adjustment so your day matches the total you told Pip. It counts in P&L, not as a trade.">day total</span>
+                    : <span className="ml-2 rounded-full border border-ink-border px-1.5 py-0.5 text-[10px] font-normal text-ink-muted" title="You told Pip about this one, so it has no entry or exit">manual</span>)}
                   {trade.source === "manual" && <button onClick={() => removeManual(trade.id)} className="ml-1.5 text-xs text-ink-muted hover:text-red-400" title="Remove this logged result" aria-label="Remove this logged result">✕</button>}
                 </td>
                 <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-brand-300" : "text-red-400"}`}>{trade.side ?? "—"}</td>

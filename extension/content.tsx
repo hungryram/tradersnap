@@ -91,7 +91,7 @@ function tradeProposalFields(msg: any) {
   const p = msg.trade_proposal
   if (!p) return {}
   return {
-    tradeProposal: { id: p.id, amount: p.amount, symbol: p.symbol ?? null, strategies: p.strategies ?? [] },
+    tradeProposal: { id: p.id, kind: p.kind ?? 'trade', amount: p.amount, symbol: p.symbol ?? null, logged_net: p.logged_net ?? 0, logged_count: p.logged_count ?? 0, strategies: p.strategies ?? [] },
     tradeStatus: p.status === 'pending' ? undefined : p.status
   }
 }
@@ -660,14 +660,22 @@ const TradingBuddyWidget = () => {
   const setTradeStatus = (proposalId: string, tradeStatus: string, tradeError?: string) =>
     setMessages(prev => prev.map(m => m.tradeProposal?.id === proposalId ? { ...m, tradeStatus, tradeError } : m))
 
-  const logReportedTrade = async (proposal: { id: string; amount: number; symbol: string | null }) => {
+  const logReportedTrade = async (proposal: { id: string; amount: number; symbol: string | null }, kind: 'trade' | 'day_total' = 'trade') => {
     setTradeStatus(proposal.id, 'saving')
     try {
       const { supabase_session } = await chrome.storage.local.get('supabase_session')
       const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades/manual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session?.access_token}` },
-        body: JSON.stringify({ proposal_id: proposal.id, amount: proposal.amount, symbol: proposal.symbol, strategy_id: tradeStrategy[proposal.id] || null })
+        body: JSON.stringify({
+          proposal_id: proposal.id,
+          amount: proposal.amount,
+          symbol: proposal.symbol,
+          kind,
+          // A day total is logged as the difference from what the journal holds since the trader's local midnight
+          day_start: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          strategy_id: kind === 'trade' ? tradeStrategy[proposal.id] || null : null
+        })
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -2653,25 +2661,45 @@ const TradingBuddyWidget = () => {
                         </span>
                       ) : (
                         <>
-                          {msg.tradeProposal.strategies?.length > 0 && (
-                            <select
-                              value={tradeStrategy[msg.tradeProposal.id] ?? ''}
-                              onChange={e => setTradeStrategy(prev => ({ ...prev, [msg.tradeProposal.id]: e.target.value }))}
-                              disabled={msg.tradeStatus === 'saving'}
-                              title="Which of your strategies this trade was"
-                              className={`max-w-[10rem] rounded-lg border px-2 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-300 bg-white text-slate-700'}`}
-                            >
-                              <option value="">No strategy / other</option>
-                              {msg.tradeProposal.strategies.map((st: { id: string; name: string }) => <option key={st.id} value={st.id}>{st.name}</option>)}
-                            </select>
-                          )}
-                          <button
-                            onClick={() => logReportedTrade(msg.tradeProposal)}
-                            disabled={msg.tradeStatus === 'saving'}
-                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-                          >
-                            {msg.tradeStatus === 'saving' ? 'Logging…' : `Log ${msg.tradeProposal.amount < 0 ? '-' : '+'}$${Math.abs(msg.tradeProposal.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}${msg.tradeProposal.symbol ? ` ${msg.tradeProposal.symbol}` : ''} to my journal`}
-                          </button>
+                          {(() => {
+                            const p = msg.tradeProposal
+                            const kind: string = p.kind ?? 'trade'
+                            const money = (n: number) => `${n < 0 ? '-' : '+'}$${Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+                            const gap = Math.round((p.amount - (p.logged_net ?? 0)) * 100) / 100
+                            const busy = msg.tradeStatus === 'saving'
+                            const primary = 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60'
+                            const secondary = `rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${theme === 'dark' ? 'border-blue-500 text-blue-300 hover:bg-blue-500/10' : 'border-blue-600 text-blue-700 hover:bg-blue-50'}`
+                            const dayLabel = (p.logged_net ?? 0) !== 0 ? `Log ${money(gap)} to make your day ${money(p.amount)}` : `Log ${money(p.amount)} as my day total`
+                            return (
+                              <>
+                                {kind === 'unclear' && (
+                                  <span className={`w-full text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-600'}`}>Was that one trade, or your total for the day?</span>
+                                )}
+                                {kind !== 'day_total' && p.strategies?.length > 0 && (
+                                  <select
+                                    value={tradeStrategy[p.id] ?? ''}
+                                    onChange={e => setTradeStrategy(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                    disabled={busy}
+                                    title="Which of your strategies this trade was"
+                                    className={`max-w-[10rem] rounded-lg border px-2 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-300 bg-white text-slate-700'}`}
+                                  >
+                                    <option value="">No strategy / other</option>
+                                    {p.strategies.map((st: { id: string; name: string }) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                                  </select>
+                                )}
+                                {kind !== 'day_total' && (
+                                  <button onClick={() => logReportedTrade(p, 'trade')} disabled={busy} className={primary}>
+                                    {busy ? 'Logging…' : kind === 'unclear' ? `One trade: ${money(p.amount)}${p.symbol ? ` ${p.symbol}` : ''}` : `Log ${money(p.amount)}${p.symbol ? ` ${p.symbol}` : ''} to my journal`}
+                                  </button>
+                                )}
+                                {kind !== 'trade' && (
+                                  <button onClick={() => logReportedTrade(p, 'day_total')} disabled={busy} className={kind === 'day_total' ? primary : secondary} title="Adds what the journal is missing so your day adds up. It counts in P&L, not as a trade.">
+                                    {busy && kind === 'day_total' ? 'Logging…' : kind === 'unclear' ? `Day total${(p.logged_net ?? 0) !== 0 ? ` (adds ${money(gap)})` : ''}` : dayLabel}
+                                  </button>
+                                )}
+                              </>
+                            )
+                          })()}
                           <button
                             onClick={() => dismissReportedTrade(msg.tradeProposal.id)}
                             className={`rounded-lg border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border text-dark-text hover:text-dark-body' : 'border-slate-300 text-slate-600 hover:text-slate-900'}`}

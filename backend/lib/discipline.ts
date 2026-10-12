@@ -13,7 +13,8 @@ export function dayKeyOf(iso: string) {
 
 export function brokenRules(dayTrades: Trade[], limits: TradingLimits | null): string[] {
   if (!limits || dayTrades.length === 0) return []
-  const trades = [...dayTrades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  // Day-total entries count in the day's P&L but are not trades
+  const trades = dayTrades.filter(t => t.kind !== "day_total").sort((a, b) => a.closed_at.localeCompare(b.closed_at))
   const broken: string[] = []
 
   if (limits.max_trades_per_day && trades.length > limits.max_trades_per_day) {
@@ -24,7 +25,7 @@ export function brokenRules(dayTrades: Trade[], limits: TradingLimits | null): s
     for (const t of trades) { streak = pnl(t) < 0 ? streak + 1 : 0; worst = Math.max(worst, streak) }
     if (worst > limits.stop_after_losses) broken.push(`Kept trading after ${limits.stop_after_losses} losses in a row`)
   }
-  const net = trades.reduce((sum, t) => sum + pnl(t), 0)
+  const net = dayTrades.reduce((sum, t) => sum + pnl(t), 0)
   if (limits.max_daily_loss && net < -limits.max_daily_loss) broken.push(`Past the $${limits.max_daily_loss} daily loss limit`)
   if (limits.session_start && limits.session_end) {
     const start = minutes(limits.session_start), end = minutes(limits.session_end)

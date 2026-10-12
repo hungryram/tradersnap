@@ -101,14 +101,17 @@ export async function loadTradePatterns(
   limits: PatternLimits,
   timezone?: string
 ): Promise<string[]> {
-  const { data, error } = await supabase
+  const load = (cols: string) => supabase
     .from("trades")
-    .select("opened_at, closed_at, realized_pnl")
+    .select(cols)
     .eq("user_id", userId)
     .gte("closed_at", new Date(todayStart.getTime() - DAYS * 24 * 60 * 60 * 1000).toISOString())
     .lt("closed_at", todayStart.toISOString())
     .order("closed_at", { ascending: true })
     .limit(2000)
+  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind")
+  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl")) // before 20261024_day_totals.sql
   if (error || !data) return []
-  return tradePatterns(data as PatternTrade[], limits, timezone)
+  // Day-total entries are not trades, so they say nothing about how the trader trades
+  return tradePatterns((data as unknown as (PatternTrade & { kind?: string })[]).filter(t => t.kind !== "day_total"), limits, timezone)
 }

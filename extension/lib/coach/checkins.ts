@@ -25,6 +25,7 @@ export type CoachTrade = {
   realized_pnl: number | null
   opened_at: string | null
   closed_at: string
+  kind?: string // "day_total": an adjustment so the day matches the total the trader reported; counts in P&L, not as a trade
 }
 
 export type CoachLimits = {
@@ -60,8 +61,9 @@ export function pick<T>(options: T[], seed: string): T {
   return options[(h >>> 0) % options.length]
 }
 
+// Trades only: day-total entries stay out of counts, streaks and the last-trade checks (net P&L uses ctx.trades)
 function sorted(trades: CoachTrade[]) {
-  return [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  return trades.filter(t => t.kind !== "day_total").sort((a, b) => a.closed_at.localeCompare(b.closed_at))
 }
 
 function lossStreak(trades: CoachTrade[]) {
@@ -188,7 +190,7 @@ export function afterTrades(ctx: CoachContext): CheckIn[] {
   }
 
   // Daily loss limit
-  const net = trades.reduce((sum, t) => sum + pnlOf(t), 0)
+  const net = ctx.trades.reduce((sum, t) => sum + pnlOf(t), 0)
   if (l?.max_daily_loss && net <= -l.max_daily_loss) {
     const id = `${day}:daily_loss`
     out.push({
@@ -319,7 +321,7 @@ export function sessionRecap(ctx: CoachContext, hasOpenPositions: boolean): Chec
 
   const wins = trades.filter(t => pnlOf(t) > 0).length
   const losses = trades.filter(t => pnlOf(t) < 0).length
-  const net = trades.reduce((sum, t) => sum + pnlOf(t), 0)
+  const net = ctx.trades.reduce((sum, t) => sum + pnlOf(t), 0)
 
   const broken: string[] = []
   if (l?.max_trades_per_day && trades.length > l.max_trades_per_day) broken.push(`took ${trades.length} trades (limit ${l.max_trades_per_day})`)
