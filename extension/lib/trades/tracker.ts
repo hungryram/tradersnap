@@ -12,7 +12,9 @@ export function buildTrades(
   fills: Fill[],
   openPositions: Map<string, number>,
   account: string | null,
-  platform: ClosedTrade["platform"]
+  platform: ClosedTrade["platform"],
+  // Dollars per point the platform itself reports for a symbol, when it does (else the built-in table is used)
+  platformPointValue?: (symbol: string) => number | null
 ): ClosedTrade[] {
   const bySymbol = new Map<string, Fill[]>()
   for (const fill of fills) {
@@ -23,7 +25,8 @@ export function buildTrades(
   const trades: ClosedTrade[] = []
   for (const [symbol, symbolFills] of bySymbol) {
     symbolFills.sort((a, b) => a.time - b.time || compareIds(a.orderId, b.orderId))
-    const { value: pv, known: pvKnown } = pointValue(symbol)
+    const fromPlatform = platformPointValue?.(symbol)
+    const { value: pv, known: pvKnown } = fromPlatform ? { value: fromPlatform, known: true } : pointValue(symbol)
 
     let position = (openPositions.get(symbol) ?? 0) - symbolFills.reduce((sum, f) => sum + f.qty, 0)
     position = Math.round(position * 1e6) / 1e6

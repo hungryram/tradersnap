@@ -136,12 +136,12 @@ const POINT_VALUES: Record<string, number> = {
   BTC: 5, MBT: 0.1, ETH: 50, MET: 0.1
 }
 
-const FUTURES_TICKER = /[FGHJKMNQUVXZ]\d{2,4}$|\d+!$/
+const FUTURES_TICKER = /[FGHJKMNQUVXZ]\d{1,4}$|\d+!$/
 
 // "CME_MINI:MNQZ2026" or "CME_MINI:MNQ1!" -> { value: 2, known: true }
 export function pointValue(symbol: string): { value: number; known: boolean } {
   const ticker = symbol.split(":").pop() ?? symbol
-  const root = ticker.replace(/[FGHJKMNQUVXZ]\d{2,4}$/, "").replace(/\d+!$/, "")
+  const root = ticker.replace(/[FGHJKMNQUVXZ]\d{1,4}$/, "").replace(/\d+!$/, "")
   if (POINT_VALUES[root] !== undefined) return { value: POINT_VALUES[root], known: true }
   // Stocks and ETFs really are $1 per point; an unlisted futures contract is a guess
   return { value: 1, known: !FUTURES_TICKER.test(ticker) }

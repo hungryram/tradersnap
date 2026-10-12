@@ -21,7 +21,7 @@ Keeps the sign-in session, recent chat, settings (theme, check-in preference, wi
 Refreshes the sign-in session in the background (about once a minute while it's close to expiring) so the trader isn't signed out mid-session.
 
 **scripting**
-On TopstepX only, Pip registers one small script that runs inside the TopstepX page (Chrome's `world: "MAIN"` content script, registered with `chrome.scripting`). It reads the closed-trade list the TopstepX page itself downloads, plus live trade updates the page receives, and passes them to Pip's content script. It makes no requests of its own, never reads the sign-in token, and only matches topstepx.com.
+On TopstepX and Tradovate only, Pip registers one small script per site that runs inside that site's page (Chrome's `world: "MAIN"` content script, registered with `chrome.scripting`). It reads the trade data the page itself receives (TopstepX: the closed-trade list and live updates; Tradovate: the fills, fees, positions and contract names its page loads and streams) and passes it to Pip's content script. It makes no requests of its own, never reads the sign-in token, and only matches topstepx.com and tradovate.com.
 
 **Host permission (`<all_urls>`)**
 `chrome.tabs.captureVisibleTab` requires the `<all_urls>` host permission (or activeTab from a toolbar click); traders start chart checks from the widget on the page, so activeTab alone doesn't cover it. The content script itself only runs on the listed trading and charting sites (TradingView, Tradovate, TopstepX, brokers and exchanges) and on our dashboard; Pip doesn't read or change other websites.
@@ -36,7 +36,7 @@ Lets the Pip dashboard hand the trader's sign-in to the extension after they log
 - **Personally identifiable information:** email address, optional first name (account).
 - **Authentication information:** sign-in session tokens.
 - **Personal communications:** messages the trader sends to Pip and Pip's replies. When a message reports a trade result (for example "I just made 200"), a smaller AI model checks it so Pip can offer to log it; nothing is saved unless the trader taps to confirm.
-- **Financial and payment information:** trade history detected from the trading panel or, on TopstepX, from the closed-trade list the page loads (symbol, size, prices, fees, profit or loss), and results the trader chooses to log by hand (amount, optional ticker, time). Payments are handled by Stripe on the website, not the extension.
+- **Financial and payment information:** trade history detected from the trading panel or, on TopstepX and Tradovate, from the trade data the page loads (symbol, size, prices, fees, profit or loss), and results the trader chooses to log by hand (amount, optional ticker, time). Payments are handled by Stripe on the website, not the extension.
 - **User activity:** feature usage events (chart checks, messages, check-ins shown).
 - **Website content:** chart screenshots, only when the trader asks for a chart check.
 

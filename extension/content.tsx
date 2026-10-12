@@ -9,6 +9,7 @@ import ResetBreak from "./components/ResetBreak"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import { startTopstepTracking } from "~lib/trades/topstepx"
+import { startTradovateTracking } from "~lib/trades/tradovate"
 import type { ClosedTrade } from "~lib/trades/types"
 import { afterTrades, morningPlan, onPositionOpened, sessionRecap, type CheckIn, type CoachLimits, type CoachTrade } from "~lib/coach/checkins"
 import { marked } from "marked"
@@ -516,7 +517,8 @@ const TradingBuddyWidget = () => {
     chrome.storage.onChanged.addListener(handleTradeSync)
 
     const onTopstep = window.location.hostname.endsWith('topstepx.com')
-    if (!window.location.hostname.endsWith('tradingview.com') && !onTopstep) {
+    const onTradovate = window.location.hostname.endsWith('tradovate.com')
+    if (!window.location.hostname.endsWith('tradingview.com') && !onTopstep && !onTradovate) {
       return () => chrome.storage.onChanged.removeListener(handleTradeSync)
     }
 
@@ -548,7 +550,7 @@ const TradingBuddyWidget = () => {
       }
     }
 
-    const stopTracking = (onTopstep ? startTopstepTracking : startTradeTracking)({
+    const stopTracking = (onTopstep ? startTopstepTracking : onTradovate ? startTradovateTracking : startTradeTracking)({
       onTrades: (trades) => {
         unsent.push(...trades)
         sendTrades()
@@ -631,8 +633,11 @@ const TradingBuddyWidget = () => {
 
   const isTradingView = window.location.hostname.endsWith('tradingview.com')
   const isTopstep = window.location.hostname.endsWith('topstepx.com')
+  const isTradovate = window.location.hostname.endsWith('tradovate.com')
+  // TopstepX and Tradovate are read from what the page itself loads; TradingView from its trading panel
+  const platformName = isTopstep ? 'TopstepX' : isTradovate ? 'Tradovate' : 'TradingView'
   // What to tell the trader when Pip isn't seeing their trades yet, per platform
-  const noTrackingHint = isTopstep ? 'reload TopstepX so Pip can see your trades' : "open TradingView's trading panel (it can be small)"
+  const noTrackingHint = isTopstep || isTradovate ? `reload ${platformName} so Pip can see your trades` : "open TradingView's trading panel (it can be small)"
 
   // ---- Coach check-ins ------------------------------------------------------
   // Latest values for callbacks that outlive a render (tracker ticks, timers)
@@ -939,7 +944,7 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     const g = gettingStarted
     if (!g || g.dismissed || g.completed || !session) return
-    if (g.analyzed && g.chartChatted && (autoDetectTrades || !(isTradingView || isTopstep))) {
+    if (g.analyzed && g.chartChatted && (autoDetectTrades || !(isTradingView || isTopstep || isTradovate))) {
       updateGettingStarted({ completed: true }, 'checklist_completed')
     }
   }, [gettingStarted, autoDetectTrades, session])
@@ -2392,7 +2397,7 @@ const TradingBuddyWidget = () => {
                 </div>
                 <button
                   onClick={() => setAutoDetect(!autoDetectTrades)}
-                  title={isTopstep ? "Logs your closed trades and wins/losses from TopstepX. Keep TopstepX open while you trade." : "Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."}
+                  title={isTopstep || isTradovate ? `Logs your closed trades and wins/losses from ${platformName}. Keep ${platformName} open while you trade.` : "Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."}
                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   <span>Auto-detect trades</span>
@@ -2540,8 +2545,8 @@ const TradingBuddyWidget = () => {
             signedIn={!!session}
             analyzed={!!gettingStarted.analyzed}
             chartChatted={!!gettingStarted.chartChatted}
-            showTradeTracking={isTradingView || isTopstep}
-            tradeTrackingDetail={isTopstep ? 'Pip reads your closed trades from TopstepX while it is open.' : "Keep TradingView's trading panel open (it can be small)."}
+            showTradeTracking={isTradingView || isTopstep || isTradovate}
+            tradeTrackingDetail={isTopstep || isTradovate ? `Pip reads your closed trades from ${platformName} while it is open.` : "Keep TradingView's trading panel open (it can be small)."}
             tradeTrackingOn={autoDetectTrades}
             onSignIn={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/welcome`, '_blank')}
             onAnalyze={handleAnalyze}
