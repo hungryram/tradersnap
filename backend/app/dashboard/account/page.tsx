@@ -6,6 +6,7 @@ import { api } from "@/lib/dashboard-data"
 import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
 import UsageMeter, { type Credits } from "../components/UsageMeter"
+import TradingProfileCard, { type TradingProfile } from "../components/TradingProfileCard"
 import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
 interface UserData {
@@ -16,6 +17,7 @@ interface UserData {
     plan: string
     subscribed_plan?: string
     trial_days_left?: number
+    trading_profile?: TradingProfile
     subscription_status: string
     created_at: string
   }
@@ -182,6 +184,8 @@ export default function AccountPage() {
             </dl>
           )}
         </Card>
+
+        <TradingProfileCard key={JSON.stringify(user.trading_profile ?? null)} profile={user.trading_profile ?? null} onSaved={load} />
 
         <Card title="Usage today">
           {topupDone && <div className="mb-4"><Notice tone="good">Thanks! Your extra usage is added. It's used after your daily allowance and never expires.</Notice></div>}
