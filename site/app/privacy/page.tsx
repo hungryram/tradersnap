@@ -14,7 +14,7 @@ export default function Page() {
       <ul>
         <li>Pip never asks for your broker login and can&apos;t place, change or close trades.</li>
         <li>The extension only works on the trading sites it supports. It doesn&apos;t read the rest of your browsing.</li>
-        <li>Chart screenshots are taken only when you click Analyze or send a chart.</li>
+        <li>Chart screenshots are taken only when you click Check this setup or include your chart in a message.</li>
         <li>We don&apos;t sell your data or use it for advertising.</li>
         <li>You can delete your account and your data yourself, instantly, from your account page.</li>
       </ul>
@@ -40,7 +40,7 @@ export default function Page() {
       <h2>3. Information the extension collects while you trade</h2>
       <h3>3.1 Chart screenshots</h3>
       <p>
-        When you click <strong>Analyze</strong> or send a message with your chart, the extension captures the visible browser tab and sends the image to our
+        When you click <strong>Check this setup</strong> or send a message with your chart included, the extension captures the visible browser tab and sends the image to our
         servers and our AI provider to produce Pip&apos;s answer. We don&apos;t store chart images on our servers. The extension keeps them in your
         browser&apos;s local storage with your chat history, and they are removed when you clear the chat, sign out or uninstall.
       </p>

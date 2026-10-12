@@ -45,7 +45,7 @@ export default function FAQPage() {
         },
         {
           q: "Why does the extension need certain permissions?",
-          a: "Pip needs permission to capture chart screenshots from trading platforms (like TradingView) and to communicate with our servers to provide AI-powered analysis. We only access content when you explicitly click 'Analyze Chart'."
+          a: "Pip needs permission to capture chart screenshots from trading platforms (like TradingView) and to communicate with our servers to provide AI-powered analysis. We only capture your chart when you click 'Check this setup' or include your chart in a message."
         },
         {
           q: "What trading platforms are supported?",
@@ -58,7 +58,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "What counts against my usage?",
-          a: "Each time you click 'Analyze Chart' in the extension, it counts as one chart analysis and a message."
+          a: "Each chart check (Check this setup) uses more of your daily allowance than a message. A message with your chart included sits in between."
         },
         {
           q: "When does my usage reset?",

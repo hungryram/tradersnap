@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       {
         user_id: user.id,
         role: 'user',
-        content: '📸 Analyze this chart',
+        content: '📸 Check this setup',
         screenshot_url: null, // Chart images stored in extension chrome.storage
         created_at: requestStartedAt
       },

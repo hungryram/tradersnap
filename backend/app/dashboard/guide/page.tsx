@@ -59,7 +59,7 @@ export default function GuidePage() {
                             <>Pin the Pip extension to your Chrome toolbar (puzzle icon → pin).</>,
                             <>Set up your <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
                             <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Pip</strong> button at the bottom right.</>,
-                            <>Click <strong className="text-ink-body">Analyze this chart</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
+                            <>Click <strong className="text-ink-body">Check this setup</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
                             <>On TradingView, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
                         ].map((step, i) => (
                             <li key={i} className="flex items-start">
@@ -183,7 +183,7 @@ export default function GuidePage() {
                                     Get AI Analysis
                                 </h3>
                                 <p className="text-ink-text mb-2">
-                                    Click the <strong>"Analyze Chart"</strong> button in the chat
+                                    Click the <strong>"Check this setup"</strong> button in the chat
                                     widget. Our AI will:
                                 </p>
                                 <ul className="list-disc list-inside text-ink-text space-y-1 ml-4">

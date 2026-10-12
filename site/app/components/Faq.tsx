@@ -27,7 +27,7 @@ export const FAQ: FaqGroup[] = [
     title: "Privacy",
     items: [
       { q: "Can Pip access my broker account?", a: "No. Pip only reads what's on your screen in your browser. He can't place, change or close orders, and never sees your broker password." },
-      { q: "What do you store?", a: "Your account, rules, chats and the trades Pip detects (symbol, size, prices and result) so your coach and journal can use them. Charts are only captured when you click Analyze or send a chart. You can delete your account and all your data from your account page, instantly." },
+      { q: "What do you store?", a: "Your account, rules, chats and the trades Pip detects (symbol, size, prices and result) so your coach and journal can use them. Charts are only captured when you click Check this setup or include your chart. You can delete your account and all your data from your account page, instantly." },
     ],
   },
   {

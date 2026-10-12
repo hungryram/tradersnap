@@ -100,7 +100,7 @@ export default function HeroReplay() {
             </div>
 
             <div className="flex gap-2 border-t border-ink-border p-2.5">
-              <span className="flex-1 rounded-md bg-brand-500 px-2 py-1.5 text-center text-[11px] font-medium text-ink-bg">Analyze this chart</span>
+              <span className="flex-1 rounded-md bg-brand-500 px-2 py-1.5 text-center text-[11px] font-medium text-ink-bg">Check this setup</span>
               <span className="flex-1 rounded-md bg-ink-elevated px-2 py-1.5 text-center text-[11px] text-ink-text">Ask Pip</span>
             </div>
           </div>

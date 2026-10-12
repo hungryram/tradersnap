@@ -101,7 +101,7 @@ function limitReachedText(plan: string, canBuyMore?: boolean) {
   return base + (isPaid ? "" : " If you want more room every day, Pro gives you about 7x.")
 }
 
-// Shown under "Analyze this chart" while an analysis runs
+// Shown on the "Check this setup" button while a check runs
 const ANALYZE_STAGES = ["Capturing your chart...", "Reading price action...", "Checking your rules...", "Writing your verdict..."]
 
 // Tap-to-ask starters for an empty chat (chart ones turn on the Chart toggle)
@@ -1093,7 +1093,7 @@ const TradingBuddyWidget = () => {
       // Add user message
       const userMessage = {
         type: 'user',
-        content: '📸 Analyze this chart',
+        content: '📸 Check this setup',
         timestamp: new Date(),
         chartImage: chartImage
       }
@@ -2596,76 +2596,102 @@ const TradingBuddyWidget = () => {
                       : type === 'invalidation' ? 'bg-orange-500'
                       : 'bg-blue-500'
 
+                    // The card answers one question at a glance: does this fit my rules, and if
+                    // not, what am I waiting for? Everything else is one tap away in Details.
+                    const aligned = analysis.setup_status === 'aligned'
+                    const waitFor: string[] = analysis.wait_for || []
+                    const nextStep = !aligned ? waitFor[0] : undefined
+                    // The nudge earns a spot up front only on a rule break or an off-plan setup
+                    const nudgeUpFront = !!analysis.behavioral_nudge && (analysis.setup_status === 'violated' || analysis.matched_strategy === null)
+
                     return (
                       <>
                         {/* Which of their strategies this chart was checked against */}
                         {'matched_strategy' in analysis && (
                           <div className={`mb-1.5 text-[11px] ${muted}`}>
                             {analysis.matched_strategy
-                              ? <>Checked against your <span className={dark ? 'text-dark-body font-medium' : 'text-slate-900 font-medium'}>{analysis.matched_strategy}</span> strategy</>
+                              ? <>Your <span className={dark ? 'text-dark-body font-medium' : 'text-slate-900 font-medium'}>{analysis.matched_strategy}</span> strategy</>
                               : 'Not one of your strategies'}
                           </div>
                         )}
-                        {/* Verdict first */}
                         <div className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-semibold uppercase tracking-wide mb-1.5 ${getVerdictColor(analysis.setup_status)}`}>
                           {analysis.headline || getVerdictLabel(analysis.setup_status)}
                         </div>
                         {analysis.headline_reason && (
-                          <div className={`text-[13px] mb-3 ${muted}`}>{analysis.headline_reason}</div>
+                          <div className={dark ? 'text-dark-body' : 'text-slate-900'}>{analysis.headline_reason}</div>
                         )}
-
-                        <div className={`mb-3 ${dark ? 'text-dark-body' : 'text-slate-900'}`}>{analysis.summary}</div>
-
-                        {analysis.wait_for?.length > 0 && (
-                          <div className="mb-3">
-                            <div className={sectionLabel}>Wait for</div>
-                            <ul className="space-y-1">
-                              {analysis.wait_for.map((item: string, idx: number) => (
-                                <li key={idx} className="flex gap-2">
-                                  <span className={muted}>›</span>
-                                  <span>{item}</span>
-                                </li>
-                              ))}
-                            </ul>
+                        {nextStep && (
+                          <div className="mt-2 flex gap-1.5 text-[13px]">
+                            <span className={`shrink-0 font-semibold ${muted}`}>Wait for:</span>
+                            <span>{nextStep}</span>
                           </div>
                         )}
-
-                        {analysis.levels_to_watch?.length > 0 && (
-                          <div className="mb-3">
-                            <div className={sectionLabel}>Levels</div>
-                            <div className="space-y-1">
-                              {analysis.levels_to_watch.map((level: any, idx: number) => (
-                                <div key={idx} className="flex items-baseline gap-2">
-                                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${levelDot(level.type)}`} />
-                                  <span className="font-medium">{level.label}</span>
-                                  {level.why_it_matters && (
-                                    <span className={`text-[13px] ${muted}`}>{level.why_it_matters}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                        {nudgeUpFront && (
+                          <div className={`mt-2 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
                         )}
 
-                        {/* Rule tally; full checklist lives in Details */}
-                        <button
-                          onClick={() => setExpandedDetails(prev => ({ ...prev, [i]: !prev[i] }))}
-                          className={`w-full flex items-center justify-between gap-2 text-[13px] pt-2 mt-1 border-t ${dark ? 'border-dark-border' : 'border-slate-200'}`}
-                        >
-                          <span className="flex flex-wrap gap-x-3">
-                            {passed > 0 && <span className="text-green-500">✓ {passed} pass</span>}
-                            {failed > 0 && <span className="text-red-500">✗ {failed} fail</span>}
-                            {unclear > 0 && <span className="text-yellow-500">? {unclear} unclear</span>}
-                            {selfChecks.length > 0 && <span className={muted}>{selfChecks.length} to confirm</span>}
-                          </span>
-                          <span className={`shrink-0 ${muted}`}>{detailsOpen ? 'Hide ▴' : 'Details ▾'}</span>
-                        </button>
+                        {/* Details toggle and rating on one quiet row */}
+                        <div className={`mt-3 flex items-center justify-between gap-2 border-t pt-2 text-[12px] ${dark ? 'border-dark-border' : 'border-slate-200'}`}>
+                          <button onClick={() => setExpandedDetails(prev => ({ ...prev, [i]: !prev[i] }))} className={`flex items-center gap-2 ${muted} hover:underline`}>
+                            {detailsOpen ? 'Hide details ▴' : 'Details ▾'}
+                            {!detailsOpen && (passed + failed + unclear > 0) && (
+                              <span className="flex gap-2 no-underline">
+                                {passed > 0 && <span className="text-green-500">✓{passed}</span>}
+                                {failed > 0 && <span className="text-red-500">✗{failed}</span>}
+                                {unclear > 0 && <span className="text-yellow-500">?{unclear}</span>}
+                              </span>
+                            )}
+                          </button>
+                          {msg.id && (
+                            ratings[msg.id] ? (
+                              <span className={muted}>Thanks!</span>
+                            ) : (
+                              <span className={`flex items-center gap-0.5 ${muted}`} title="Was this verdict right?">
+                                <button onClick={() => rateAnalysis(msg.id, 1)} aria-label="Verdict was right" className={`rounded px-1 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👍</button>
+                                <button onClick={() => rateAnalysis(msg.id, -1)} aria-label="Verdict was wrong" className={`rounded px-1 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👎</button>
+                              </span>
+                            )
+                          )}
+                        </div>
 
                         {detailsOpen && (
                           <div className="mt-3 space-y-3 text-[13px]">
+                            {analysis.summary && (
+                              <div>
+                                <div className={sectionLabel}>Right now</div>
+                                <div>{analysis.summary}</div>
+                              </div>
+                            )}
+
+                            {waitFor.length > (nextStep ? 1 : 0) && (
+                              <div>
+                                <div className={sectionLabel}>{nextStep ? 'Also wait for' : 'Wait for'}</div>
+                                <ul className="space-y-1">
+                                  {waitFor.slice(nextStep ? 1 : 0).map((item: string, idx: number) => (
+                                    <li key={idx} className="flex gap-2"><span className={muted}>›</span><span>{item}</span></li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {analysis.levels_to_watch?.length > 0 && (
+                              <div>
+                                <div className={sectionLabel}>Levels</div>
+                                <div className="space-y-1">
+                                  {analysis.levels_to_watch.map((level: any, idx: number) => (
+                                    <div key={idx} className="flex items-baseline gap-2">
+                                      <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${levelDot(level.type)}`} />
+                                      <span className="font-medium">{level.label}</span>
+                                      {level.why_it_matters && <span className={`text-[12px] ${muted}`}>{level.why_it_matters}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {checks.length > 0 && (
                               <div>
-                                <div className={sectionLabel}>Chart rules</div>
+                                <div className={sectionLabel}>Your rules on this chart</div>
                                 <div className="space-y-1.5">
                                   {checks.map((check: any, idx: number) => (
                                     <div key={idx} className="flex items-start gap-2">
@@ -2684,13 +2710,10 @@ const TradingBuddyWidget = () => {
 
                             {selfChecks.length > 0 && (
                               <div>
-                                <div className={sectionLabel}>Confirm yourself</div>
+                                <div className={sectionLabel}>Check these yourself</div>
                                 <ul className="space-y-1">
                                   {selfChecks.map((rule: string, idx: number) => (
-                                    <li key={idx} className="flex gap-2">
-                                      <span className={muted}>☐</span>
-                                      <span>{rule}</span>
-                                    </li>
+                                    <li key={idx} className="flex gap-2"><span className={muted}>☐</span><span>{rule}</span></li>
                                   ))}
                                 </ul>
                               </div>
@@ -2701,44 +2724,19 @@ const TradingBuddyWidget = () => {
                                 <div className={sectionLabel}>What I see</div>
                                 <ul className="space-y-1">
                                   {analysis.bullets.map((bullet: string, idx: number) => (
-                                    <li key={idx} className="flex gap-2">
-                                      <span className={muted}>•</span>
-                                      <span>{bullet}</span>
-                                    </li>
+                                    <li key={idx} className="flex gap-2"><span className={muted}>•</span><span>{bullet}</span></li>
                                   ))}
                                 </ul>
                               </div>
                             )}
 
-                            {analysis.ruleset_name && (
-                              <div className={`text-[11px] ${muted}`}>Ruleset: {analysis.ruleset_name}</div>
+                            {analysis.behavioral_nudge && !nudgeUpFront && (
+                              <div className={`italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
                             )}
                           </div>
                         )}
 
-                        {analysis.behavioral_nudge && (
-                          <div className={`mt-3 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>
-                            {analysis.behavioral_nudge}
-                          </div>
-                        )}
-
-                        {msg.id && (
-                          <div className={`mt-3 flex items-center gap-1 text-[11px] ${muted}`}>
-                            {ratings[msg.id] ? (
-                              <span>Thanks for the feedback.</span>
-                            ) : (
-                              <>
-                                <span className="mr-1">Was this verdict right?</span>
-                                <button onClick={() => rateAnalysis(msg.id, 1)} title="Yes" className={`rounded px-1.5 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👍</button>
-                                <button onClick={() => rateAnalysis(msg.id, -1)} title="No" className={`rounded px-1.5 py-0.5 ${dark ? 'hover:bg-dark-elevated' : 'hover:bg-slate-100'}`}>👎</button>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        <div className={`text-[9px] mt-3 pt-2 border-t leading-tight ${dark ? 'text-dark-text border-dark-border' : 'text-slate-500 border-slate-200'}`}>
-                          AI can make mistakes. Not financial advice. This analysis is for educational purposes only. Trading involves substantial risk of loss.
-                        </div>
+                        <div className={`mt-2 text-[10px] ${muted}`}>Not financial advice. AI can be wrong.</div>
                       </>
                     )
                   })()}
@@ -2866,7 +2864,7 @@ const TradingBuddyWidget = () => {
                 className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
               >
                 <span className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Analyze this chart"}
+                {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Check this setup"}
               </button>
 
               {/* Message box */}
@@ -2897,7 +2895,7 @@ const TradingBuddyWidget = () => {
                   <button
                     onClick={() => setAttachChart(!attachChart)}
                     aria-pressed={attachChart}
-                    title="Include a screenshot of your chart with this message"
+                    title="Send a screenshot of your chart with this message, to ask about what's on screen"
                     className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       attachChart
                         ? 'border-blue-500 bg-blue-500/15 text-blue-400'
@@ -2909,7 +2907,7 @@ const TradingBuddyWidget = () => {
                       <circle cx="8.5" cy="8.5" r="1.5"></circle>
                       <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
-                    Chart{attachChart ? ' on' : ''}
+                    {attachChart ? 'Chart included' : 'Include my chart'}
                   </button>
                   <div className="flex items-center gap-2">
                     {inputText.length >= 400 && (
@@ -3030,7 +3028,7 @@ function GettingStarted(props: {
 
   const items = [
     !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds.', action: 'Sign in', onClick: props.onSignIn },
-    { done: props.analyzed, title: 'Check this chart against your rules', detail: 'A verdict in about 15 seconds. Free, doesn\'t count toward your daily limit.', action: props.signedIn ? 'Analyze this chart' : null, onClick: props.onAnalyze },
+    { done: props.analyzed, title: 'Check this chart against your rules', detail: 'A verdict in about 15 seconds. Free, doesn\'t count toward your daily limit.', action: props.signedIn ? 'Check this setup' : null, onClick: props.onAnalyze },
     { done: props.chartChatted, title: 'Ask about your chart', detail: 'Type a question, turn on Chart, and send. Your first one is free too.', action: props.signedIn ? 'Try a question' : null, onClick: props.onTryChartQuestion },
     props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking }
   ].filter(Boolean) as { done: boolean, title: string, detail: string, action: string | null, onClick: () => void }[]

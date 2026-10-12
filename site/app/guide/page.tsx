@@ -9,7 +9,7 @@ const STEPS = [
   { title: "Create your free account", text: <>A welcome page opens after you install. Sign up there, or any time at <a href={APP_URL}>your dashboard</a>.</> },
   { title: "Set your rules and limits", text: <>Pick a template or write the rules you trade by, plus your daily loss and trade limits. You can change them any time under Rules.</> },
   { title: "Open your chart", text: <>Open TradingView, Tradovate or Topstep in Chrome. The Pip button appears in the bottom right corner. Click it, or press Alt+Shift+S.</> },
-  { title: "Check a setup", text: <>Click <strong>Analyze chart</strong> before you enter. The coach checks your chart against your rules and tells you if the setup lines up. Use <strong>Send with chart</strong> to ask a question about what's on screen.</> },
+  { title: "Check a setup", text: <>Click <strong>Check this setup</strong> before you enter. The coach checks your chart against your rules and tells you if the setup lines up. Use <strong>Send with chart</strong> to ask a question about what's on screen.</> },
   { title: "Let it track your trades", text: <>On TradingView, keep the trading panel open (it can be small). Pip reads your Order history and logs each trade and result. Your day shows up on the Today page and in your Journal.</> },
   { title: "Listen when it checks in", text: <>After a losing streak, a quick re-entry after a loss or when you near your limits, the coach messages you first. You can switch it to warnings only, or off, under Coach check-ins in the widget menu.</> },
 ]

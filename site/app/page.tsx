@@ -68,7 +68,7 @@ const FEATURES = [
 const TRUST = [
   { title: "No broker login", text: "No passwords, no API keys, nothing to connect." },
   { title: "Can't touch your orders", text: "Pip reads your screen. He can't place, change or close a trade." },
-  { title: "Charts only when you ask", text: "A screenshot is taken only when you click Analyze or send a chart." },
+  { title: "Charts only when you ask", text: "A screenshot is taken only when you click Check this setup or include your chart." },
   { title: "Delete everything, anytime", text: "One button in your account removes your account and all your data." },
 ]
 
