@@ -555,7 +555,7 @@ Use for time-based coaching when they ask about the next candle or how long they
     // "I just made 200": offer to log it (the trader confirms in the widget; nothing is saved here)
     const { claim, tokens: claimTokens } = await claimCheck
     const tradeProposal = claim && !responseFailed && !(await alreadyLogged(supabase, user.id, claim.amount))
-      ? { id: crypto.randomUUID(), amount: claim.amount, symbol: claim.symbol }
+      ? { id: crypto.randomUUID(), amount: claim.amount, symbol: claim.symbol, strategies: strategies.map(st => ({ id: st.id, name: st.name })) }
       : null
 
     // Cost tracking, and the once-a-day notes update, after the reply is sent

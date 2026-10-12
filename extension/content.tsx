@@ -91,7 +91,7 @@ function tradeProposalFields(msg: any) {
   const p = msg.trade_proposal
   if (!p) return {}
   return {
-    tradeProposal: { id: p.id, amount: p.amount, symbol: p.symbol ?? null },
+    tradeProposal: { id: p.id, amount: p.amount, symbol: p.symbol ?? null, strategies: p.strategies ?? [] },
     tradeStatus: p.status === 'pending' ? undefined : p.status
   }
 }
@@ -168,6 +168,8 @@ const TradingBuddyWidget = () => {
   const [pipTyping, setPipTyping] = useState(false)
   // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
   const [resetOpen, setResetOpen] = useState(false)
+  // Which strategy each pending "log this result?" card has selected (empty: no strategy, or something else)
+  const [tradeStrategy, setTradeStrategy] = useState<Record<string, string>>({})
   const [streak, setStreak] = useState<{ days: number; brokenToday: boolean } | null>(null)
   const streakRef = useRef<number | null>(null)
   // "Save as my rules" under replies where Pip drafted a ruleset: per message index
@@ -665,7 +667,7 @@ const TradingBuddyWidget = () => {
       const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades/manual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session?.access_token}` },
-        body: JSON.stringify({ proposal_id: proposal.id, amount: proposal.amount, symbol: proposal.symbol })
+        body: JSON.stringify({ proposal_id: proposal.id, amount: proposal.amount, symbol: proposal.symbol, strategy_id: tradeStrategy[proposal.id] || null })
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -2651,6 +2653,18 @@ const TradingBuddyWidget = () => {
                         </span>
                       ) : (
                         <>
+                          {msg.tradeProposal.strategies?.length > 0 && (
+                            <select
+                              value={tradeStrategy[msg.tradeProposal.id] ?? ''}
+                              onChange={e => setTradeStrategy(prev => ({ ...prev, [msg.tradeProposal.id]: e.target.value }))}
+                              disabled={msg.tradeStatus === 'saving'}
+                              title="Which of your strategies this trade was"
+                              className={`max-w-[10rem] rounded-lg border px-2 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-body' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              <option value="">No strategy / other</option>
+                              {msg.tradeProposal.strategies.map((st: { id: string; name: string }) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                            </select>
+                          )}
                           <button
                             onClick={() => logReportedTrade(msg.tradeProposal)}
                             disabled={msg.tradeStatus === 'saving'}
