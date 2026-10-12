@@ -9,6 +9,9 @@ export type Trade = {
   symbol: string | null
   side: "long" | "short" | null
   qty: number | null
+  is_copy?: boolean // copied to several accounts: only the first of the group counts as a trade
+  copies?: number // how many accounts the same trade was copied to (1 when alone)
+  group_pnl?: number // profit and loss of the whole group, for win/loss decisions
   kind?: "trade" | "day_total" // "day_total": an adjustment so the day matches the total the trader reported; not a trade
   source?: "auto" | "manual" // "manual": the trader reported it in chat, so there is no entry or exit
   entry_price: number | null
@@ -107,20 +110,31 @@ export async function loadStrategyOptions(): Promise<StrategyOption[]> {
 
 export const pnlOf = (trade: Trade) => Number(trade.realized_pnl ?? 0)
 
-// Day-total entries count in P&L but are not trades
-export const realTrades = (trades: Trade[]) => trades.filter(t => t.kind !== "day_total")
+// Day-total entries count in P&L but are not trades, and a trade copied to several accounts counts once
+export const realTrades = (trades: Trade[]) => trades.filter(t => t.kind !== "day_total" && !t.is_copy)
+
+// A copied trade wins or loses as a group
+const decisionPnl = (t: Trade) => t.group_pnl ?? pnlOf(t)
+
+// The trades of one account (or all of them). Within one account nothing is a copy, so counts are plain.
+export function forAccount(trades: Trade[], account: string): Trade[] {
+  return account ? trades.filter(t => t.account === account).map(t => ({ ...t, is_copy: false, copies: 1, group_pnl: undefined })) : trades
+}
+export const accountsOf = (trades: Trade[]) => [...new Set(trades.map(t => t.account).filter((a): a is string => !!a))].sort()
+// "tradovate:LMX0505" -> "LMX0505"
+export const accountLabel = (account: string | null) => (account ? account.replace(/^[a-z]+:/i, "") : "—")
 
 export function summarize(all: Trade[]) {
   const trades = realTrades(all)
-  const wins = trades.filter(t => pnlOf(t) > 0)
-  const losses = trades.filter(t => pnlOf(t) < 0)
+  const wins = trades.filter(t => decisionPnl(t) > 0)
+  const losses = trades.filter(t => decisionPnl(t) < 0)
   const net = all.reduce((sum, t) => sum + pnlOf(t), 0)
-  const grossWin = wins.reduce((sum, t) => sum + pnlOf(t), 0)
-  const grossLoss = Math.abs(losses.reduce((sum, t) => sum + pnlOf(t), 0))
+  const grossWin = wins.reduce((sum, t) => sum + decisionPnl(t), 0)
+  const grossLoss = Math.abs(losses.reduce((sum, t) => sum + decisionPnl(t), 0))
   // trades come newest first
   let lossStreak = 0
   for (const t of trades) {
-    if (pnlOf(t) < 0) lossStreak++
+    if (decisionPnl(t) < 0) lossStreak++
     else break
   }
   return {

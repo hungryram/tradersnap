@@ -27,6 +27,9 @@ export type CoachTrade = {
   realized_pnl: number | null
   opened_at: string | null
   closed_at: string
+  is_copy?: boolean // copied to several accounts: only the first of the group counts as a trade
+  copies?: number
+  group_pnl?: number // profit and loss of the whole group
   kind?: string // "day_total": an adjustment so the day matches the total the trader reported; counts in P&L, not as a trade
 }
 
@@ -63,9 +66,13 @@ export function pick<T>(options: T[], seed: string): T {
   return options[(h >>> 0) % options.length]
 }
 
-// Trades only: day-total entries stay out of counts, streaks and the last-trade checks (net P&L uses ctx.trades)
+// Trades only: day-total entries and copies of the same trade on other accounts stay out of counts, streaks and
+// the last-trade checks. A copied trade wins or loses as a group. (Net P&L uses ctx.trades: every account counts.)
 function sorted(trades: CoachTrade[]) {
-  return trades.filter(t => t.kind !== "day_total").sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  return trades
+    .filter(t => t.kind !== "day_total" && !t.is_copy)
+    .map(t => (t.group_pnl !== undefined ? { ...t, realized_pnl: t.group_pnl } : t))
+    .sort((a, b) => a.closed_at.localeCompare(b.closed_at))
 }
 
 function lossStreak(trades: CoachTrade[]) {

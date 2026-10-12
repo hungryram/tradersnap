@@ -847,14 +847,16 @@ const TradingBuddyWidget = () => {
     const keyOf = (t: CoachTrade) => t.id ?? `${t.closed_at}|${t.symbol}`
     const seen = seenTradesRef.current
     const fresh = seen
-      ? tradesToday.filter(t => !seen.has(keyOf(t)) && t.source !== 'manual' && (t as any).kind !== 'day_total').sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+      ? tradesToday.filter(t => !seen.has(keyOf(t)) && t.source !== 'manual' && (t as any).kind !== 'day_total' && !t.is_copy).sort((a, b) => a.closed_at.localeCompare(b.closed_at))
       : []
     seenTradesRef.current = new Set([...(seen ?? []), ...tradesToday.map(keyOf)])
     if (fresh.length === 0) return
     setMessages(prev => [...prev, ...fresh.map(t => {
-      const pnl = Number(t.realized_pnl ?? 0)
+      // A trade copied to several accounts is one row, with the combined result
+      const pnl = Number(t.group_pnl ?? t.realized_pnl ?? 0)
       const money = `${pnl < 0 ? '-' : pnl > 0 ? '+' : ''}$${Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-      return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol)} trade closed · ${money}`, timestamp: new Date(t.closed_at) }
+      const accounts = (t.copies ?? 1) > 1 ? ` · ${t.copies} accounts` : ''
+      return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol)} trade closed · ${money}${accounts}`, timestamp: new Date(t.closed_at) }
     })])
   }, [tradesToday])
 

@@ -4,6 +4,8 @@ import type { Trade, TradingLimits } from "./dashboard-data"
 // end-of-session recap in the extension (lib/coach/checkins.ts).
 
 const pnl = (t: Trade) => Number(t.realized_pnl ?? 0)
+// A trade copied to several accounts wins or loses as a group
+const decision = (t: Trade) => t.group_pnl ?? pnl(t)
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
 
 export function dayKeyOf(iso: string) {
@@ -14,7 +16,7 @@ export function dayKeyOf(iso: string) {
 export function brokenRules(dayTrades: Trade[], limits: TradingLimits | null): string[] {
   if (!limits || dayTrades.length === 0) return []
   // Day-total entries count in the day's P&L but are not trades
-  const trades = dayTrades.filter(t => t.kind !== "day_total").sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  const trades = dayTrades.filter(t => t.kind !== "day_total" && !t.is_copy).sort((a, b) => a.closed_at.localeCompare(b.closed_at))
   const broken: string[] = []
 
   if (limits.max_trades_per_day && trades.length > limits.max_trades_per_day) {
@@ -22,7 +24,7 @@ export function brokenRules(dayTrades: Trade[], limits: TradingLimits | null): s
   }
   if (limits.stop_after_losses) {
     let streak = 0, worst = 0
-    for (const t of trades) { streak = pnl(t) < 0 ? streak + 1 : 0; worst = Math.max(worst, streak) }
+    for (const t of trades) { streak = decision(t) < 0 ? streak + 1 : 0; worst = Math.max(worst, streak) }
     if (worst > limits.stop_after_losses) broken.push(`Kept trading after ${limits.stop_after_losses} losses in a row`)
   }
   const net = dayTrades.reduce((sum, t) => sum + pnl(t), 0)

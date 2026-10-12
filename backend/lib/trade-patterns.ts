@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { markCopies } from "./copy-trades"
 
 // Habits computed from a trader's recent trades, with no AI involved. Pip gets
 // these as memory, and the dashboard's Memory page shows the same lines.
@@ -109,31 +110,33 @@ export async function loadTradePatterns(
     .lt("closed_at", todayStart.toISOString())
     .order("closed_at", { ascending: true })
     .limit(2000)
-  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind")
-  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl")) // before 20261024_day_totals.sql
+  let { data, error } = await load("opened_at, closed_at, realized_pnl, kind, account, symbol, side")
+  if (error) ({ data, error } = await load("opened_at, closed_at, realized_pnl, account, symbol, side")) // before 20261024_day_totals.sql
   if (error || !data) return []
-  // Day-total entries are not trades, so they say nothing about how the trader trades
-  return tradePatterns((data as unknown as (PatternTrade & { kind?: string })[]).filter(t => t.kind !== "day_total"), limits, timezone)
+  // Day-total entries are not trades, and a trade copied to several accounts is one decision (its result is the group's)
+  const marked = markCopies(data as unknown as (PatternTrade & { kind?: string; account: string | null; symbol: string | null; side: string | null })[])
+  return tradePatterns(marked.filter(t => t.kind !== "day_total" && !t.is_copy).map(t => ({ ...t, realized_pnl: t.group_pnl })), limits, timezone)
 }
 
 // One plain line per recent trading day (before today), so Pip can answer "what did I do yesterday?".
 // Day-total entries count toward the day's net but not its trade count.
 export function recentDayLines(
-  trades: { closed_at: string; realized_pnl: number | null; kind?: string }[],
+  trades: { closed_at: string; realized_pnl: number | null; kind?: string; account?: string | null; symbol?: string | null; side?: string | null; opened_at?: string | null }[],
   timezone = "America/New_York",
   days = 7
 ): string[] {
   const byDay = new Map<string, { count: number; wins: number; losses: number; net: number; adjustment: number }>()
-  for (const t of trades) {
+  const marked = markCopies(trades.map(t => ({ account: null, symbol: null, side: null, opened_at: null, ...t })))
+  for (const t of marked) {
     const day = localParts(t.closed_at, timezone).day
     const row = byDay.get(day) ?? { count: 0, wins: 0, losses: 0, net: 0, adjustment: 0 }
-    const value = Number(t.realized_pnl ?? 0)
-    row.net += value
-    if (t.kind === "day_total") row.adjustment += value
-    else {
+    row.net += Number(t.realized_pnl ?? 0)
+    if (t.kind === "day_total") row.adjustment += Number(t.realized_pnl ?? 0)
+    else if (!t.is_copy) {
+      // A trade copied to several accounts counts once; it wins or loses as a group
       row.count++
-      if (value > 0) row.wins++
-      else if (value < 0) row.losses++
+      if (t.group_pnl > 0) row.wins++
+      else if (t.group_pnl < 0) row.losses++
     }
     byDay.set(day, row)
   }
@@ -157,8 +160,8 @@ export async function loadRecentDays(supabase: SupabaseClient, userId: string, t
     .gte("closed_at", new Date(todayStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
     .lt("closed_at", todayStart.toISOString())
     .limit(1000)
-  let { data, error } = await load("closed_at, realized_pnl, kind")
-  if (error) ({ data, error } = await load("closed_at, realized_pnl")) // before 20261024_day_totals.sql
+  let { data, error } = await load("closed_at, opened_at, realized_pnl, kind, account, symbol, side")
+  if (error) ({ data, error } = await load("closed_at, opened_at, realized_pnl, account, symbol, side")) // before 20261024_day_totals.sql
   if (error || !data) return []
-  return recentDayLines(data as unknown as { closed_at: string; realized_pnl: number | null; kind?: string }[], timezone)
+  return recentDayLines(data as unknown as Parameters<typeof recentDayLines>[0], timezone)
 }

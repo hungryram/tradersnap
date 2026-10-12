@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { api, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { api, forAccount, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
 import { Card, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
@@ -19,8 +19,10 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Month calendar of trading days: trades and P&L per day, plus whether the day's
 // rules were kept. Colors by discipline by default; P&L is one click away.
-export default function JournalCalendar({ limits, strategies, onStrategyChange, load = loadTradeWindow, loadNotes = loadMonthNotes }: {
+export default function JournalCalendar({ limits, strategies, onStrategyChange, account = "", load = loadTradeWindow, loadNotes = loadMonthNotes }: {
   limits: TradingLimits | null
+  // Show one account's trades ("" = all of them)
+  account?: string
   strategies: StrategyOption[]
   onStrategyChange: (tradeId: string, strategyId: string | null) => void
   // Where a month's trades and notes come from (replaceable for previews)
@@ -73,7 +75,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
 
   const { weeks, totals } = useMemo(() => {
     const byDay = new Map<string, Trade[]>()
-    for (const t of data?.trades ?? []) {
+    for (const t of forAccount(data?.trades ?? [], account)) {
       const key = dayKeyOf(t.closed_at)
       byDay.set(key, [...(byDay.get(key) ?? []), t])
     }
@@ -111,7 +113,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
         keptDays: tradingDays.filter(d => d.broken.length === 0).length,
       }
     }
-  }, [data, month, limits])
+  }, [data, month, limits, account])
 
   const selectedDay = selected ? weeks.flat().find(d => d.key === selected) ?? null : null
   const today = dayKeyOf(new Date().toISOString())

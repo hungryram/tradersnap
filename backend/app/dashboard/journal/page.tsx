@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { api, formatDay, loadStrategyOptions, loadTradeWindow, pnlOf, startOfLocalDay, summarize, tickerOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { accountLabel, accountsOf, api, forAccount, formatDay, loadStrategyOptions, loadTradeWindow, pnlOf, startOfLocalDay, summarize, tickerOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { Card, Loading, Notice, PageHeader, Stat, money } from "../components/ui"
 import TradeTable from "../components/TradeTable"
 import JournalCalendar from "../components/JournalCalendar"
@@ -11,7 +11,9 @@ const REENTRY_MINUTES = 15
 
 export default function JournalPage() {
   const [days, setDays] = useState<(typeof RANGES)[number]>(30)
-  const [trades, setTrades] = useState<Trade[] | null>(null)
+  const [loaded, setLoaded] = useState<Trade[] | null>(null)
+  // "" = every account. Traders with several accounts can look at one at a time.
+  const [account, setAccount] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [historyFrom, setHistoryFrom] = useState<string | null>(null)
@@ -24,17 +26,19 @@ export default function JournalPage() {
   }, [])
 
   useEffect(() => {
-    setTrades(null)
+    setLoaded(null)
     loadTradeWindow(startOfLocalDay(days - 1), null)
-      .then(({ trades, historyFrom }) => { setTrades(trades); setHistoryFrom(historyFrom) })
+      .then(({ trades, historyFrom }) => { setLoaded(trades); setHistoryFrom(historyFrom) })
       .catch(err => setError(err.message))
   }, [days])
 
+  const accounts = useMemo(() => (loaded ? accountsOf(loaded) : []), [loaded])
+  const trades = useMemo(() => (loaded ? forAccount(loaded, account) : null), [loaded, account])
   const view = useMemo(() => (trades ? analyze(trades, strategies) : null), [trades, strategies])
 
   // Tag a trade with a strategy (or clear it); the table shows the choice right away
   const setStrategy = (tradeId: string, strategyId: string | null) => {
-    setTrades(list => list && list.map(t => t.id === tradeId ? { ...t, strategy_id: strategyId, strategy_source: strategyId ? "user" : null } : t))
+    setLoaded(list => list && list.map(t => t.id === tradeId ? { ...t, strategy_id: strategyId, strategy_source: strategyId ? "user" : null } : t))
     api("/api/trades", { method: "PATCH", body: JSON.stringify({ id: tradeId, strategy_id: strategyId }) }).catch(() => {})
   }
 
@@ -60,8 +64,24 @@ export default function JournalPage() {
 
       {error && <Notice tone="bad">Couldn't load trades: {error}</Notice>}
 
+      {accounts.length > 1 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <label htmlFor="account-filter" className="text-ink-muted">Account</label>
+          <select
+            id="account-filter"
+            value={account}
+            onChange={e => setAccount(e.target.value)}
+            className="rounded-md border border-ink-border bg-ink-bg px-2 py-1 text-ink-body"
+          >
+            <option value="">All accounts ({accounts.length})</option>
+            {accounts.map(a => <option key={a} value={a}>{accountLabel(a)}</option>)}
+          </select>
+          {!account && <span className="text-xs text-ink-muted">A trade copied to several accounts counts as one trade; profit and loss adds up every account.</span>}
+        </div>
+      )}
+
       <div className="mb-6">
-        <JournalCalendar limits={limits} strategies={strategies} onStrategyChange={setStrategy} />
+        <JournalCalendar limits={limits} strategies={strategies} onStrategyChange={setStrategy} account={account} />
       </div>
 
       {historyFrom && days > 7 && (
@@ -229,7 +249,7 @@ function analyze(allTrades: Trade[], strategies: StrategyOption[]) {
     .sort((a, b) => a.value - b.value)
 
   // Trades opened soon after a losing trade closed (oldest first to walk in order)
-  const chronological = [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+  const chronological = [...trades].filter(t => !t.is_copy).sort((a, b) => a.closed_at.localeCompare(b.closed_at))
   const reentries: Trade[] = []
   const rest: Trade[] = []
   chronological.forEach((t, i) => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { disciplineStreak, markChecked } from "@/lib/trade-insights"
+import { markCopies } from "@/lib/copy-trades"
 import { features, loadPlan } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -48,7 +49,11 @@ const tradeSchema = z.object({
   closed_at: z.string().datetime()
 })
 
-type TradeRow = { realized_pnl: number | null; closed_at: string; source?: string; kind?: string }
+type TradeRow = {
+  realized_pnl: number | null; closed_at: string; source?: string; kind?: string
+  account?: string | null; symbol?: string | null; side?: string | null; opened_at?: string | null
+  is_copy?: boolean; group_pnl?: number
+}
 
 // A chart check this long before a trade opened tags the trade with its strategy
 const TAG_WINDOW_MS = 20 * 60 * 1000
@@ -89,20 +94,22 @@ async function autoTagTrades(userId: string) {
 }
 
 // Counts, net PnL and the current losing streak (most recent trades first)
-// Day-total entries count in net P&L but are not trades
+// Day-total entries count in net P&L but are not trades, and a trade copied to several accounts counts once
+// (its win or loss is the whole group's), while net P&L adds up every account
 function summarize(all: TradeRow[]) {
-  const trades = all.filter(t => t.kind !== "day_total")
+  const trades = all.filter(t => t.kind !== "day_total" && !t.is_copy)
+  const decision = (t: TradeRow) => t.group_pnl ?? Number(t.realized_pnl ?? 0)
   let wins = 0
   let losses = 0
   let net = all.reduce((sum, t) => sum + Number(t.realized_pnl ?? 0), 0)
   for (const trade of trades) {
-    const pnl = Number(trade.realized_pnl ?? 0)
+    const pnl = decision(trade)
     if (pnl > 0) wins++
     else if (pnl < 0) losses++
   }
   let lossStreak = 0
   for (const trade of trades) {
-    if (Number(trade.realized_pnl ?? 0) < 0) lossStreak++
+    if (decision(trade) < 0) lossStreak++
     else break
   }
   return { count: trades.length, wins, losses, net: Math.round(net * 100) / 100, lossStreak }
@@ -185,11 +192,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Whether each trade had a chart check first, and (on request) the discipline streak
-    const trades = await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null })[])
+    const trades = markCopies(await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null; account: string | null; symbol: string | null; side: string | null })[]))
     const params = request.nextUrl.searchParams
     const streak = params.get("streak") ? await disciplineStreak(supabase, user.id, params.get("tz") || undefined) : undefined
     // Trades the trader typed in have no entry time, so they can't be "checked first" or not
-    const detected = trades.filter(t => t.source !== "manual")
+    const detected = trades.filter(t => t.source !== "manual" && !t.is_copy)
     const checked = detected.filter(t => t.checked).length
     return addCorsHeaders(NextResponse.json({
       trades,

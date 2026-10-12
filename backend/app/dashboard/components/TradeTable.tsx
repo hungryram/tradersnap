@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { api, formatTime, holdTime, pnlOf, tickerOf, type StrategyOption, type Trade } from "@/lib/dashboard-data"
+import { accountLabel, accountsOf, api, formatTime, holdTime, pnlOf, tickerOf, type StrategyOption, type Trade } from "@/lib/dashboard-data"
 import { money } from "./ui"
 
 export default function TradeTable({ trades, showDate = false, strategies, onStrategyChange }: {
@@ -14,6 +14,8 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
   // Shown immediately; the parent saves it
   const [picked, setPicked] = useState<Record<string, string | null>>({})
   const showStrategy = !!strategies && strategies.length > 0 && !!onStrategyChange
+  // Which account each trade is on, when there's more than one
+  const showAccount = accountsOf(trades).length > 1
 
   // Only results the trader logged by hand can be removed; the page reloads so every total matches
   const removeManual = async (id: string) => {
@@ -28,12 +30,13 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
 
   return (
     <div className="-mx-5 overflow-x-auto sm:-mx-6">
-      <table className={`w-full text-sm ${showStrategy ? "min-w-[720px]" : "min-w-[560px]"}`}>
+      <table className={`w-full text-sm ${showStrategy ? "min-w-[720px]" : "min-w-[560px]"}${showAccount ? " min-w-[800px]" : ""}`}>
         <thead>
           <tr className="text-left text-xs text-ink-muted">
             <th className="px-5 pb-2 font-normal sm:px-6">{showDate ? "Closed" : "Time"}</th>
             <th className="pb-2 font-normal">Symbol</th>
             <th className="pb-2 font-normal">Side</th>
+            {showAccount && <th className="pb-2 font-normal">Account</th>}
             {showStrategy && <th className="pb-2 font-normal" title="Tagged from the chart check right before the trade, or by you">Strategy</th>}
             <th className="pb-2 font-normal text-right">Size</th>
             <th className="pb-2 font-normal text-right">Entry → Exit</th>
@@ -58,6 +61,12 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
                   {trade.source === "manual" && <button onClick={() => removeManual(trade.id)} className="ml-1.5 text-xs text-ink-muted hover:text-red-400" title="Remove this logged result" aria-label="Remove this logged result">✕</button>}
                 </td>
                 <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-brand-300" : "text-red-400"}`}>{trade.side ?? "—"}</td>
+                {showAccount && (
+                  <td className="max-w-[9rem] truncate py-2.5 pr-3 text-ink-text" title={trade.account ?? undefined}>
+                    {accountLabel(trade.account ?? null)}
+                    {(trade.copies ?? 1) > 1 && !trade.is_copy && <span className="ml-1.5 rounded-full border border-ink-border px-1.5 py-0.5 text-[10px] text-ink-muted" title={`Copied to ${trade.copies} accounts: counts as one trade`}>×{trade.copies}</span>}
+                  </td>
+                )}
                 {showStrategy && (
                   <td className="py-1.5 pr-3">
                     <select
