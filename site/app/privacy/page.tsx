@@ -94,6 +94,7 @@ export default function Page() {
       <h2>6. How we use your information</h2>
       <ul>
         <li>To run the Service: answer your messages, check your charts against your rules, detect your trades, send check-ins and show your journal.</li>
+        <li>To email you about your account, for example once when your free Pro trial is about to end. We don&apos;t send marketing email.</li>
         <li>To manage your account, plan, daily allowance and payments.</li>
         <li>To give support and send service messages (such as sign-in links and billing receipts).</li>
         <li>To understand how Pip is used, mostly in aggregate, so we can improve it.</li>
@@ -116,7 +117,7 @@ export default function Page() {
         <li><strong>Vercel:</strong> website and server hosting</li>
         <li><strong>Anthropic and OpenAI:</strong> AI responses</li>
         <li><strong>Stripe:</strong> payments</li>
-        <li><strong>Postmark:</strong> email delivery of the messages you send through our feedback form</li>
+        <li><strong>Postmark:</strong> email delivery of the messages you send through our feedback form and the emails we send you about your account</li>
         <li><strong>Google:</strong> website analytics, and Google sign-in if you use it</li>
       </ul>
       <p>
