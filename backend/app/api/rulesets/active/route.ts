@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { features, loadPlan } from "@/lib/plans"
 import { createClient } from "@supabase/supabase-js"
-import { activeStrategyLimit } from "@/lib/strategies"
+import { activeStrategyLimit, loadActiveStrategies } from "@/lib/strategies"
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -58,7 +58,9 @@ export async function GET(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    const response = NextResponse.json({ ruleset })
+    // The strategies the trader has switched on, for the picker in the chat box
+    const active = await loadActiveStrategies(supabase, user.id, ruleset.id)
+    const response = NextResponse.json({ ruleset, strategies: active.map(s => ({ id: s.id, name: s.name })) })
     return addCorsHeaders(response, origin)
 
   } catch (error) {

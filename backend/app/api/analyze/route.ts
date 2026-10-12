@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js"
 import { analyzeChart } from "@/lib/llm"
 import { analysisOutputSchema, analysisResponseSchema, trimAnalysis } from "@/lib/analysis-schema"
 import { buildAnalysisPrompt } from "@/lib/analysis-prompt"
-import { loadActiveStrategies, loadAlwaysRules, matchStrategy, strategiesBlock } from "@/lib/strategies"
+import { loadActiveStrategies, loadAlwaysRules, matchStrategy, strategiesBlock, strategiesFor } from "@/lib/strategies"
 import { CREDIT_COSTS, claimWelcomeCredit, consumeUsage, getLimits, refundUsage, type Reservation, type UsageCost, allowanceUsedMessage } from "@/lib/usage"
 import { signChartToken } from "@/lib/chart-token"
 
@@ -18,6 +18,8 @@ const supabase = createClient(
 // Request validation schema
 const analyzeRequestSchema = z.object({
   rulesetId: z.string().uuid(),
+  // The strategy picked in the chat box; without it the chart is checked against all the active ones
+  strategyId: z.string().uuid().optional(),
   sessionId: z.string().uuid().optional(),
   context: z.object({
     symbol: z.string().max(50).optional(),
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
     const validatedRequest = analyzeRequestSchema.parse(body)
 
     // 4. The trader's active strategies (the chart is checked against whichever fits)
-    const strategies = await loadActiveStrategies(supabase, user.id, validatedRequest.rulesetId)
+    const strategies = await strategiesFor(supabase, user.id, await loadActiveStrategies(supabase, user.id, validatedRequest.rulesetId), validatedRequest.strategyId)
     if (strategies.length === 0) {
       const response = NextResponse.json({ error: "Ruleset not found" }, { status: 404 })
       return addCorsHeaders(response, origin)

@@ -177,6 +177,11 @@ const TradingBuddyWidget = () => {
   const [pipTyping, setPipTyping] = useState(false)
   // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
   const [resetOpen, setResetOpen] = useState(false)
+  // Which strategy chart checks and answers use ('' = all of the trader's active strategies)
+  const [strategyOptions, setStrategyOptions] = useState<{ id: string; name: string }[]>([])
+  const [selectedStrategy, setSelectedStrategy] = useState('')
+  const selectedStrategyRef = useRef('')
+  selectedStrategyRef.current = selectedStrategy
   // Closed trades already seen this page load, so a "trade closed" row appears once per new trade
   const seenTradesRef = useRef<Set<string> | null>(null)
   // Which strategy each pending "log this result?" card has selected (empty: no strategy, or something else)
@@ -561,6 +566,25 @@ const TradingBuddyWidget = () => {
     }
   }, [autoDetectTrades, isSignedIn, fetchTradeStats])
 
+  // The trader's active strategies for the picker in the chat box (refreshed whenever the widget opens)
+  useEffect(() => {
+    if (!isSignedIn) return
+    let cancelled = false
+    ;(async () => {
+      const { supabase_session, selected_strategy } = await chrome.storage.local.get(['supabase_session', 'selected_strategy'])
+      if (!supabase_session?.access_token) return
+      try {
+        const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/rulesets/active`, { headers: { Authorization: `Bearer ${supabase_session.access_token}` } })
+        if (!response.ok || cancelled) return
+        const { strategies } = await response.json()
+        const options: { id: string; name: string }[] = Array.isArray(strategies) ? strategies : []
+        setStrategyOptions(options)
+        setSelectedStrategy(options.some(o => o.id === selected_strategy) ? selected_strategy : '')
+      } catch { /* the picker just stays hidden */ }
+    })()
+    return () => { cancelled = true }
+  }, [isSignedIn, isOpen])
+
   // First run: open the chat with the getting-started checklist. Onboarding links
   // to the trading platform with ?snapchart=start; otherwise it opens once on the
   // first visit to a trading site.
@@ -709,6 +733,11 @@ const TradingBuddyWidget = () => {
     } catch {
       setTradeStatus(proposal.id, 'error', "Couldn't log that one. Check your connection and try again.")
     }
+  }
+
+  const chooseStrategy = (id: string) => {
+    setSelectedStrategy(id)
+    chrome.storage.local.set({ selected_strategy: id }).catch(() => {})
   }
 
   const dismissReportedTrade = async (proposalId: string) => {
@@ -1271,6 +1300,7 @@ const TradingBuddyWidget = () => {
           },
           body: JSON.stringify({
             rulesetId: ruleset.id,
+            ...(selectedStrategyRef.current ? { strategyId: selectedStrategyRef.current } : {}),
             image: chartImage,
             timestamp: new Date().toISOString(),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -1695,7 +1725,8 @@ const TradingBuddyWidget = () => {
         historyStart,
         timestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+        dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+        ...(selectedStrategyRef.current ? { strategyId: selectedStrategyRef.current } : {})
       }
       
       // Include chart image if captured or use last analyzed chart
@@ -3091,6 +3122,7 @@ const TradingBuddyWidget = () => {
                   className={`block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 leading-relaxed ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
                 />
                 <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                  <div className="flex min-w-0 items-center gap-2">
                   <button
                     onClick={() => setAttachChart(!attachChart)}
                     aria-pressed={attachChart}
@@ -3108,6 +3140,23 @@ const TradingBuddyWidget = () => {
                     </svg>
                     {attachChart ? 'Chart included' : 'Include my chart'}
                   </button>
+                  {strategyOptions.length > 1 && (
+                    <select
+                      value={selectedStrategy}
+                      onChange={e => chooseStrategy(e.target.value)}
+                      title="Which of your strategies Pip uses for chart checks and answers"
+                      aria-label="Strategy"
+                      className={`min-w-0 max-w-[9rem] truncate rounded-full border px-2 py-1 text-xs ${
+                        selectedStrategy
+                          ? 'border-blue-500 bg-blue-500/15 text-blue-400'
+                          : theme === 'dark' ? 'border-dark-border bg-dark-elevated text-dark-text' : 'border-slate-300 bg-white text-slate-500'
+                      }`}
+                    >
+                      <option value="">All my strategies</option>
+                      {strategyOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {inputText.length >= 400 && (
                       <span className={`text-[11px] tabular-nums ${inputText.length >= 500 ? 'text-red-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>{inputText.length}/500</span>

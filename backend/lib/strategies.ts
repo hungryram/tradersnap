@@ -77,3 +77,12 @@ export function matchStrategy(strategies: Strategy[], name: string | null | unde
     ?? strategies.find(s => wanted.includes(s.name.trim().toLowerCase()) || s.name.trim().toLowerCase().includes(wanted))
     ?? null
 }
+
+// The trader picked one strategy in the chat box: use just that one (if it's theirs), otherwise all the active ones
+export async function strategiesFor(supabase: SupabaseClient, userId: string, active: Strategy[], strategyId?: string | null): Promise<Strategy[]> {
+  if (!strategyId) return active
+  const found = active.find(s => s.id === strategyId)
+  if (found) return [found]
+  const { data } = await supabase.from("rulesets").select("id, name, rules_text, is_primary").eq("id", strategyId).eq("user_id", userId).maybeSingle()
+  return data ? [{ ...data, is_active: true } as Strategy] : active
+}

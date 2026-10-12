@@ -9,7 +9,7 @@ import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
 import { loadTradePatterns } from "@/lib/trade-patterns"
-import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
+import { loadActiveStrategies, loadAlwaysRules, strategiesBlock, strategiesFor } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims"
 
@@ -289,7 +289,8 @@ const chatRequestSchema = z.object({
   historyStart: z.number().int().min(0).optional(), // position of conversationHistory[0] in the whole chat
   timestamp: z.string().optional(), // ISO timestamp from client
   timezone: z.string().optional(), // IANA timezone (e.g., "America/New_York")
-  dayStart: z.string().optional() // ISO time of the trader's local midnight
+  dayStart: z.string().optional(), // ISO time of the trader's local midnight
+  strategyId: z.string().uuid().optional() // the strategy picked in the chat box
 })
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
@@ -431,7 +432,7 @@ export async function POST(request: NextRequest) {
     reserved = { userId: user.id, reservation: quota.reservation }
 
     // 6. The trader's active strategies, rules for every trade and daily limits
-    const strategies = await loadActiveStrategies(supabase, user.id)
+    const strategies = await strategiesFor(supabase, user.id, await loadActiveStrategies(supabase, user.id), validatedRequest.strategyId)
     const ruleset = strategies[0] ?? null
     const [alwaysRules, { data: limitsRow }] = await Promise.all([
       loadAlwaysRules(supabase, user.id),
