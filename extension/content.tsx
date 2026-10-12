@@ -87,6 +87,14 @@ function rulesFromReply(content: unknown): { rules: string; name: string | null 
 }
 
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
+// "CME_MINI:MNQZ2026" or "MNQZ26" -> "MNQ"
+function shortSymbol(symbol: string) {
+  const ticker = symbol.split(':').pop() ?? symbol
+  return ticker.replace(/[FGHJKMNQUVXZ]\d{2,4}$/, '').replace(/\d+!$/, '') || ticker
+}
+
+const eventTime = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
 // The "log this result?" offer saved with a chat message, in the shape the widget uses
 function tradeProposalFields(msg: any) {
   const p = msg.trade_proposal
@@ -169,6 +177,8 @@ const TradingBuddyWidget = () => {
   const [pipTyping, setPipTyping] = useState(false)
   // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
   const [resetOpen, setResetOpen] = useState(false)
+  // Closed trades already seen this page load, so a "trade closed" row appears once per new trade
+  const seenTradesRef = useRef<Set<string> | null>(null)
   // Which strategy each pending "log this result?" card has selected (empty: no strategy, or something else)
   const [tradeStrategy, setTradeStrategy] = useState<Record<string, string>>({})
   const [streak, setStreak] = useState<{ days: number; brokenToday: boolean } | null>(null)
@@ -282,7 +292,7 @@ const TradingBuddyWidget = () => {
         setMessages(prev => {
           if (!keepLocal) return formattedMessages
           const oldest = formattedMessages[0]?.timestamp.getTime() ?? 0
-          const local = prev.filter(m => (m.type === 'checkin' || m.type === 'info') && !m.id && new Date(m.timestamp).getTime() >= oldest)
+          const local = prev.filter(m => (m.type === 'checkin' || m.type === 'info' || m.type === 'event') && !m.id && new Date(m.timestamp).getTime() >= oldest)
           return [...formattedMessages, ...local].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         })
         
@@ -797,6 +807,23 @@ const TradingBuddyWidget = () => {
     deliverCheckIns([morningPlan(ctx)])
   }, [isSignedIn, limitsLoaded])
 
+  // A trade closed: one row in the chat per new trade (the first load after a page load only records what is already there)
+  useEffect(() => {
+    if (!tradeStats) return
+    const keyOf = (t: CoachTrade) => t.id ?? `${t.closed_at}|${t.symbol}`
+    const seen = seenTradesRef.current
+    const fresh = seen
+      ? tradesToday.filter(t => !seen.has(keyOf(t)) && t.source !== 'manual' && (t as any).kind !== 'day_total').sort((a, b) => a.closed_at.localeCompare(b.closed_at))
+      : []
+    seenTradesRef.current = new Set([...(seen ?? []), ...tradesToday.map(keyOf)])
+    if (fresh.length === 0) return
+    setMessages(prev => [...prev, ...fresh.map(t => {
+      const pnl = Number(t.realized_pnl ?? 0)
+      const money = `${pnl < 0 ? '-' : pnl > 0 ? '+' : ''}$${Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+      return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol)} trade closed · ${money}`, timestamp: new Date(t.closed_at) }
+    })])
+  }, [tradesToday])
+
   // A trade closed (today's trades reloaded)
   useEffect(() => {
     if (!isSignedIn || tradesToday.length === 0) return
@@ -810,7 +837,14 @@ const TradingBuddyWidget = () => {
     openPositionsRef.current = open
     if (!previous) return // first look after page load: these were already open
     const opened = [...open].filter(symbol => !previous.has(symbol))
-    if (opened.length > 0) deliverCheckIns(onPositionOpened(coachContext(), new Date()))
+    if (opened.length > 0) {
+      const now = new Date()
+      setMessages(prev => [...prev, ...opened.map(symbol => {
+        const qty = positions.get(symbol) ?? 0
+        return { type: 'event', tone: 'opened', content: `${eventTime(now)} · New ${shortSymbol(symbol)} position opened${qty ? ` · ${qty > 0 ? 'long' : 'short'} ${Math.abs(qty)}` : ''}`, timestamp: now }
+      })])
+      deliverCheckIns(onPositionOpened(coachContext(), now))
+    }
   }
 
   // End-of-session recap, checked every minute
@@ -920,7 +954,7 @@ const TradingBuddyWidget = () => {
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {
     // Errors are transient; don't restore them on the next page load
-    const savable = messages.filter(msg => msg.type !== 'error')
+    const savable = messages.filter(msg => msg.type !== 'error' && msg.type !== 'event')
     if (savable.length > 0) {
       // Keep only last 20 messages to avoid storage quota exceeded errors
       const recentMessages = savable.slice(-20)
@@ -2538,8 +2572,8 @@ const TradingBuddyWidget = () => {
 
           {messages.map((msg, i) => (
             <div key={i} className="relative group">
-              <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.type !== 'user' && (
+              <div className={`flex ${msg.type === 'user' ? 'justify-end' : msg.type === 'event' ? 'justify-center' : 'justify-start'}`}>
+                {msg.type !== 'user' && msg.type !== 'event' && (
                   <div className="mr-2 mt-0.5 shrink-0">
                     <Pip mood={messageMood(msg)} size={26} animated={i === messages.length - 1} />
                   </div>
@@ -2622,6 +2656,22 @@ const TradingBuddyWidget = () => {
                         Take a 60-second reset
                       </button>
                     )}
+                  </div>
+                )}
+
+                {msg.type === 'event' && (
+                  <div className={`rounded-full border px-3 py-1 text-xs ${
+                    theme === 'dark'
+                      ? msg.tone === 'win' ? 'border-green-800/60 bg-green-950/40 text-green-300'
+                        : msg.tone === 'loss' ? 'border-red-800/60 bg-red-950/40 text-red-300'
+                        : msg.tone === 'opened' ? 'border-blue-800/60 bg-blue-950/50 text-blue-200'
+                        : 'border-dark-border bg-dark-elevated text-dark-text'
+                      : msg.tone === 'win' ? 'border-green-200 bg-green-50 text-green-700'
+                        : msg.tone === 'loss' ? 'border-red-200 bg-red-50 text-red-700'
+                        : msg.tone === 'opened' ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-slate-100 text-slate-600'
+                  }`}>
+                    {msg.content}
                   </div>
                 )}
 

@@ -21,6 +21,8 @@ export type CheckIn = {
 }
 
 export type CoachTrade = {
+  id?: string
+  source?: string // "manual": reported by the trader in chat
   symbol: string
   realized_pnl: number | null
   opened_at: string | null
