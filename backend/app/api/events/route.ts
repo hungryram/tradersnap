@@ -45,7 +45,10 @@ const eventSchema = z.object({
     'checkin_dismissed',
     'checkins_mode',
     // Rules
-    'rules_saved_from_chat'
+    'rules_saved_from_chat',
+    // Post-loss reset
+    'reset_started',
+    'reset_finished'
   ]),
   session_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.any()).optional()

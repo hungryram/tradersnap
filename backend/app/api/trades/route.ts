@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { disciplineStreak, markChecked } from "@/lib/trade-insights"
 import { features, loadPlan } from "@/lib/plans"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
@@ -180,10 +181,15 @@ export async function GET(request: NextRequest) {
       return addCorsHeaders(NextResponse.json({ error: "Failed to load trades" }, { status: 500 }), origin)
     }
 
-    const trades = data as unknown as TradeRow[]
+    // Whether each trade had a chart check first, and (on request) the discipline streak
+    const trades = await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null })[])
+    const params = request.nextUrl.searchParams
+    const streak = params.get("streak") ? await disciplineStreak(supabase, user.id, params.get("tz") || undefined) : undefined
+    const checked = trades.filter(t => t.checked).length
     return addCorsHeaders(NextResponse.json({
       trades,
-      stats: summarize(trades),
+      stats: { ...summarize(trades), checked, unchecked: trades.length - checked },
+      ...(streak !== undefined ? { streak } : {}),
       // Set when older trades were left out because of the Free plan's history
       historyFrom: historyFrom && historyFrom > since ? historyFrom.toISOString() : null
     }), origin)

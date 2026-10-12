@@ -5,6 +5,7 @@ import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import Pip, { type PipMood } from "./components/Pip"
 import CheckDetails, { ChecklistMeter, checklistProgress } from "./components/CheckDetails"
+import ResetBreak from "./components/ResetBreak"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
@@ -145,7 +146,7 @@ const TradingBuddyWidget = () => {
   // 👍/👎 per analysis message id (kept for this page load)
   const [ratings, setRatings] = useState<{[messageId: string]: 1 | -1}>({})
   const [autoDetectTrades, setAutoDetectTrades] = useState(false)
-  const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number } | null>(null)
+  const [tradeStats, setTradeStats] = useState<{ count: number, wins: number, losses: number, net: number, lossStreak: number, checked?: number, unchecked?: number } | null>(null)
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | null>(null)
   // Coach check-ins: messages the coach starts when something happens in the trader's day
   const [tradingLimits, setTradingLimits] = useState<CoachLimits | null>(null)
@@ -155,6 +156,10 @@ const TradingBuddyWidget = () => {
   const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
   const [bubble, setBubble] = useState<CheckIn | null>(null)
   const [pipTyping, setPipTyping] = useState(false)
+  // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [streak, setStreak] = useState<{ days: number; brokenToday: boolean } | null>(null)
+  const streakRef = useRef<number | null>(null)
   // "Save as my rules" under replies where Pip drafted a ruleset: per message index
   const [rulesSave, setRulesSave] = useState<Record<number, { state: 'saving' | 'saved' | 'error'; error?: string; name?: string; id?: string; created?: boolean }>>({})
   // Re-render now and then so time-based moods (a fresh win) wear off
@@ -443,13 +448,14 @@ const TradingBuddyWidget = () => {
     midnight.setHours(0, 0, 0, 0)
     try {
       const response = await fetch(
-        `${process.env.PLASMO_PUBLIC_API_URL}/api/trades?since=${encodeURIComponent(midnight.toISOString())}`,
+        `${process.env.PLASMO_PUBLIC_API_URL}/api/trades?since=${encodeURIComponent(midnight.toISOString())}&streak=1&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`,
         { headers: { Authorization: `Bearer ${supabase_session.access_token}` } }
       )
       if (response.ok) {
         const data = await response.json()
         setTradeStats(data.stats)
         setTradesToday(data.trades ?? [])
+        if ('streak' in data) { setStreak(data.streak ?? null); streakRef.current = data.streak?.days ?? null }
       }
     } catch (error) {
       console.error('[Content] Failed to load trades:', error)
@@ -585,7 +591,7 @@ const TradingBuddyWidget = () => {
     }).catch(() => {})
   }, [])
 
-  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current, name: firstNameRef.current })
+  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current, name: firstNameRef.current, streak: streakRef.current })
 
   // One list of shown check-ins per day in storage, so another tab never repeats one
   const claimCheckIn = async (id: string) => {
@@ -625,6 +631,25 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  const finishReset = (lockMinutes: number | null) => {
+    setResetOpen(false)
+    analytics.track('reset_finished', { locked: !!lockMinutes })
+    if (!lockMinutes) return
+    const endTime = Date.now() + lockMinutes * 60_000
+    const reason = `You chose a ${lockMinutes}-minute break after a loss. Pip unlocks when it's done.`
+    chrome.storage.local.set({ timeout_end: { endTime, reason } })
+    setIsTimedOut(true)
+    setTimeoutEndTime(endTime)
+    setTimeoutReason(reason)
+  }
+
+  const openReset = () => {
+    setIsOpen(true)
+    setBubble(null)
+    setResetOpen(true)
+    analytics.track('reset_started', {})
+  }
+
   const deliverCheckIns = async (candidates: (CheckIn | null)[]) => {
     for (let checkIn of candidates) {
       if (!checkIn) continue
@@ -645,7 +670,7 @@ const TradingBuddyWidget = () => {
       setPipTyping(false)
       if (composed) checkIn = { ...checkIn, text: composed }
 
-      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, timestamp: new Date() }])
+      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset, timestamp: new Date() }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
       if (!isOpenRef.current) {
         setUnreadCheckins(prev => [...prev, checkIn])
@@ -1932,7 +1957,8 @@ const TradingBuddyWidget = () => {
     const tip = [
       'Open Pip (Alt+Shift+S). Drag to move.',
       trackingStatus === 'no-panel' ? "Not tracking trades: open TradingView's trading panel." : null,
-      losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null
+      losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null,
+      streak && streak.days > 0 && !streak.brokenToday ? `🔥 ${streak.days} ${streak.days === 1 ? 'day' : 'days'} in a row with no rules broken` : null
     ].filter(Boolean).join('\n')
     const warned = unreadCheckins.some(c => c.level === 'warning')
     const launcherMood: PipMood = busy || pipTyping ? 'thinking' : warned || losingStreak ? 'caution' : freshWin ? 'happy' : 'idle'
@@ -2004,8 +2030,13 @@ const TradingBuddyWidget = () => {
                 &times;
               </button>
             </div>
-            <div className="mt-2.5 flex justify-end">
-              <button onClick={() => replyToCheckIn(bubble)} className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
+            <div className="mt-2.5 flex justify-end gap-2">
+              {bubble.offerReset && (
+                <button onClick={openReset} className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                  60-second reset
+                </button>
+              )}
+              <button onClick={() => replyToCheckIn(bubble)} className={`rounded-md px-3 py-1 text-xs font-medium ${bubble.offerReset ? (theme === 'dark' ? 'border border-dark-border text-dark-body hover:bg-dark-elevated' : 'border border-slate-300 text-slate-700 hover:bg-slate-100') : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                 Reply
               </button>
             </div>
@@ -2086,7 +2117,8 @@ const TradingBuddyWidget = () => {
       onKeyPress={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
     >
-      <div className={`${theme === 'dark' ? 'bg-dark-bg text-white border-dark-border' : 'bg-white text-slate-900 border-slate-200'} rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: '100%', height: '100%' }}>
+      <div className={`${theme === 'dark' ? 'bg-dark-bg text-white border-dark-border' : 'bg-white text-slate-900 border-slate-200'} relative rounded-lg shadow-2xl flex flex-col border overflow-hidden`} style={{ width: '100%', height: '100%' }}>
+        {resetOpen && <ResetBreak dark={theme === 'dark'} onDone={finishReset} />}
         {/* Header - Draggable */}
         <div
           className={`select-none flex items-center justify-between p-2 cursor-move ${theme === 'dark' ? 'border-b border-dark-border bg-gradient-to-r from-dark-surface to-dark-elevated' : 'border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700'}`}
@@ -2305,9 +2337,14 @@ const TradingBuddyWidget = () => {
                 <span className={tradeStats.net >= 0 ? 'text-green-500' : 'text-red-500'}>
                   {tradeStats.net < 0 ? '\u2212' : '+'}${Math.abs(tradeStats.net).toFixed(2)}
                 </span>
-                {tradeStats.lossStreak >= 2 && (
-                  <span className="ml-auto font-medium text-amber-500">{tradeStats.lossStreak} losses in a row</span>
+                {(tradeStats.unchecked ?? 0) > 0 && (
+                  <span className="text-amber-500" title="Trades without a chart check in the 20 minutes before entry">{tradeStats.unchecked} unchecked</span>
                 )}
+                {tradeStats.lossStreak >= 2 ? (
+                  <span className="ml-auto font-medium text-amber-500">{tradeStats.lossStreak} losses in a row</span>
+                ) : streak && streak.days > 0 && !streak.brokenToday ? (
+                  <span className="ml-auto" title={`${streak.days} trading ${streak.days === 1 ? 'day' : 'days'} in a row with no rules broken`}>🔥 {streak.days}</span>
+                ) : null}
               </>
             ) : (
               <span>{trackingStatus === 'loading' ? 'Loading your order history\u2026' : 'No trades yet'}</span>
@@ -2463,6 +2500,11 @@ const TradingBuddyWidget = () => {
                   }`}>
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-70">Pip checked in</div>
                     {msg.content}
+                    {msg.offerReset && (
+                      <button onClick={openReset} className="mt-2.5 block rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+                        Take a 60-second reset
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -2765,7 +2807,7 @@ const TradingBuddyWidget = () => {
                   <div className="text-2xl">⏸️</div>
                   <div>
                     <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                      Mandatory Break
+                      Taking a break
                     </div>
                     <div className={`text-xs ${theme === 'dark' ? 'text-dark-text' : 'text-slate-600'}`}>
                       {timeoutReason}

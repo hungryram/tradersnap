@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api, loadTrades, startOfLocalDay, summarize, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { api, startOfLocalDay, summarize, type Trade, type TradingLimits, loadTodayWithStreak, type Streak } from "@/lib/dashboard-data"
 import Pip, { type PipMood } from "../components/Pip"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"
@@ -16,11 +16,12 @@ type Me = {
 export default function TodayPage() {
   const [me, setMe] = useState<Me | null>(null)
   const [trades, setTrades] = useState<Trade[] | null>(null)
+  const [streak, setStreak] = useState<Streak>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([api<Me>("/api/me"), loadTrades(startOfLocalDay())])
-      .then(([meData, tradeData]) => { setMe(meData); setTrades(tradeData) })
+    Promise.all([api<Me>("/api/me"), loadTodayWithStreak()])
+      .then(([meData, today]) => { setMe(meData); setTrades(today.trades); setStreak(today.streak) })
       .catch(err => setError(err.message))
   }, [])
 
@@ -51,7 +52,19 @@ export default function TodayPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <Stat
+          label="Rules streak"
+          value={streak ? <>{streak.days > 0 ? "🔥 " : ""}{streak.days} {streak.days === 1 ? "day" : "days"}</> : "—"}
+          tone={streak?.brokenToday ? "bad" : streak && streak.days >= 3 ? "good" : "default"}
+          hint={!streak ? "Set daily limits to start one" : streak.brokenToday ? "Broken today. Tomorrow's a new one." : "Trading days with no rules broken"}
+        />
+        <Stat
+          label="Checked first"
+          value={trades.length ? `${trades.filter(t => t.checked).length} / ${trades.length}` : "—"}
+          tone={trades.length && trades.some(t => !t.checked) ? "warn" : "default"}
+          hint="Trades with a chart check before entry"
+        />
         <Stat
           label="Trades today"
           value={limits?.max_trades_per_day ? `${stats.count} / ${limits.max_trades_per_day}` : stats.count}

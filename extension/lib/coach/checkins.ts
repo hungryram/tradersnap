@@ -7,7 +7,7 @@
 
 export type CheckInKind =
   | "morning_plan" | "loss_streak" | "daily_loss" | "revenge"
-  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap" | "announcement"
+  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap" | "announcement" | "loss_reset"
 
 export type CheckIn = {
   id: string // unique per day and event, so the same check-in never repeats
@@ -16,6 +16,8 @@ export type CheckIn = {
   text: string
   // Facts for an AI-written version (morning plan and recap); `text` is the fallback
   compose?: Record<string, unknown>
+  // Offer the 60-second reset with this check-in (after losses)
+  offerReset?: boolean
 }
 
 export type CoachTrade = {
@@ -38,6 +40,7 @@ export type CoachContext = {
   trades: CoachTrade[] // closed today, any order
   limits: CoachLimits | null
   name?: string | null // first name, when the trader gave one
+  streak?: number | null // trading days in a row with no rule broken
 }
 
 export const REVENGE_MINUTES = 5
@@ -92,7 +95,8 @@ export function morningPlan(ctx: CoachContext): CheckIn {
   const greeting = `${hi}${name ? `, ${name}` : ""}.`
   const plan = parts.join(", ")
 
-  const text = parts.length
+  const streakLine = ctx.streak && ctx.streak >= 2 ? ` That's ${ctx.streak} days in a row with no rules broken. Let's make it ${ctx.streak + 1}.` : ""
+  const text = (parts.length
     ? pick([
         `${greeting} Today's plan: ${plan}. One good setup beats five forced ones.`,
         `${greeting} Same rules as always: ${plan}. Let the setups come to you.`,
@@ -105,7 +109,7 @@ export function morningPlan(ctx: CoachContext): CheckIn {
         `${greeting} You haven't set daily limits yet. A max-trades rule is the fastest way to stop overtrading. You can add one under Rules in your dashboard.`,
         `${greeting} No daily limits set yet. Even a simple "max 3 trades" makes a big difference. Add one under Rules in your dashboard.`,
         `${greeting} Want me to keep you honest today? Set a max-trades or daily loss limit under Rules in your dashboard and I'll hold you to it.`,
-      ], id)
+      ], id)) + streakLine
 
   return {
     id,
@@ -116,6 +120,7 @@ export function morningPlan(ctx: CoachContext): CheckIn {
       name: name || null,
       local_time: ctx.now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       plan: parts,
+      streak_days: ctx.streak ?? null,
     }
   }
 }
@@ -164,6 +169,24 @@ export function afterTrades(ctx: CoachContext): CheckIn[] {
     })
   }
 
+  for (const c of out) if (c.kind === "loss_streak") c.offerReset = true
+
+  // A single loss (no streak warning above): a gentle offer to reset before the next trade
+  if (pnlOf(last) < 0 && !out.some(c => c.kind === "loss_streak")) {
+    const id = `${day}:loss_reset:${last.closed_at}`
+    out.push({
+      id,
+      kind: "loss_reset",
+      level: "info",
+      offerReset: true,
+      text: pick([
+        `That one was a loss, ${money(pnlOf(last))}. Before the next trade, take 60 seconds to reset.`,
+        `Loss on that one (${money(pnlOf(last))}). It happens. A quick reset now keeps it from turning into two.`,
+        `${money(pnlOf(last))} on that trade. Shake it off with a 60-second reset before you look for the next one.`,
+      ], id)
+    })
+  }
+
   // Daily loss limit
   const net = trades.reduce((sum, t) => sum + pnlOf(t), 0)
   if (l?.max_daily_loss && net <= -l.max_daily_loss) {
@@ -172,6 +195,7 @@ export function afterTrades(ctx: CoachContext): CheckIn[] {
       id,
       kind: "daily_loss",
       level: "warning",
+      offerReset: true,
       text: pick([
         `You're ${money(net)} today, past your $${l.max_daily_loss} daily loss limit. Your rule says stop here.`,
         `That's ${money(net)} on the day, past your $${l.max_daily_loss} limit. Today's done. Protecting the account is the win now.`,
@@ -238,6 +262,7 @@ export function onPositionOpened(ctx: CoachContext, openedAt: Date): CheckIn[] {
         id,
         kind: "revenge",
         level: "warning",
+        offerReset: true,
         text: pick([
           `You're back in ${plural(m, "minute")} after a ${loss} loss. Was this setup on your plan, or is it the last trade talking?`,
           `${plural(m, "minute")} after a ${loss} loss and you're in again. Is this an A setup, or a make-it-back trade?`,

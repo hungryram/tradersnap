@@ -98,6 +98,28 @@ export default function JournalPage() {
             <Stat label="Profit factor" value={view.stats.profitFactor !== null ? view.stats.profitFactor.toFixed(2) : "—"} hint="Gross wins ÷ gross losses" />
           </div>
 
+          {view.checkedFirst.count > 0 && view.notChecked.count > 0 && (
+            <Card title="Checked first vs not">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  { label: "Checked with Pip first", s: view.checkedFirst, tone: "text-brand-300" },
+                  { label: "No chart check first", s: view.notChecked, tone: "text-ink-text" },
+                ].map(({ label, s, tone }) => (
+                  <div key={label} className="rounded-xl border border-ink-border p-4">
+                    <p className={`text-sm font-medium ${tone}`}>{label}</p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">{s.winRate !== null ? `${Math.round(s.winRate * 100)}%` : "—"} <span className="text-sm font-normal text-ink-muted">winners</span></p>
+                    <p className="mt-1 text-sm text-ink-text">{s.count} trades · <span className={s.net >= 0 ? "text-green-400" : "text-red-400"}>{money(s.net)}</span></p>
+                  </div>
+                ))}
+              </div>
+              {view.checkedFirst.winRate !== null && view.notChecked.winRate !== null && view.checkedFirst.winRate > view.notChecked.winRate && (
+                <p className="mt-4 text-sm text-ink-body">
+                  Your checked trades win {Math.round((view.checkedFirst.winRate - view.notChecked.winRate) * 100)} points more often. That&apos;s the case for checking every setup, in your own numbers.
+                </p>
+              )}
+            </Card>
+          )}
+
           {view.reentry.count > 0 && (
             <Card title="After a loss">
               <p className="text-sm text-ink-text">
@@ -230,7 +252,11 @@ function analyze(trades: Trade[], strategies: StrategyOption[]) {
   // Only worth a card once at least one trade is tagged
   const anyTagged = byStrategy.some(row => !row.untagged)
 
-  return { stats: summarize(trades), byDay, byHour, bySymbol, byStrategy: anyTagged ? byStrategy : [], reentry: summarize(reentries), rest: summarize(rest) }
+  return {
+    stats: summarize(trades), byDay, byHour, bySymbol, byStrategy: anyTagged ? byStrategy : [], reentry: summarize(reentries), rest: summarize(rest),
+    checkedFirst: summarize(trades.filter(t => t.checked)),
+    notChecked: summarize(trades.filter(t => t.checked === false)),
+  }
 }
 
 function BarList({ rows, empty }: { rows: Row[]; empty: string }) {

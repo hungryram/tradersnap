@@ -18,6 +18,16 @@ export type Trade = {
   closed_at: string
   strategy_id?: string | null
   strategy_source?: "auto" | "user" | null
+  checked?: boolean // a chart check came first (within 20 minutes before it opened)
+}
+
+export type Streak = { days: number; brokenToday: boolean } | null
+
+// Today's trades plus the discipline streak (trading days in a row with no rule broken)
+export async function loadTodayWithStreak(): Promise<{ trades: Trade[]; streak: Streak }> {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const data = await api<{ trades: Trade[]; streak?: Streak }>(`/api/trades?since=${encodeURIComponent(startOfLocalDay().toISOString())}&limit=200&streak=1&tz=${encodeURIComponent(tz)}`)
+  return { trades: data.trades ?? [], streak: data.streak ?? null }
 }
 
 export type TradingLimits = {

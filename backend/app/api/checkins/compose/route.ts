@@ -30,7 +30,7 @@ export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(new NextResponse(null, { status: 200 }), request.headers.get("origin"))
 }
 
-const KINDS = ["morning_plan", "session_recap", "loss_streak", "daily_loss", "revenge", "max_trades", "over_max", "outside_hours", "big_win"] as const
+const KINDS = ["morning_plan", "session_recap", "loss_streak", "daily_loss", "revenge", "max_trades", "over_max", "outside_hours", "big_win", "loss_reset"] as const
 
 const bodySchema = z.object({
   kind: z.enum(KINDS),
@@ -42,7 +42,7 @@ const bodySchema = z.object({
 
 // What each check-in is for; the plain version always carries the facts
 const TASKS: Record<(typeof KINDS)[number], string> = {
-  morning_plan: "The morning check-in: greet them (by name if given), restate today's plan with every limit, and add one short line of focus for today.",
+  morning_plan: "The morning check-in: greet them (by name if given), restate today's plan with every limit, and add one short line of focus for today. If streak_days is 2 or more, mention their run of days with no rules broken.",
   session_recap: "The end-of-session recap: state the day's numbers, say plainly whether rules were kept or which were broken (no lecturing), and ask one short reflective question.",
   loss_streak: "A warning in the moment: they just hit a losing streak. Calm and direct, like a coach putting a hand on their shoulder. If they've hit their stop rule, be clear the day is done.",
   daily_loss: "A warning in the moment: they're past their daily loss limit. Calm, firm and kind; their own rule says stop.",
@@ -51,6 +51,7 @@ const TASKS: Record<(typeof KINDS)[number], string> = {
   over_max: "A warning in the moment: they already opened a trade past their daily max (it's live now). Ask what's different about this one, gently.",
   outside_hours: "A heads-up: they just opened a trade outside the hours they set. Point it out and ask if it's worth breaking their rule.",
   big_win: "After a big winning trade: congratulate them briefly, then remind them that overconfidence follows big wins.",
+  loss_reset: "After a single losing trade: acknowledge it without drama and suggest a 60-second reset before the next trade (a button for it appears under your message). One or two sentences.",
 }
 
 const SYSTEM = `You are Pip, a friendly AI trading-discipline coach who lives on the trader's chart. You're writing one short message you send on your own (the trader didn't ask).
