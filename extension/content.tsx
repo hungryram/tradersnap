@@ -8,6 +8,7 @@ import CheckDetails, { ChecklistMeter, checklistProgress } from "./components/Ch
 import ResetBreak from "./components/ResetBreak"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
+import { startTopstepTracking } from "~lib/trades/topstepx"
 import type { ClosedTrade } from "~lib/trades/types"
 import { afterTrades, morningPlan, onPositionOpened, sessionRecap, type CheckIn, type CoachLimits, type CoachTrade } from "~lib/coach/checkins"
 import { marked } from "marked"
@@ -499,7 +500,8 @@ const TradingBuddyWidget = () => {
     }
     chrome.storage.onChanged.addListener(handleTradeSync)
 
-    if (!window.location.hostname.endsWith('tradingview.com')) {
+    const onTopstep = window.location.hostname.endsWith('topstepx.com')
+    if (!window.location.hostname.endsWith('tradingview.com') && !onTopstep) {
       return () => chrome.storage.onChanged.removeListener(handleTradeSync)
     }
 
@@ -531,7 +533,7 @@ const TradingBuddyWidget = () => {
       }
     }
 
-    const stopTracking = startTradeTracking({
+    const stopTracking = (onTopstep ? startTopstepTracking : startTradeTracking)({
       onTrades: (trades) => {
         unsent.push(...trades)
         sendTrades()
@@ -594,6 +596,9 @@ const TradingBuddyWidget = () => {
   }
 
   const isTradingView = window.location.hostname.endsWith('tradingview.com')
+  const isTopstep = window.location.hostname.endsWith('topstepx.com')
+  // What to tell the trader when Pip isn't seeing their trades yet, per platform
+  const noTrackingHint = isTopstep ? 'reload TopstepX so Pip can see your trades' : "open TradingView's trading panel (it can be small)"
 
   // ---- Coach check-ins ------------------------------------------------------
   // Latest values for callbacks that outlive a render (tracker ticks, timers)
@@ -871,7 +876,7 @@ const TradingBuddyWidget = () => {
   useEffect(() => {
     const g = gettingStarted
     if (!g || g.dismissed || g.completed || !session) return
-    if (g.analyzed && g.chartChatted && (autoDetectTrades || !isTradingView)) {
+    if (g.analyzed && g.chartChatted && (autoDetectTrades || !(isTradingView || isTopstep))) {
       updateGettingStarted({ completed: true }, 'checklist_completed')
     }
   }, [gettingStarted, autoDetectTrades, session])
@@ -2050,7 +2055,7 @@ const TradingBuddyWidget = () => {
     const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' ? 'bg-red-400' : null
     const tip = [
       'Open Pip (Alt+Shift+S). Drag to move.',
-      trackingStatus === 'no-panel' ? "Not tracking trades: open TradingView's trading panel." : null,
+      trackingStatus === 'no-panel' ? `Not tracking trades: ${noTrackingHint}.` : null,
       losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null,
       streak && streak.days > 0 && !streak.brokenToday ? `🔥 ${streak.days} ${streak.days === 1 ? 'day' : 'days'} in a row with no rules broken` : null
     ].filter(Boolean).join('\n')
@@ -2306,7 +2311,7 @@ const TradingBuddyWidget = () => {
                 </div>
                 <button
                   onClick={() => setAutoDetect(!autoDetectTrades)}
-                  title="Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."
+                  title={isTopstep ? "Logs your closed trades and wins/losses from TopstepX. Keep TopstepX open while you trade." : "Logs your trades and wins/losses from TradingView's trading panel (Positions and Order history). Keep the panel open while you trade; it can be small."}
                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 text-sm ${theme === 'dark' ? 'hover:bg-dark-elevated text-slate-200' : 'hover:bg-slate-100 text-slate-700'}`}
                 >
                   <span>Auto-detect trades</span>
@@ -2415,12 +2420,12 @@ const TradingBuddyWidget = () => {
             {trackingStatus && (
               <span
                 className={`inline-block w-2 h-2 rounded-full shrink-0 ${trackingStatus === 'tracking' ? 'bg-green-500' : trackingStatus === 'loading' ? 'bg-amber-500' : 'bg-red-500'}`}
-                title={trackingStatus === 'tracking' ? 'Tracking your trades' : trackingStatus === 'loading' ? 'Loading your order history' : "Not tracking: open TradingView's trading panel"}
+                title={trackingStatus === 'tracking' ? 'Tracking your trades' : trackingStatus === 'loading' ? 'Loading your order history' : `Not tracking: ${noTrackingHint}`}
               />
             )}
             <span className={`font-semibold ${theme === 'dark' ? 'text-dark-body' : 'text-slate-900'}`}>Today</span>
             {trackingStatus === 'no-panel' && (
-              <span className="text-red-500">Not tracking: open TradingView's trading panel (it can be small)</span>
+              <span className="text-red-500">Not tracking: {noTrackingHint}</span>
             )}
             {trackingStatus === 'no-panel' ? null : tradeStats && tradeStats.count > 0 ? (
               <>
@@ -2454,7 +2459,8 @@ const TradingBuddyWidget = () => {
             signedIn={!!session}
             analyzed={!!gettingStarted.analyzed}
             chartChatted={!!gettingStarted.chartChatted}
-            showTradeTracking={isTradingView}
+            showTradeTracking={isTradingView || isTopstep}
+            tradeTrackingDetail={isTopstep ? 'Pip reads your closed trades from TopstepX while it is open.' : "Keep TradingView's trading panel open (it can be small)."}
             tradeTrackingOn={autoDetectTrades}
             onSignIn={() => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/welcome`, '_blank')}
             onAnalyze={handleAnalyze}
@@ -3142,6 +3148,7 @@ function GettingStarted(props: {
   chartChatted: boolean
   showTradeTracking: boolean
   tradeTrackingOn: boolean
+  tradeTrackingDetail: string
   onSignIn: () => void
   onAnalyze: () => void
   onTryChartQuestion: () => void
@@ -3157,7 +3164,7 @@ function GettingStarted(props: {
     !props.signedIn && { done: false, title: 'Create your free account', detail: 'About 10 seconds.', action: 'Sign in', onClick: props.onSignIn },
     { done: props.analyzed, title: 'Check this chart against your rules', detail: 'A verdict in about 15 seconds. Free, doesn\'t count toward your daily limit.', action: props.signedIn ? 'Check this setup' : null, onClick: props.onAnalyze },
     { done: props.chartChatted, title: 'Ask about your chart', detail: 'Type a question, turn on Chart, and send. Your first one is free too.', action: props.signedIn ? 'Try a question' : null, onClick: props.onTryChartQuestion },
-    props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: "Keep TradingView's trading panel open (it can be small).", action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking }
+    props.showTradeTracking && { done: props.tradeTrackingOn, title: 'Track your trades automatically', detail: props.tradeTrackingDetail, action: props.signedIn ? 'Turn on' : null, onClick: props.onEnableTradeTracking }
   ].filter(Boolean) as { done: boolean, title: string, detail: string, action: string | null, onClick: () => void }[]
 
   const doneCount = items.filter(item => item.done).length
