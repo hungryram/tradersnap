@@ -11,6 +11,7 @@ import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@
 import { loadTradePatterns } from "@/lib/trade-patterns"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
+import { alreadyLogged, detectTradeClaim } from "@/lib/trade-claims"
 
 // Recent conversation sent with each message. The window starts on a multiple
 // of HISTORY_STEP, so it holds still for a few exchanges and stays cached,
@@ -126,6 +127,7 @@ function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams
 You do not provide signals, entries, or exits.
 You never validate or authorize trades.
 You help the trader think, not act.
+You cannot log or change trades yourself. When a trader tells you a result, respond to it as a coach. The app may show them a button to log it; never say you logged it or ask them to type it in somewhere.
 
 ${fullName ? `TRADER: ${fullName}\n` : ""}SUBSCRIPTION TIER: ${tier.toUpperCase()}`
 
@@ -511,7 +513,9 @@ Use for time-based coaching when they ask about the next candle or how long they
       ? `${imageDescription}\n\n${validatedRequest.message}`
       : validatedRequest.message
 
-    // 8. Call the model (provider + model selection live in lib/llm)
+    // 8. Call the model (provider + model selection live in lib/llm). When the message may report
+    // a trade result, a cheap model checks it alongside, so the reply isn't delayed.
+    const claimCheck = detectTradeClaim(validatedRequest.message)
     const result = await llmChat({
       system: coachingPrompt,
       memory,
@@ -547,9 +551,16 @@ Use for time-based coaching when they ask about the next candle or how long they
       }
     }
 
+    // "I just made 200": offer to log it (the trader confirms in the widget; nothing is saved here)
+    const { claim, tokens: claimTokens } = await claimCheck
+    const tradeProposal = claim && !responseFailed && !(await alreadyLogged(supabase, user.id, claim.amount))
+      ? { id: crypto.randomUUID(), amount: claim.amount, symbol: claim.symbol }
+      : null
+
     // Cost tracking, and the once-a-day notes update, after the reply is sent
     after(async () => {
       await logLlmUsage(supabase, user.id, 'chat', result.tokens)
+      await logLlmUsage(supabase, user.id, 'chat', claimTokens)
       if (memoryOn) await maybeRefreshNotes(supabase, user.id)
     })
 
@@ -637,6 +648,7 @@ Use for time-based coaching when they ask about the next candle or how long they
       userMessageId,
       assistantMessageId,
       action,
+      tradeProposal,
       welcomeFree: welcomeFree || undefined,
       usage: usagePayload(
         quota.credits && refunded

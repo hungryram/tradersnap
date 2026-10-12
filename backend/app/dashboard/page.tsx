@@ -61,8 +61,8 @@ export default function TodayPage() {
         />
         <Stat
           label="Checked first"
-          value={trades.length ? `${trades.filter(t => t.checked).length} / ${trades.length}` : "—"}
-          tone={trades.length && trades.some(t => !t.checked) ? "warn" : "default"}
+          value={trades.some(t => t.source !== "manual") ? `${trades.filter(t => t.checked).length} / ${trades.filter(t => t.source !== "manual").length}` : "—"}
+          tone={trades.some(t => t.source !== "manual" && !t.checked) ? "warn" : "default"}
           hint="Trades with a chart check before entry"
         />
         <Stat

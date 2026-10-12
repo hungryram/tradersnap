@@ -13,7 +13,7 @@ const supabase = createClient(
 function addCorsHeaders(response: NextResponse, origin: string | null) {
   if (origin) {
     response.headers.set("Access-Control-Allow-Origin", origin)
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
   }
   return response
@@ -48,7 +48,7 @@ const tradeSchema = z.object({
   closed_at: z.string().datetime()
 })
 
-type TradeRow = { realized_pnl: number | null; closed_at: string }
+type TradeRow = { realized_pnl: number | null; closed_at: string; source?: string }
 
 // A chart check this long before a trade opened tags the trade with its strategy
 const TAG_WINDOW_MS = 20 * 60 * 1000
@@ -173,7 +173,8 @@ export async function GET(request: NextRequest) {
       if (until) q = q.lt("closed_at", until.toISOString())
       return q.order("closed_at", { ascending: false }).limit(limit)
     }
-    let { data, error } = await query(`${columns}, strategy_id, strategy_source`)
+    let { data, error } = await query(`${columns}, strategy_id, strategy_source, source`)
+    if (error) ({ data, error } = await query(`${columns}, strategy_id, strategy_source`)) // before 20261022_manual_trades.sql
     if (error) ({ data, error } = await query(columns)) // before 20261020_strategies.sql
 
     if (error || !data) {
@@ -185,10 +186,12 @@ export async function GET(request: NextRequest) {
     const trades = await markChecked(supabase, user.id, data as unknown as (TradeRow & { opened_at: string | null })[])
     const params = request.nextUrl.searchParams
     const streak = params.get("streak") ? await disciplineStreak(supabase, user.id, params.get("tz") || undefined) : undefined
-    const checked = trades.filter(t => t.checked).length
+    // Trades the trader typed in have no entry time, so they can't be "checked first" or not
+    const detected = trades.filter(t => t.source !== "manual")
+    const checked = detected.filter(t => t.checked).length
     return addCorsHeaders(NextResponse.json({
       trades,
-      stats: { ...summarize(trades), checked, unchecked: trades.length - checked },
+      stats: { ...summarize(trades), checked, unchecked: detected.length - checked },
       ...(streak !== undefined ? { streak } : {}),
       // Set when older trades were left out because of the Free plan's history
       historyFrom: historyFrom && historyFrom > since ? historyFrom.toISOString() : null
@@ -197,6 +200,21 @@ export async function GET(request: NextRequest) {
     console.error("[Trades] Error:", error)
     return addCorsHeaders(NextResponse.json({ error: "Internal server error" }, { status: 500 }), origin)
   }
+}
+
+// DELETE /api/trades { id } — removes a result the trader logged by hand. Trades read from the
+// platform stay (they would be read again), so only manual ones can be deleted.
+export async function DELETE(request: NextRequest) {
+  const origin = request.headers.get("origin")
+  const user = await getUser(request)
+  if (!user) return addCorsHeaders(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), origin)
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse(await request.json().catch(() => null))
+  if (!parsed.success) return addCorsHeaders(NextResponse.json({ error: "Invalid request" }, { status: 400 }), origin)
+
+  const { error } = await supabase.from("trades").delete().eq("id", parsed.data.id).eq("user_id", user.id).eq("source", "manual")
+  if (error) return addCorsHeaders(NextResponse.json({ error: "Couldn't delete the trade" }, { status: 500 }), origin)
+  return addCorsHeaders(NextResponse.json({ success: true }), origin)
 }
 
 // PATCH /api/trades { id, strategy_id } — the trader sets (or clears) a trade's strategy

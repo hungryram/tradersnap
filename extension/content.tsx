@@ -643,6 +643,32 @@ const TradingBuddyWidget = () => {
     }
   }
 
+  // "I just made 200": log it to the journal once the trader taps Log it
+  const setTradeStatus = (proposalId: string, tradeStatus: string, tradeError?: string) =>
+    setMessages(prev => prev.map(m => m.tradeProposal?.id === proposalId ? { ...m, tradeStatus, tradeError } : m))
+
+  const logReportedTrade = async (proposal: { id: string; amount: number; symbol: string | null }) => {
+    setTradeStatus(proposal.id, 'saving')
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      const response = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session?.access_token}` },
+        body: JSON.stringify({ proposal_id: proposal.id, amount: proposal.amount, symbol: proposal.symbol })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setTradeStatus(proposal.id, 'error', data.error || "Couldn't log that one. Try again.")
+        return
+      }
+      setTradeStatus(proposal.id, data.duplicate ? 'duplicate' : 'logged')
+      analytics.track('trade_logged', { duplicate: !!data.duplicate })
+      fetchTradeStats()
+    } catch {
+      setTradeStatus(proposal.id, 'error', "Couldn't log that one. Check your connection and try again.")
+    }
+  }
+
   const finishReset = (lockMinutes: number | null) => {
     setResetOpen(false)
     analytics.track('reset_finished', { locked: !!lockMinutes })
@@ -1716,9 +1742,11 @@ const TradingBuddyWidget = () => {
         chartImage: responseChartImage,
         drawings: hasDrawings ? chatResult.drawings : undefined,
         id: chatResult.assistantMessageId,
-        isFavorited: false
+        isFavorited: false,
+        tradeProposal: chatResult.tradeProposal || undefined
       }
       setMessages(prev => [...prev, assistantMessage])
+      if (chatResult.tradeProposal) analytics.track('trade_log_offered', {})
       
       // Scroll to show the thinking bubble
       setTimeout(() => scrollToBottom(), 100)
@@ -2580,6 +2608,33 @@ const TradingBuddyWidget = () => {
                     }`}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
+                  {msg.tradeProposal && !msg.isTyping && msg.tradeStatus !== 'dismissed' && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                      {msg.tradeStatus === 'logged' || msg.tradeStatus === 'duplicate' ? (
+                        <span className={`text-xs ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                          {msg.tradeStatus === 'duplicate' ? 'I already have that one in your journal.' : 'Logged to your journal.'}{' '}
+                          <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/journal`} target="_blank" rel="noopener noreferrer" className="underline">View</a>
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => logReportedTrade(msg.tradeProposal)}
+                            disabled={msg.tradeStatus === 'saving'}
+                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            {msg.tradeStatus === 'saving' ? 'Logging…' : `Log ${msg.tradeProposal.amount < 0 ? '-' : '+'}$${Math.abs(msg.tradeProposal.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}${msg.tradeProposal.symbol ? ` ${msg.tradeProposal.symbol}` : ''} to my journal`}
+                          </button>
+                          <button
+                            onClick={() => { setTradeStatus(msg.tradeProposal.id, 'dismissed'); analytics.track('trade_log_dismissed', {}) }}
+                            className={`rounded-lg border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border text-dark-text hover:text-dark-body' : 'border-slate-300 text-slate-600 hover:text-slate-900'}`}
+                          >
+                            Not now
+                          </button>
+                        </>
+                      )}
+                      {msg.tradeStatus === 'error' && <span className="text-xs text-red-400">{msg.tradeError}</span>}
+                    </div>
+                  )}
                   {(() => {
                     const draft = rulesFromReply(msg.content)
                     if (!draft) return null

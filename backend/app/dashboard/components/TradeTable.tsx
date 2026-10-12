@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { formatTime, holdTime, pnlOf, tickerOf, type StrategyOption, type Trade } from "@/lib/dashboard-data"
+import { api, formatTime, holdTime, pnlOf, tickerOf, type StrategyOption, type Trade } from "@/lib/dashboard-data"
 import { money } from "./ui"
 
 export default function TradeTable({ trades, showDate = false, strategies, onStrategyChange }: {
@@ -14,6 +14,17 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
   // Shown immediately; the parent saves it
   const [picked, setPicked] = useState<Record<string, string | null>>({})
   const showStrategy = !!strategies && strategies.length > 0 && !!onStrategyChange
+
+  // Only results the trader logged by hand can be removed; the page reloads so every total matches
+  const removeManual = async (id: string) => {
+    if (!window.confirm("Remove this logged result from your journal?")) return
+    try {
+      await api("/api/trades", { method: "DELETE", body: JSON.stringify({ id }) })
+      window.location.reload()
+    } catch {
+      window.alert("Couldn't remove that one. Try again.")
+    }
+  }
 
   return (
     <div className="-mx-5 overflow-x-auto sm:-mx-6">
@@ -39,8 +50,12 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
                 <td className="px-5 py-2.5 text-ink-text tabular-nums sm:px-6">
                   {showDate ? new Date(trade.closed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : formatTime(trade.closed_at)}
                 </td>
-                <td className="py-2.5 font-medium">{tickerOf(trade.symbol)}</td>
-                <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-brand-300" : "text-red-400"}`}>{trade.side}</td>
+                <td className="py-2.5 font-medium">
+                  {tickerOf(trade.symbol)}
+                  {trade.source === "manual" && <span className="ml-2 rounded-full border border-ink-border px-1.5 py-0.5 text-[10px] font-normal text-ink-muted" title="You told Pip about this one, so it has no entry or exit">manual</span>}
+                  {trade.source === "manual" && <button onClick={() => removeManual(trade.id)} className="ml-1.5 text-xs text-ink-muted hover:text-red-400" title="Remove this logged result" aria-label="Remove this logged result">✕</button>}
+                </td>
+                <td className={`py-2.5 capitalize ${trade.side === "long" ? "text-brand-300" : "text-red-400"}`}>{trade.side ?? "—"}</td>
                 {showStrategy && (
                   <td className="py-1.5 pr-3">
                     <select
@@ -58,7 +73,7 @@ export default function TradeTable({ trades, showDate = false, strategies, onStr
                     </select>
                   </td>
                 )}
-                <td className="py-2.5 text-right tabular-nums">{trade.qty}</td>
+                <td className="py-2.5 text-right tabular-nums">{trade.qty ?? "—"}</td>
                 <td className="py-2.5 text-right tabular-nums text-ink-text">
                   {fmtPrice(trade.entry_price)} → {fmtPrice(trade.exit_price)}
                 </td>

@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 type TradeRow = {
-  symbol: string
-  side: "long" | "short"
-  qty: number
+  symbol: string | null
+  side: "long" | "short" | null
+  qty: number | null
+  source?: string
   entry_price: number | null
   exit_price: number | null
   fill_count: number | null
@@ -23,15 +24,27 @@ export async function buildTradesContext(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("trades")
-    .select("symbol, side, qty, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
+    .select("symbol, side, qty, source, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
     .eq("user_id", userId)
     .gte("closed_at", since.toISOString())
     .order("closed_at", { ascending: true })
     .limit(100)
 
-  if (error) return null
+  // Before 20261022_manual_trades.sql there is no source column
+  let rows: unknown[] | null = data
+  if (error) {
+    const retry = await supabase
+      .from("trades")
+      .select("symbol, side, qty, entry_price, exit_price, fill_count, realized_pnl, pnl_source, closed_at")
+      .eq("user_id", userId)
+      .gte("closed_at", since.toISOString())
+      .order("closed_at", { ascending: true })
+      .limit(100)
+    if (retry.error) return null
+    rows = retry.data
+  }
 
-  const trades = (data ?? []) as TradeRow[]
+  const trades = (rows ?? []) as unknown as TradeRow[]
   if (trades.length === 0) {
     return `TODAY'S TRADES: none recorded. Trades are only recorded when the trader has "Auto-detect trades" on and TradingView's trading panel open, so they may still have traded elsewhere. If it matters, ask.`
   }
@@ -58,10 +71,11 @@ export async function buildTradesContext(
     const n = trades.length - shown.length + i + 1
     const fills = t.fill_count && t.fill_count > 2 ? `, ${t.fill_count} fills` : ""
     const estimated = t.pnl_source === "estimated" ? " (estimated)" : ""
-    return `${n}. ${time(t.closed_at)} ${t.symbol.split(":").pop()} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${estimated}${fills}`
+    if (t.source === "manual") return `${n}. ${time(t.closed_at)} ${t.symbol ? t.symbol.split(":").pop() + " " : ""}reported by the trader: ${money(pnl(t))}`
+    return `${n}. ${time(t.closed_at)} ${(t.symbol ?? "?").split(":").pop()} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${estimated}${fills}`
   })
 
-  return `TODAY'S TRADES (auto-detected from the trader's platform, closing times in their local time):
+  return `TODAY'S TRADES (auto-detected from the trader's platform, plus any results the trader reported and logged; times in their local time):
 ${trades.length} trades, ${wins} wins, ${losses} losses, net ${money(net)}${streak >= 2 ? `, ${streak} losses in a row right now` : ""}.
 ${lines.join("\n")}
 

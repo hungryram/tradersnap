@@ -6,9 +6,10 @@ export type Trade = {
   id: string
   platform: string
   account: string | null
-  symbol: string
-  side: "long" | "short"
-  qty: number
+  symbol: string | null
+  side: "long" | "short" | null
+  qty: number | null
+  source?: "auto" | "manual" // "manual": the trader reported it in chat, so there is no entry or exit
   entry_price: number | null
   exit_price: number | null
   fill_count: number | null
@@ -130,7 +131,8 @@ export function summarize(trades: Trade[]) {
   }
 }
 
-export function tickerOf(symbol: string) {
+export function tickerOf(symbol: string | null) {
+  if (!symbol) return "—"
   return symbol.split(":").pop() ?? symbol
 }
 

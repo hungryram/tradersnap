@@ -48,7 +48,11 @@ const eventSchema = z.object({
     'rules_saved_from_chat',
     // Post-loss reset
     'reset_started',
-    'reset_finished'
+    'reset_finished',
+    // Logging a result the trader told Pip about
+    'trade_log_offered',
+    'trade_logged',
+    'trade_log_dismissed'
   ]),
   session_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.any()).optional()

@@ -9,7 +9,7 @@ export const CHECK_WINDOW_MS = 20 * 60 * 1000
 type TradeTimes = { opened_at: string | null; closed_at: string }
 
 // Adds `checked` to each trade: a chart check within 20 minutes before it opened
-export async function markChecked<T extends TradeTimes>(supabase: SupabaseClient, userId: string, trades: T[]): Promise<(T & { checked: boolean })[]> {
+export async function markChecked<T extends TradeTimes & { source?: string }>(supabase: SupabaseClient, userId: string, trades: T[]): Promise<(T & { checked?: boolean })[]> {
   if (!trades.length) return []
   const opens = trades.map(t => Date.parse(t.opened_at ?? t.closed_at))
   const { data } = await supabase
@@ -20,10 +20,11 @@ export async function markChecked<T extends TradeTimes>(supabase: SupabaseClient
     .lte("created_at", new Date(Math.max(...opens) + 60_000).toISOString())
     .limit(2000)
   const checks = (data ?? []).map(r => Date.parse(r.created_at))
-  return trades.map((t, i) => ({
+  // Trades the trader reported in chat have no entry time, so they are neither checked nor unchecked
+  return trades.map((t, i) => t.source === "manual" ? t : {
     ...t,
     checked: checks.some(at => at <= opens[i] + 60_000 && at >= opens[i] - CHECK_WINDOW_MS)
-  }))
+  })
 }
 
 type Limits = {
