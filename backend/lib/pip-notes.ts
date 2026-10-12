@@ -43,7 +43,7 @@ export async function loadJournalNotes(supabase: SupabaseClient, userId: string,
 }
 
 // The memory block Pip sees (cached with the system prompt)
-export function memoryContext(notes: PipNote[], patterns: string[], journal: JournalNote[] = []): string | null {
+export function memoryContext(notes: PipNote[], patterns: string[], journal: JournalNote[] = [], recentDays: string[] = []): string | null {
   const parts: string[] = []
   if (notes.length) {
     parts.push(`PIP'S NOTES ABOUT THIS TRADER (what you've learned from past conversations; lines marked "trader" were written by them and override yours):
@@ -56,6 +56,12 @@ Use these the way a coach who knows someone would: naturally, when relevant. Don
 ${patterns.map(p => `- ${p}`).join("\n")}
 
 Bring a pattern up when it's relevant to the moment (for example a re-entry right after a loss), framed as their own data, never as a prediction.`)
+  }
+  if (recentDays.length) {
+    parts.push(`THEIR RECENT DAYS (trades before today, newest first, in their local time):
+${recentDays.map(d => `- ${d}`).join("\n")}
+
+Use these when they ask what they did on a recent day. If a day isn't listed, there were no detected or logged trades; say you can't see it, and don't guess.`)
   }
   if (journal.length) {
     parts.push(`THEIR JOURNAL NOTES (what they wrote about recent trading days, newest first):

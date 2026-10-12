@@ -8,7 +8,7 @@ import { allowanceUsedMessage, claimWelcomeCredit, consumeUsage, creditState, ge
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
-import { loadTradePatterns } from "@/lib/trade-patterns"
+import { loadRecentDays, loadTradePatterns } from "@/lib/trade-patterns"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock, strategiesFor } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims"
@@ -203,9 +203,17 @@ Use time to slow behavior:
 
   const timeoutProtocol = `TIMEOUT PROTOCOL
 Trigger ONLY if user explicitly requests a break.
-Use format: TIMEOUT: X (5, 10, or 15 minutes).
+Use format: TIMEOUT: X. Offer 10 minutes unless they ask for a different length (5, 10, or 15).
 
 For severe emotional trading, you MAY trigger a timeout, but confirm with user.`
+
+  const conversationStyle = `NOT BEING REPETITIVE
+Say each thing once. A coach who repeats the same line gets tuned out.
+- Use a number from their data (a 30-day total, a streak) once per conversation. Use it again only if it has changed or they ask.
+- Ask each question at most twice. If they answer something else, or move on to a new topic, answer what they asked and drop the old question.
+- Offer a timeout once. Offer it again only if they show a new urge (adding size, revenge, chasing), not on every reply.
+- End with one question or one next step, not a list of demands.
+- Describe where losses came from ("those trades are where the money went"). Never say a loss would have been avoided or that following the rules would have made them money.`
 
   const writing = `WRITING STYLE
 Be concise and human.
@@ -270,6 +278,7 @@ Waiting is a valid outcome.`
     timeoutProtocol,
     rulesHelpSection(tier === "pro" ? 5000 : 1000),
     writing,
+    conversationStyle,
     judgmentMode,
     featureRequests,
     goal,
@@ -492,15 +501,16 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Skipped entirely when the trader has turned memory off.
     const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits').eq('id', user.id).single()
     const memoryOn = memorySettings?.memory_enabled !== false
-    const [notes, patterns, journal] = memoryOn
+    const [notes, patterns, journal, recentDays] = memoryOn
       ? await Promise.all([
           loadNotes(supabase, user.id),
           loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone),
           // Pip reads journal notes on paid plans
-          features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id) : Promise.resolve([])
+          features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id) : Promise.resolve([]),
+          loadRecentDays(supabase, user.id, dayStart, validatedRequest.timezone)
         ])
-      : [[], [], []]
-    const memory = [favoritedContext, memoryContext(notes, patterns, journal)].filter(Boolean).join('\n\n') || null
+      : [[], [], [], []]
+    const memory = [favoritedContext, memoryContext(notes, patterns, journal, recentDays)].filter(Boolean).join('\n\n') || null
 
     // Recent conversation, the same size on every plan (see historyWindow)
     const fullHistory = validatedRequest.conversationHistory ?? []

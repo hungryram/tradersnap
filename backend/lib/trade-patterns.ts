@@ -115,3 +115,50 @@ export async function loadTradePatterns(
   // Day-total entries are not trades, so they say nothing about how the trader trades
   return tradePatterns((data as unknown as (PatternTrade & { kind?: string })[]).filter(t => t.kind !== "day_total"), limits, timezone)
 }
+
+// One plain line per recent trading day (before today), so Pip can answer "what did I do yesterday?".
+// Day-total entries count toward the day's net but not its trade count.
+export function recentDayLines(
+  trades: { closed_at: string; realized_pnl: number | null; kind?: string }[],
+  timezone = "America/New_York",
+  days = 7
+): string[] {
+  const byDay = new Map<string, { count: number; wins: number; losses: number; net: number; adjustment: number }>()
+  for (const t of trades) {
+    const day = localParts(t.closed_at, timezone).day
+    const row = byDay.get(day) ?? { count: 0, wins: 0, losses: 0, net: 0, adjustment: 0 }
+    const value = Number(t.realized_pnl ?? 0)
+    row.net += value
+    if (t.kind === "day_total") row.adjustment += value
+    else {
+      row.count++
+      if (value > 0) row.wins++
+      else if (value < 0) row.losses++
+    }
+    byDay.set(day, row)
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, days)
+    .map(([day, r]) => {
+      const [y, m, d] = day.split("-").map(Number)
+      const label = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" })
+      const trades = r.count ? `${r.count} ${r.count === 1 ? "trade" : "trades"} (${r.wins}W ${r.losses}L)` : "no detected trades"
+      const adjusted = r.adjustment ? `, includes ${money(r.adjustment)} the trader logged as their day total` : ""
+      return `${label}: ${trades}, net ${money(r.net)}${adjusted}`
+    })
+}
+
+export async function loadRecentDays(supabase: SupabaseClient, userId: string, todayStart: Date, timezone?: string): Promise<string[]> {
+  const load = (cols: string) => supabase
+    .from("trades")
+    .select(cols)
+    .eq("user_id", userId)
+    .gte("closed_at", new Date(todayStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
+    .lt("closed_at", todayStart.toISOString())
+    .limit(1000)
+  let { data, error } = await load("closed_at, realized_pnl, kind")
+  if (error) ({ data, error } = await load("closed_at, realized_pnl")) // before 20261024_day_totals.sql
+  if (error || !data) return []
+  return recentDayLines(data as unknown as { closed_at: string; realized_pnl: number | null; kind?: string }[], timezone)
+}
