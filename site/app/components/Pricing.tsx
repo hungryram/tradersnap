@@ -11,7 +11,9 @@ const PLANS = [
     note: "Starts with 7 days of Pro, no card",
     items: [
       "About 5 chart checks and 15 messages with Pip a day",
-      "Automatic trade tracking",
+      "Automatic trade tracking on TradingView, Tradovate and TopstepX",
+      "Several accounts: copied trades count once, limits per account",
+      "Tell Pip about a trade and log it in one tap",
       "Check-ins: losing streaks, limits, revenge trades",
       "Daily loss and trade limits",
       "1 strategy checked at a time",

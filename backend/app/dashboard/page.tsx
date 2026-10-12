@@ -90,7 +90,7 @@ export default function TodayPage() {
               <div className="py-6 text-center">
                 <p className="text-sm text-ink-text">No trades recorded today.</p>
                 <p className="mt-1 text-xs text-ink-muted max-w-sm mx-auto">
-                  Turn on <span className="text-ink-text">Auto-detect trades</span> in the Pip chat (⋮ menu) and keep TradingView's trading panel open. Trades show up here as they close.
+                  Turn on <span className="text-ink-text">Auto-detect trades</span> in the Pip chat (⋮ menu). On TradingView, keep its trading panel open (it can be small); on Tradovate and TopstepX just keep the page open. Trades show up here as they close.
                 </p>
               </div>
             ) : (

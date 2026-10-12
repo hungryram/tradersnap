@@ -17,16 +17,18 @@ export const FAQ: FaqGroup[] = [
   {
     title: "Setup and platforms",
     items: [
-      { q: "Which platforms does it work with?", a: "Pip's chart checks and chat work on any chart you open in Chrome, including TradingView, Tradovate and Topstep. Automatic trade tracking works on TradingView today, with more platforms on the way." },
+      { q: "Which platforms does it work with?", a: "Pip's chart checks and chat work on any chart you open in Chrome, including TradingView, Tradovate and Topstep. Automatic trade tracking works on TradingView, Tradovate and TopstepX." },
       { q: "Do I need to write rules first?", a: "No. Setup gives you templates to start from, and you can edit them any time. Your rules and daily limits are what make Pip personal, so it's worth the two minutes." },
       { q: "I trade more than one setup. Does Pip handle that?", a: "Yes. Write each setup as its own strategy, plus the rules that apply to every trade. Pip checks each chart against whichever strategy fits, tells you which one it matched (or that it matches none), and your journal shows results per strategy." },
-      { q: "How does Pip know my trades?", a: "He reads the Order history in TradingView's trading panel, in your own browser, while you trade. There's no broker login and no API keys. Keep the trading panel open (it can be small) and Pip logs each trade and its result." },
+      { q: "I trade several accounts, like prop firm evals. Does that work?", a: "Yes. Pip tracks each account separately. If you copy one trade to five accounts it counts as one trade, so your max-trades rule isn't broken by the copies. Your daily limits are checked on each account on its own, and your profit and loss still adds up every account. The journal has an account filter to look at one at a time." },
+      { q: "Can I tell Pip about a trade instead of waiting for it to be detected?", a: "Yes. Say something like \"I just made 200\" and Pip offers to log it, with a button to confirm and a choice of strategy. If you give your total for the day (\"I'm up 381 today\"), Pip logs only what the journal is missing, and it doesn't count as an extra trade. Nothing is logged until you tap." },
+      { q: "How does Pip know my trades?", a: "On TradingView he reads the Order history in the trading panel, in your own browser, while you trade; keep the panel open (it can be small). On Tradovate and TopstepX he reads the trade data the page already loads, so there's nothing to keep open. There's no broker login and no API keys on any of them, and Pip logs each trade and its result." },
     ],
   },
   {
     title: "Privacy",
     items: [
-      { q: "Can Pip access my broker account?", a: "No. Pip only reads what's on your screen in your browser. He can't place, change or close orders, and never sees your broker password." },
+      { q: "Can Pip access my broker account?", a: "No. Pip only reads what your platform already shows in your browser. He can't place, change or close orders, and never sees your broker password." },
       { q: "What do you store?", a: "Your account, rules, chats and the trades Pip detects (symbol, size, prices and result) so your coach and journal can use them. Charts are only captured when you click Check this setup or include your chart. You can delete your account and all your data from your account page, instantly." },
     ],
   },

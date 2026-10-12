@@ -60,7 +60,7 @@ export default function GuidePage() {
                             <>Set up your <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
                             <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Pip</strong> button at the bottom right.</>,
                             <>Click <strong className="text-ink-body">Check this setup</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
-                            <>On TradingView, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
+                            <>On TradingView, Tradovate or TopstepX, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
                         ].map((step, i) => (
                             <li key={i} className="flex items-start">
                                 <span className="font-semibold text-brand-300 mr-2">{i + 1}.</span>

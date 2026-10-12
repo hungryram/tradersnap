@@ -99,7 +99,7 @@ export default function JournalPage() {
           <div className="py-10 text-center">
             <p className="text-ink-body">No trades in the last {days} days.</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-ink-text">
-              In the Pip chat on TradingView, open the ⋮ menu and turn on <span className="text-ink-body">Auto-detect trades</span>. Keep the trading panel open while you trade (it can be small), and your trades land here automatically.
+              In the Pip chat on TradingView, Tradovate or TopstepX, open the ⋮ menu and turn on <span className="text-ink-body">Auto-detect trades</span>. On TradingView keep the trading panel open while you trade (it can be small). Your trades land here automatically.
             </p>
           </div>
         </Card>

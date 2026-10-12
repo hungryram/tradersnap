@@ -34,7 +34,7 @@ const SESSION: { when: string; title: string; text: string; mood: PipMood; messa
   {
     when: "After a loss",
     title: "He notices the jump back in",
-    text: "Pip sees your trades as they close. Re-enter right after a loss and he asks the question you won't ask yourself.",
+    text: "Pip sees your trades as they close. Re-enter right after a loss and he asks the question you won't ask yourself, and offers a 60-second reset.",
     mood: "caution",
     message: "You're back in 2 minutes after a −$180 loss. Was this setup on your plan, or is it the last trade talking?",
   },
@@ -48,7 +48,7 @@ const SESSION: { when: string; title: string; text: string; mood: PipMood; messa
   {
     when: "After the close",
     title: "Scored on discipline",
-    text: "Your day lands in your journal automatically, with a recap that counts the rules you kept.",
+    text: "Your day lands in your journal automatically, with a recap that counts the rules you kept and a streak of clean days.",
     mood: "happy",
     message: "Today: 3 trades. No rules broken. That's the win. What's one thing to do differently tomorrow?",
   },
@@ -56,18 +56,22 @@ const SESSION: { when: string; title: string; text: string; mood: PipMood; messa
 
 const FEATURES = [
   { title: "Chart checks against your rules", text: "Lines up, incomplete or rule broken, with the reasons." },
-  { title: "Automatic trade log", text: "Every trade and result from TradingView, no spreadsheets." },
+  { title: "Automatic trade log", text: "Every trade and result from TradingView, Tradovate and TopstepX. No spreadsheets." },
   { title: "Check-ins when it matters", text: "Losing streaks, quick re-entries, limits, your daily plan." },
-  { title: "Daily limits", text: "Max trades, max loss, losses in a row, trading hours." },
-  { title: "Cooldown timer", text: "Ask for a 5 to 15 minute break. Pip runs the clock." },
-  { title: "Journal and today view", text: "Your day at a glance and every session to look back on." },
-  { title: "Rule templates", text: "Start from a template, then make it yours." },
+  { title: "Daily limits", text: "Max trades, max loss, losses in a row, trading hours, checked on each account." },
+  { title: "Reset and cooldown", text: "After a loss, a 60-second breathing reset. Or ask for a 5 to 15 minute timeout and Pip runs the clock." },
+  { title: "Several strategies", text: "Write each setup as its own strategy, or start from a template. Pip matches each chart to the right one and shows results per strategy." },
+  { title: "Tell Pip how it went", text: "Say \"I just made 200\" or \"I'm up 381 today\" and Pip offers to log it, as a trade or as your day total." },
+  { title: "Built for several accounts", text: "A trade copied across your eval accounts counts once, limits apply per account, and the journal filters by account." },
+  { title: "Journal and calendar", text: "Every day at a glance: your trades, your notes, and whether your rules held." },
+  { title: "Day reviews", text: "Pip reads a day from your journal and tells you what held up, what slipped and one question to take with you. Pro." },
+  { title: "Your discipline streak", text: "Days in a row with no rule broken, and how many of your trades you checked first." },
   { title: "Ask Pip anything", text: "Talk through a setup, a loss or a bad day, in plain language." },
 ]
 
 const TRUST = [
   { title: "No broker login", text: "No passwords, no API keys, nothing to connect." },
-  { title: "Can't touch your orders", text: "Pip reads your screen. He can't place, change or close a trade." },
+  { title: "Can't touch your orders", text: "Pip only reads what your platform already shows in your browser. He can't place, change or close a trade." },
   { title: "Charts only when you ask", text: "A screenshot is taken only when you click Check this setup or include your chart." },
   { title: "Delete everything, anytime", text: "One button in your account removes your account and all your data." },
 ]
