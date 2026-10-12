@@ -15,8 +15,8 @@ export const provider: Provider = process.env.AI_PROVIDER === "anthropic" ? "ant
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5"
 // Model for chart analysis; set ANTHROPIC_ANALYZE_MODEL to try another model without touching the rest
 const ANTHROPIC_ANALYZE_MODEL = process.env.ANTHROPIC_ANALYZE_MODEL || ANTHROPIC_MODEL
-// Coaching chat. Short conversational replies don't need Opus; set ANTHROPIC_CHAT_MODEL=claude-opus-5-5 to go back
-const ANTHROPIC_CHAT_MODEL = process.env.ANTHROPIC_CHAT_MODEL || "claude-sonnet-5-5"
+// Coaching chat. Defaults to the main model; set ANTHROPIC_CHAT_MODEL=claude-sonnet-5-5 to run chat on Sonnet (cheaper)
+const ANTHROPIC_CHAT_MODEL = process.env.ANTHROPIC_CHAT_MODEL || ANTHROPIC_MODEL
 // Model for free-tier chat, if it should differ from the chat model
 const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_CHAT_MODEL
 // Thinking effort for chart analysis: higher is more careful but slower
