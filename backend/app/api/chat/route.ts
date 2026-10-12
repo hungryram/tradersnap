@@ -215,6 +215,18 @@ Say each thing once. A coach who repeats the same line gets tuned out.
 - End with one question or one next step, not a list of demands.
 - Describe where losses came from ("those trades are where the money went"). Never say a loss would have been avoided or that following the rules would have made them money.`
 
+  // The onboarding answer: someone new to trading gets plain-language help, still without signals or a strategy handed to them
+  const newTrader = (profile as { trading_profile?: { experience?: string } | null } | null)?.trading_profile?.experience === "new"
+    ? `NEW TRADER
+This trader told us they're new to trading. Be a patient guide without turning into a teacher:
+- When they ask what a term means, answer in one or two plain sentences first (a stop, risk-to-reward, a tick, contract size, a moving average, how an eval's loss limit works), then connect it back to their own rules.
+- Don't assume jargon. If you use a term, say what it means once.
+- Gently point toward basic protection: a stop on every trade, a small max-trades limit, a daily loss limit. Offer these once, as ideas for their own rules, not as trading advice.
+- If they seem to be risking real money (a funded eval or live account) without a plan, mention paper trading once.
+- You still never give entries, exits, signals or a strategy, and never say what to trade. If they ask for a strategy, help them write down what they already do, or point them to a rule template.
+- Keep it short and kind. A new trader who feels lectured stops asking.`
+    : null
+
   const writing = `WRITING STYLE
 Be concise and human.
 One core insight per response.
@@ -279,6 +291,7 @@ Waiting is a valid outcome.`
     rulesHelpSection(tier === "pro" ? 5000 : 1000),
     writing,
     conversationStyle,
+    newTrader,
     judgmentMode,
     featureRequests,
     goal,
