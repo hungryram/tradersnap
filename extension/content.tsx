@@ -2231,6 +2231,22 @@ const TradingBuddyWidget = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation()
+                window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/journal`, '_blank')
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="flex items-center text-white hover:text-blue-100 px-1"
+              title="Open your journal"
+              aria-label="Open your journal"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <path d="M9 7h7M9 11h5" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
                 setShowMenu(!showMenu)
               }}
               className="text-white hover:text-blue-100 text-base px-1"
