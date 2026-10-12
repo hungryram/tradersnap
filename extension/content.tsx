@@ -204,8 +204,14 @@ const TradingBuddyWidget = () => {
   const abortControllerRef = useRef<AbortController | null>(null)
   const typingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Tell the widgets in other tabs that the saved chat changed, so they reload it
+  const broadcastChat = () => {
+    chrome.storage.local.set({ chat_sync: { action: 'message_sent', timestamp: Date.now(), tabId } }).catch(() => {})
+  }
+  const busyRef = useRef(false)
+
   // Function to load chat history from database
-  const loadChatHistoryFromDB = async () => {
+  const loadChatHistoryFromDB = async (keepLocal = false) => {
     const result = await chrome.storage.local.get('supabase_session')
     if (!result.supabase_session) return
     
@@ -254,11 +260,17 @@ const TradingBuddyWidget = () => {
         
         // Sort by timestamp to ensure chronological order (oldest first).
         // Older messages share a timestamp with their reply, so put the user's message first on ties.
-        formattedMessages.sort((a, b) =>
+        formattedMessages.sort((a: any, b: any) =>
           a.timestamp.getTime() - b.timestamp.getTime() || (a.type === 'user' ? -1 : 0) - (b.type === 'user' ? -1 : 0)
         )
         
-        setMessages(formattedMessages)
+        // Syncing from another tab: keep this tab's own Pip check-ins and notices (they are not stored in the database)
+        setMessages(prev => {
+          if (!keepLocal) return formattedMessages
+          const oldest = formattedMessages[0]?.timestamp.getTime() ?? 0
+          const local = prev.filter(m => (m.type === 'checkin' || m.type === 'info') && !m.id && new Date(m.timestamp).getTime() >= oldest)
+          return [...formattedMessages, ...local].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        })
         
         // Update cache
         chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
@@ -429,7 +441,7 @@ const TradingBuddyWidget = () => {
         const syncEvent = changes.chat_sync.newValue
         if (syncEvent?.action === 'message_sent' && syncEvent.tabId !== tabId) {
           // Reload chat history from database (only if message came from another tab)
-          loadChatHistoryFromDB()
+          if (!busyRef.current) loadChatHistoryFromDB(true)
         }
       }
     }
@@ -848,6 +860,20 @@ const TradingBuddyWidget = () => {
     }
   }, [messages])
 
+  // Don't swap the chat out from under a reply that's still being written in this tab
+  useEffect(() => {
+    busyRef.current = isSending || isAnalyzing
+  }, [isSending, isAnalyzing])
+
+  // Safety net: a tab that was in the background catches up when you switch back to it
+  useEffect(() => {
+    const catchUp = () => {
+      if (document.visibilityState === 'visible' && !busyRef.current) loadChatHistoryFromDB(true)
+    }
+    document.addEventListener('visibilitychange', catchUp)
+    return () => document.removeEventListener('visibilitychange', catchUp)
+  }, [])
+
   // Reset scroll flag when widget opens
   useEffect(() => {
     if (isOpen) {
@@ -1177,6 +1203,8 @@ const TradingBuddyWidget = () => {
         isFavorited: false
       }
       setMessages(prev => [...prev, assistantMessage])
+
+      broadcastChat()
 
       // Refresh usage to update progress bar
       await refreshUsage()
@@ -1629,13 +1657,7 @@ const TradingBuddyWidget = () => {
       }
       
       // Broadcast to other tabs that chat was updated
-      chrome.storage.local.set({
-        chat_sync: {
-          action: 'message_sent',
-          timestamp: Date.now(),
-          tabId: tabId
-        }
-      })
+      broadcastChat()
       
       // Check for timeout action
       if (chatResult.action && chatResult.action.type === 'timeout') {
@@ -2258,6 +2280,7 @@ const TradingBuddyWidget = () => {
                           // Favorites remain in database for dashboard
                           setMessages([])
                           chrome.storage.local.remove('chat_messages')
+                          broadcastChat()
                           analytics.sessionCleared()
                           setShowMenu(false)
                         } catch (error) {
