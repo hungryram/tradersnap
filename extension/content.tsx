@@ -4,6 +4,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { ChartOverlay } from "./ChartOverlay"
 import { ChartLightbox } from "./ChartLightbox"
 import Pip, { type PipMood } from "./components/Pip"
+import CheckDetails, { ChecklistMeter, checklistProgress } from "./components/CheckDetails"
 import { analytics } from "~lib/analytics"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import type { ClosedTrade } from "~lib/trades/types"
@@ -2603,6 +2604,14 @@ const TradingBuddyWidget = () => {
                     const nextStep = !aligned ? waitFor[0] : undefined
                     // The nudge earns a spot up front only on a rule break or an off-plan setup
                     const nudgeUpFront = !!analysis.behavioral_nudge && (analysis.setup_status === 'violated' || analysis.matched_strategy === null)
+                    const ticked: number[] = msg.checklistTicked || []
+                    const checklist = checklistProgress(analysis, ticked)
+                    const tick = (index: number) => {
+                      skipNextScrollRef.current = true
+                      setMessages(prev => prev.map((m, idx) => idx === i
+                        ? { ...m, checklistTicked: ticked.includes(index) ? ticked.filter(t => t !== index) : [...ticked, index] }
+                        : m))
+                    }
 
                     return (
                       <>
@@ -2633,14 +2642,9 @@ const TradingBuddyWidget = () => {
                         {/* Details toggle and rating on one quiet row */}
                         <div className={`mt-3 flex items-center justify-between gap-2 border-t pt-2 text-[12px] ${dark ? 'border-dark-border' : 'border-slate-200'}`}>
                           <button onClick={() => setExpandedDetails(prev => ({ ...prev, [i]: !prev[i] }))} className={`flex items-center gap-2 ${muted} hover:underline`}>
-                            {detailsOpen ? 'Hide details ▴' : 'Details ▾'}
-                            {!detailsOpen && (passed + failed + unclear > 0) && (
-                              <span className="flex gap-2 no-underline">
-                                {passed > 0 && <span className="text-green-500">✓{passed}</span>}
-                                {failed > 0 && <span className="text-red-500">✗{failed}</span>}
-                                {unclear > 0 && <span className="text-yellow-500">?{unclear}</span>}
-                              </span>
-                            )}
+                            {detailsOpen ? 'Hide details ▴' : (checklist.total ? 'Checklist' : 'Details')}
+                            {!detailsOpen && checklist.total > 0 && <ChecklistMeter done={checklist.done} total={checklist.total} dark={dark} />}
+                            {!detailsOpen && <span>▾</span>}
                           </button>
                           {msg.id && (
                             ratings[msg.id] ? (
@@ -2655,85 +2659,12 @@ const TradingBuddyWidget = () => {
                         </div>
 
                         {detailsOpen && (
-                          <div className="mt-3 space-y-3 text-[13px]">
-                            {analysis.summary && (
-                              <div>
-                                <div className={sectionLabel}>Right now</div>
-                                <div>{analysis.summary}</div>
-                              </div>
-                            )}
-
-                            {waitFor.length > (nextStep ? 1 : 0) && (
-                              <div>
-                                <div className={sectionLabel}>{nextStep ? 'Also wait for' : 'Wait for'}</div>
-                                <ul className="space-y-1">
-                                  {waitFor.slice(nextStep ? 1 : 0).map((item: string, idx: number) => (
-                                    <li key={idx} className="flex gap-2"><span className={muted}>›</span><span>{item}</span></li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {analysis.levels_to_watch?.length > 0 && (
-                              <div>
-                                <div className={sectionLabel}>Levels</div>
-                                <div className="space-y-1">
-                                  {analysis.levels_to_watch.map((level: any, idx: number) => (
-                                    <div key={idx} className="flex items-baseline gap-2">
-                                      <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${levelDot(level.type)}`} />
-                                      <span className="font-medium">{level.label}</span>
-                                      {level.why_it_matters && <span className={`text-[12px] ${muted}`}>{level.why_it_matters}</span>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {checks.length > 0 && (
-                              <div>
-                                <div className={sectionLabel}>Your rules on this chart</div>
-                                <div className="space-y-1.5">
-                                  {checks.map((check: any, idx: number) => (
-                                    <div key={idx} className="flex items-start gap-2">
-                                      <span className={check.status === 'pass' ? 'text-green-500' : check.status === 'fail' ? 'text-red-500' : 'text-yellow-500'}>
-                                        {check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '?'}
-                                      </span>
-                                      <div>
-                                        <div className="font-medium">{check.rule}</div>
-                                        {check.note && <div className={`text-[12px] ${muted}`}>{check.note}</div>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {selfChecks.length > 0 && (
-                              <div>
-                                <div className={sectionLabel}>Check these yourself</div>
-                                <ul className="space-y-1">
-                                  {selfChecks.map((rule: string, idx: number) => (
-                                    <li key={idx} className="flex gap-2"><span className={muted}>☐</span><span>{rule}</span></li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {analysis.bullets?.length > 0 && (
-                              <div>
-                                <div className={sectionLabel}>What I see</div>
-                                <ul className="space-y-1">
-                                  {analysis.bullets.map((bullet: string, idx: number) => (
-                                    <li key={idx} className="flex gap-2"><span className={muted}>•</span><span>{bullet}</span></li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
+                          <>
+                            <CheckDetails analysis={analysis} dark={dark} ticked={ticked} onTick={tick} skipFirstWaitFor={!!nextStep} />
                             {analysis.behavioral_nudge && !nudgeUpFront && (
-                              <div className={`italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
+                              <div className={`mt-3 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
                             )}
-                          </div>
+                          </>
                         )}
 
                         <div className={`mt-2 text-[10px] ${muted}`}>Not financial advice. AI can be wrong.</div>
