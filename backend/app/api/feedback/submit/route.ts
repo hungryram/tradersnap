@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { SITE_ORIGINS } from "@/lib/urls"
@@ -20,6 +20,36 @@ function addCorsHeaders(response: NextResponse, origin: string | null) {
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(new NextResponse(null, { status: 200 }), request.headers.get("origin"))
+}
+
+// Emails each submission through Postmark. The message is already saved, so a failure here only loses the email.
+// Needs POSTMARK_SERVER_TOKEN, and the From address must be a verified sender signature in Postmark.
+async function emailFeedback(feedback: { kind: string; message: string; email: string | null; source: string | null; version: string | null }) {
+  const token = process.env.POSTMARK_SERVER_TOKEN
+  if (!token) return
+  const label = { bug: "Bug report", idea: "Idea", other: "Feedback" }[feedback.kind] ?? "Feedback"
+  const preview = feedback.message.replace(/\s+/g, " ").slice(0, 70)
+  const response = await fetch("https://api.postmarkapp.com/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json", "X-Postmark-Server-Token": token },
+    body: JSON.stringify({
+      From: process.env.FEEDBACK_FROM_EMAIL || "forms@hungryramwebdesign.com",
+      To: process.env.FEEDBACK_TO_EMAIL || "ram@hungryram.com",
+      // Replying goes straight to the person, when they left an email
+      ...(feedback.email ? { ReplyTo: feedback.email } : {}),
+      Subject: `Pip ${label.toLowerCase()}: ${preview}`,
+      TextBody: [
+        feedback.message,
+        "",
+        "---",
+        `Type: ${label}`,
+        `From: ${feedback.email ?? "no email left"}`,
+        feedback.source ? `Sent from: ${feedback.source}${feedback.version ? ` (v${feedback.version})` : ""}` : null
+      ].filter(line => line !== null).join("\n"),
+      MessageStream: process.env.POSTMARK_MESSAGE_STREAM || "outbound"
+    })
+  })
+  if (!response.ok) console.error("[Feedback form] Postmark error:", response.status, await response.text().catch(() => ""))
 }
 
 const bodySchema = z.object({
@@ -49,16 +79,18 @@ export async function POST(request: NextRequest) {
     .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
   if ((count ?? 0) >= 200) return reply({ error: "We're getting a lot of messages right now. Please try again later." }, 429)
 
-  const { error } = await supabase.from("feedback").insert({
+  const row = {
     kind: parsed.data.kind,
     message: parsed.data.message,
     email: parsed.data.email || null,
     source: parsed.data.source ?? null,
     extension_version: parsed.data.version ?? null
-  })
-  if (error) {
-    console.error("[Feedback form] Insert error:", error)
-    return reply({ error: "Couldn't send that. Please try again, or email us." }, 500)
   }
+  const { error } = await supabase.from("feedback").insert(row)
+  // The email is the notification, so a message still reaches you if the table isn't set up yet
+  if (error) console.error("[Feedback form] Insert error:", error)
+  if (error && !process.env.POSTMARK_SERVER_TOKEN) return reply({ error: "Couldn't send that. Please try again, or email us." }, 500)
+
+  after(() => emailFeedback({ ...row, version: row.extension_version }).catch(err => console.error("[Feedback form] Email failed:", err)))
   return reply({ success: true })
 }

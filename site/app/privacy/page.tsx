@@ -116,6 +116,7 @@ export default function Page() {
         <li><strong>Vercel:</strong> website and server hosting</li>
         <li><strong>Anthropic and OpenAI:</strong> AI responses</li>
         <li><strong>Stripe:</strong> payments</li>
+        <li><strong>Postmark:</strong> email delivery of the messages you send through our feedback form</li>
         <li><strong>Google:</strong> website analytics, and Google sign-in if you use it</li>
       </ul>
       <p>
