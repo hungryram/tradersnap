@@ -594,14 +594,23 @@ Use for time-based coaching when they ask about the next candle or how long they
           user_id: user.id,
           role: 'assistant',
           content: aiResponse,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          // The offer to log a reported result stays with the message (see 20261023_trade_proposals.sql)
+          ...(tradeProposal ? { trade_proposal: { ...tradeProposal, status: 'pending' } } : {})
         }
       ]
 
-      const { data: savedMessages, error: dbError } = await supabase
+      let { data: savedMessages, error: dbError } = await supabase
         .from('chat_messages')
         .insert(messagesToSave)
         .select('id, role')
+      if (dbError && tradeProposal) {
+        // The column doesn't exist yet: save the messages without the offer
+        ;({ data: savedMessages, error: dbError } = await supabase
+          .from('chat_messages')
+          .insert(messagesToSave.map(({ trade_proposal, ...rest }: any) => rest))
+          .select('id, role'))
+      }
 
       if (dbError) {
         console.error('[Chat API] Failed to save messages:', dbError)

@@ -86,6 +86,16 @@ function rulesFromReply(content: unknown): { rules: string; name: string | null 
 }
 
 // Pip's face for a message: pleased when a setup lines up, wary at a rule break or warning
+// The "log this result?" offer saved with a chat message, in the shape the widget uses
+function tradeProposalFields(msg: any) {
+  const p = msg.trade_proposal
+  if (!p) return {}
+  return {
+    tradeProposal: { id: p.id, amount: p.amount, symbol: p.symbol ?? null },
+    tradeStatus: p.status === 'pending' ? undefined : p.status
+  }
+}
+
 function messageMood(msg: any): PipMood {
   if (msg.type === 'checkin') return msg.level === 'warning' ? 'caution' : 'idle'
   if (msg.type === 'error') return 'idle'
@@ -254,7 +264,8 @@ const TradingBuddyWidget = () => {
             type: msg.role === 'user' ? 'user' : 'assistant',
             content: content,
             timestamp: msg.created_at ? new Date(msg.created_at) : new Date(),
-            isFavorited: msg.is_favorited || false
+            isFavorited: msg.is_favorited || false,
+            ...tradeProposalFields(msg)
           }
         })
         
@@ -662,10 +673,32 @@ const TradingBuddyWidget = () => {
         return
       }
       setTradeStatus(proposal.id, data.duplicate ? 'duplicate' : 'logged')
+      // Pip answers in the chat (saved on the server, so it shows after a reload and in other tabs)
+      if (data.message) {
+        setMessages(prev => [...prev, { type: 'assistant', content: data.message, timestamp: new Date(), id: data.messageId || undefined, isFavorited: false }])
+        setTimeout(() => scrollToBottom(), 100)
+      }
       analytics.track('trade_logged', { duplicate: !!data.duplicate })
       fetchTradeStats()
+      broadcastChat()
     } catch {
       setTradeStatus(proposal.id, 'error', "Couldn't log that one. Check your connection and try again.")
+    }
+  }
+
+  const dismissReportedTrade = async (proposalId: string) => {
+    setTradeStatus(proposalId, 'dismissed')
+    analytics.track('trade_log_dismissed', {})
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/trades/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session?.access_token}` },
+        body: JSON.stringify({ proposal_id: proposalId, dismiss: true })
+      })
+      broadcastChat()
+    } catch {
+      // Hidden here either way; the server copy catches up next time
     }
   }
 
@@ -1334,7 +1367,8 @@ const TradingBuddyWidget = () => {
             type: msg.role === 'user' ? 'user' : 'assistant',
             content: content,
             timestamp: new Date(msg.created_at),
-            isFavorited: msg.is_favorited || false
+            isFavorited: msg.is_favorited || false,
+            ...tradeProposalFields(msg)
           }
         })
 
@@ -2625,7 +2659,7 @@ const TradingBuddyWidget = () => {
                             {msg.tradeStatus === 'saving' ? 'Logging…' : `Log ${msg.tradeProposal.amount < 0 ? '-' : '+'}$${Math.abs(msg.tradeProposal.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}${msg.tradeProposal.symbol ? ` ${msg.tradeProposal.symbol}` : ''} to my journal`}
                           </button>
                           <button
-                            onClick={() => { setTradeStatus(msg.tradeProposal.id, 'dismissed'); analytics.track('trade_log_dismissed', {}) }}
+                            onClick={() => dismissReportedTrade(msg.tradeProposal.id)}
                             className={`rounded-lg border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-dark-border text-dark-text hover:text-dark-body' : 'border-slate-300 text-slate-600 hover:text-slate-900'}`}
                           >
                             Not now
