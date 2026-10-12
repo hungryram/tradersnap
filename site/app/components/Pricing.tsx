@@ -12,12 +12,10 @@ const PLANS = [
     items: [
       "About 5 chart checks and 15 messages with Pip a day",
       "Automatic trade tracking on TradingView, Tradovate and TopstepX",
-      "Several accounts: copied trades count once, limits per account",
-      "Tell Pip about a trade and log it in one tap",
-      "Check-ins: losing streaks, limits, revenge trades",
-      "Daily loss and trade limits",
+      "Check-ins and daily limits",
       "1 strategy checked at a time",
       "Journal, calendar and notes: last 7 days",
+      "Pip remembers 3 saved messages",
     ],
     cta: "Add to Chrome",
   },
@@ -26,6 +24,7 @@ const PLANS = [
     price: { month: 29, year: 249 },
     badge: "Most popular",
     items: [
+      "Everything in Free",
       "About 30 chart checks and 150 messages a day",
       "Up to 5 strategies, Pip matches each chart to the right one",
       "Full journal, calendar and notes history",
@@ -42,10 +41,11 @@ const PLANS = [
     price: { month: 99, year: 990 },
     note: "For full-time and multi-account traders",
     items: [
+      "Everything in Pro",
       "About 100 chart checks and 400 messages a day",
       "Unlimited strategies",
-      "Everything in Pro",
-      "Pip reads your last 15 journal notes, and reviews up to 15 days a day",
+      "Pip reads your last 15 journal notes",
+      "Up to 15 day reviews a day",
       "Pip remembers 50 saved messages",
     ],
     cta: "Start free, upgrade anytime",
@@ -113,7 +113,7 @@ export default function Pricing() {
       </div>
 
       <p className="mt-6 text-center text-sm text-ink-muted">
-        Every new account gets 7 days of Pro, free, no card. Usage resets daily at midnight UTC. Busy day? Buy extra usage on any plan; it never expires.
+        Every plan works with several accounts (copied trades count once, limits apply per account) and lets you tell Pip about a trade and log it in one tap. Every new account gets 7 days of Pro, free, no card. Usage resets daily at midnight UTC. Busy day? Buy extra usage on any plan; it never expires.
       </p>
     </div>
   )
