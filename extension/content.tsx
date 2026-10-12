@@ -71,6 +71,16 @@ export const config: PlasmoCSConfig = {
 // Largest image (as a data URL) a request can carry under the server's 4.5 MB body limit
 const MAX_IMAGE_CHARS = 4_000_000
 
+// Pip's own website and dashboard have no chart, so chart checks and "include my chart" are hidden there
+const ON_PIP_SITE = (() => {
+  try {
+    const host = window.location.hostname
+    return host.endsWith('tradewithpip.ai') || host.endsWith('snapchartapp.com') || window.location.origin === new URL(process.env.PLASMO_PUBLIC_API_URL!).origin
+  } catch {
+    return false
+  }
+})()
+
 // Before a check-in appears, Pip "types" for a moment, so it reads as Pip noticing
 // something and speaking up
 const CHECKIN_TYPING_MS = 1500
@@ -1138,7 +1148,7 @@ const TradingBuddyWidget = () => {
       if (message.type === "OPEN_WIDGET") {
         setIsOpen(true)
         analytics.extensionOpened({ sessionId: session?.id })
-        if (message.action === "analyze") {
+        if (message.action === "analyze" && !ON_PIP_SITE) {
           handleAnalyze()
         }
       }
@@ -1169,7 +1179,7 @@ const TradingBuddyWidget = () => {
       // Ctrl+Alt+A - Analyze chart
       if ((e.key === 'a' || e.key === 'A') && e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
         e.preventDefault()
-        handleAnalyze()
+        if (!ON_PIP_SITE) handleAnalyze()
         return
       }
       
@@ -1177,7 +1187,7 @@ const TradingBuddyWidget = () => {
       if (e.key === 'Enter' && e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
         if (inputText.trim() && !isSending) {
           e.preventDefault()
-          handleSendMessage(inputText, true)
+          handleSendMessage(inputText, !ON_PIP_SITE)
         }
         return
       }
@@ -1567,6 +1577,7 @@ const TradingBuddyWidget = () => {
 
   const handleSendMessage = async (text: string, includeChart: boolean = false) => {
     if (!text.trim() || isSending) return
+    if (ON_PIP_SITE) includeChart = false
     
     setIsSending(true)
     
@@ -2541,7 +2552,7 @@ const TradingBuddyWidget = () => {
         )}
 
         {/* Getting started (pinned above the messages so it never scrolls away) */}
-        {gettingStarted && !gettingStarted.dismissed && (
+        {gettingStarted && !gettingStarted.dismissed && !ON_PIP_SITE && (
           <GettingStarted
             dark={theme === 'dark'}
             signedIn={!!session}
@@ -3094,15 +3105,17 @@ const TradingBuddyWidget = () => {
           ) : (
             <>
               {/* Main action */}
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing || isSending}
-                title={isSending ? "Please wait for the reply" : "Check this chart against your rules"}
-                className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
-              >
-                <span className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Check this setup"}
-              </button>
+              {!ON_PIP_SITE && (
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || isSending}
+                  title={isSending ? "Please wait for the reply" : "Check this chart against your rules"}
+                  className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
+                >
+                  <span className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                  {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Check this setup"}
+                </button>
+              )}
 
               {/* Message box */}
               <div className={`rounded-xl border transition-colors focus-within:border-blue-500 ${theme === 'dark' ? 'border-dark-border bg-dark-surface' : 'border-slate-300 bg-white'}`}>
@@ -3130,6 +3143,7 @@ const TradingBuddyWidget = () => {
                 />
                 <div className="flex items-center justify-between gap-2 px-2 pb-2">
                   <div className="flex min-w-0 items-center gap-2">
+                  {!ON_PIP_SITE && (
                   <button
                     onClick={() => setAttachChart(!attachChart)}
                     aria-pressed={attachChart}
@@ -3147,6 +3161,7 @@ const TradingBuddyWidget = () => {
                     </svg>
                     {attachChart ? 'Chart included' : 'Include my chart'}
                   </button>
+                  )}
                   {strategyOptions.length > 1 && (
                     <select
                       value={selectedStrategy}
