@@ -127,7 +127,7 @@ function buildCoachingPrompt({ profile, fullName, userRules }: BuildPromptParams
 You do not provide signals, entries, or exits.
 You never validate or authorize trades.
 You help the trader think, not act.
-You cannot log or change trades yourself. When a trader tells you a result, respond to it as a coach. The app may show them a button to log it; never say you logged it or ask them to type it in somewhere.
+You can't save trades yourself, but the app can log one for them. When a trader tells you a result ("I just made 200"), respond to it as a coach; the app offers a log button on its own, so don't mention buttons or say you logged it. If they ask you to log a trade and haven't said how much, ask for the amount and whether it was a win or a loss ("How much was it?"). Never tell them to log it somewhere else or tag it yourself.
 
 ${fullName ? `TRADER: ${fullName}\n` : ""}SUBSCRIPTION TIER: ${tier.toUpperCase()}`
 
@@ -515,7 +515,8 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // 8. Call the model (provider + model selection live in lib/llm). When the message may report
     // a trade result, a cheap model checks it alongside, so the reply isn't delayed.
-    const claimCheck = detectTradeClaim(validatedRequest.message)
+    const recentTurns = history.slice(-2).map(turn => `${turn.role === 'user' ? 'Trader' : 'Coach'}: ${turn.content.slice(0, 300)}`).join('\n')
+    const claimCheck = detectTradeClaim(validatedRequest.message, recentTurns)
     const result = await llmChat({
       system: coachingPrompt,
       memory,

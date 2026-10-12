@@ -14,6 +14,10 @@ const HAS_RESULT = /\b(made|make|won|win|lost|lose|loss|profit|profited|up|down|
 export const mightReportResult = (message: string) =>
   message.length <= 300 && HAS_AMOUNT.test(message) && HAS_RESULT.test(message)
 
+// "-150" or "$200" on its own, answering Pip's "how much was it?" after the trader asked to log a trade
+const BARE_AMOUNT = /^\s*[-+]?\s?\$?\s?\d[\d,]*(\.\d+)?\s?(k|dollars|bucks|usd)?\s*$/i
+const answersLogRequest = (message: string, recent: string) => BARE_AMOUNT.test(message) && /\blog\b/i.test(recent)
+
 const claimSchema = z.object({
   reported_trade: z.boolean(),
   amount: z.number().nullable(),
@@ -22,16 +26,18 @@ const claimSchema = z.object({
 
 export type TradeClaim = { amount: number; symbol: string | null }
 
-export async function detectTradeClaim(message: string): Promise<{ claim: TradeClaim | null; tokens: TokenUsage | null }> {
-  if (!mightReportResult(message)) return { claim: null, tokens: null }
+// `recent` is the last couple of turns of the conversation, as plain text
+export async function detectTradeClaim(message: string, recent = ""): Promise<{ claim: TradeClaim | null; tokens: TokenUsage | null }> {
+  if (!mightReportResult(message) && !answersLogRequest(message, recent)) return { claim: null, tokens: null }
   try {
     const { output, tokens } = await smallJson({
       system: `You read one message from a trader to their coach and decide whether they are reporting the result of a trade (or session) that already happened, in dollars.
 reported_trade is true only when they state a result that already happened with a dollar amount, like "just made 200", "lost $150 on that one", "got stopped out for -75", "up 400 today".
 It is false for: questions, hypotheticals ("if I make 200"), goals ("I want to make 500"), plans, account sizes, prices, stop distances, and results in points, ticks or percent with no dollar amount.
 amount is the signed dollar result: positive for a gain, negative for a loss. Use null when reported_trade is false.
-symbol is the ticker if they named one (like NQ, ES, AAPL), else null.`,
-      prompt: message,
+symbol is the ticker if they named one (like NQ, ES, AAPL), else null.
+If the message is only an amount, it answers a question about a trade the trader asked to log. Use the recent conversation to decide: a loser, loss or stop-out is negative, a winner is positive. If you can't tell the sign, reported_trade is false.`,
+      prompt: recent ? `Recent conversation:\n${recent}\n\nLatest message from the trader: ${message}` : message,
       schema: claimSchema,
       maxTokens: 150
     })
