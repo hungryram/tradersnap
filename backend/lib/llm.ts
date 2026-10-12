@@ -11,9 +11,14 @@ import { isPaid } from "./plans"
 export type Provider = "openai" | "anthropic"
 export const provider: Provider = process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai"
 
+// Main model: chart analysis and rare judgment jobs (rules review). Opus reads charts best.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5"
-// Model for free-tier chat (e.g. set to claude-sonnet-5-5 to lower free-tier cost)
-const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_MODEL
+// Model for chart analysis; set ANTHROPIC_ANALYZE_MODEL to try another model without touching the rest
+const ANTHROPIC_ANALYZE_MODEL = process.env.ANTHROPIC_ANALYZE_MODEL || ANTHROPIC_MODEL
+// Coaching chat. Short conversational replies don't need Opus; set ANTHROPIC_CHAT_MODEL=claude-opus-5-5 to go back
+const ANTHROPIC_CHAT_MODEL = process.env.ANTHROPIC_CHAT_MODEL || "claude-sonnet-5-5"
+// Model for free-tier chat, if it should differ from the chat model
+const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_CHAT_MODEL
 // Thinking effort for chart analysis: higher is more careful but slower
 const ANALYZE_EFFORT = (process.env.ANTHROPIC_ANALYZE_EFFORT || "medium") as "low" | "medium" | "high"
 // Thinking effort for chat. Plain conversation doesn't need deep thinking, and
@@ -87,7 +92,7 @@ export async function analyzeChart(opts: {
 }): Promise<AnalysisResult> {
   if (provider === "anthropic") {
     const response = await anthropic().beta.messages.parse({
-      model: ANTHROPIC_MODEL,
+      model: ANTHROPIC_ANALYZE_MODEL,
       max_tokens: 16000,
       betas: [FALLBACK_BETA],
       fallbacks: "default",
@@ -152,7 +157,7 @@ export async function chat(opts: {
 }
 
 async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResult> {
-  const model = isPaidPlan(opts.plan) ? ANTHROPIC_MODEL : ANTHROPIC_MODEL_FREE
+  const model = isPaidPlan(opts.plan) ? ANTHROPIC_CHAT_MODEL : ANTHROPIC_MODEL_FREE
 
   // Cached prefix, most stable first. The system prompt and memory change at most
   // daily, so they're cached for an hour (trading sessions have long gaps between
