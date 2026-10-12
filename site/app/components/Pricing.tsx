@@ -15,6 +15,7 @@ const PLANS = [
       "Check-ins and daily limits",
       "1 strategy checked at a time",
       "Journal, calendar and notes: last 7 days",
+      "1 free day review a week",
       "Pip remembers 3 saved messages",
     ],
     cta: "Add to Chrome",

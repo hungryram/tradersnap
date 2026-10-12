@@ -29,7 +29,7 @@ interface UserData {
 }
 
 const PLAN_LISTS = {
-  free: ["About 5 chart checks and 15 messages a day", "Trade tracking on TradingView, Tradovate and TopstepX", "Check-ins and daily limits", "1 strategy checked at a time", "Journal, calendar and notes: last 7 days", "Pip remembers 3 saved messages"],
+  free: ["About 5 chart checks and 15 messages a day", "Trade tracking on TradingView, Tradovate and TopstepX", "Check-ins and daily limits", "1 strategy checked at a time", "Journal, calendar and notes: last 7 days", "1 free day review a week", "Pip remembers 3 saved messages"],
   pro: ["Everything in Free", "About 30 chart checks and 150 messages a day", "Up to 5 strategies checked at once", "Full journal, calendar and notes history", "Results per strategy", "Pip reads your last 10 journal notes and your last trading day", "Pip reviews any day in your journal (5 a day)", "Pip remembers 20 saved messages"],
   pro_plus: ["Everything in Pro", "About 100 chart checks and 400 messages a day", "Unlimited strategies", "Pip reads your last 15 journal notes", "Up to 15 day reviews a day", "Pip remembers 50 saved messages", "For full-time and multi-account traders"],
 }

@@ -5,7 +5,7 @@ import { api } from "@/lib/dashboard-data"
 import { buttonPrimary, buttonSecondary } from "./ui"
 
 type Review = { summary: string; went_well: string[]; to_work_on: string[]; question: string; created_at?: string }
-type State = { review: Review | null; limit: number; used: number }
+type State = { review: Review | null; limit: number; used: number; period?: "day" | "week" | null }
 
 // "Review this day": Pip's read of one journal day (its trades and the trader's note) against their rules.
 // A paid feature with a daily cap; the latest review of each day is saved.
@@ -20,7 +20,7 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
     let cancelled = false
     api<State>(`/api/journal/review?day=${day}`)
       .then(data => { if (!cancelled) setState(data) })
-      .catch(() => { if (!cancelled) setState({ review: null, limit: 0, used: 0 }) })
+      .catch(() => { if (!cancelled) setState({ review: null, limit: 0, used: 0, period: null }) })
     return () => { cancelled = true }
   }, [day])
 
@@ -51,11 +51,14 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
 
   const { review } = state
   const left = Math.max(0, state.limit - state.used)
+  const weekly = state.period === "week"
+  // Free plans get one review a week; once it's used (and this day has none), Pro is the way to more
+  const usedUp = weekly && left === 0 && !review
   return (
     <div className="mt-5 rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Pip&apos;s read of this day</p>
-        <span className="text-xs text-ink-muted">{left} of {state.limit} reviews left today</span>
+        <span className="text-xs text-ink-muted">{weekly ? (left ? "1 free review a week" : "Free review used this week") : `${left} of ${state.limit} reviews left today`}</span>
       </div>
 
       {review ? (
@@ -82,14 +85,20 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
         </p>
       )}
 
+      {usedUp && (
+        <p className="mt-3 text-sm text-ink-text">You&apos;ve used this week&apos;s free review. <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro</a> gives you 5 a day, and you can review any day again.</p>
+      )}
+      {weekly && review && <p className="mt-3 text-xs text-ink-muted">Free plans get one review a week. <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro</a> lets you review any day, again and again.</p>}
       {noteUnsaved && <p className="mt-3 text-xs text-amber-300">You have an unsaved note. Save it first so Pip reads it.</p>}
       {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
 
-      <div className="mt-3">
-        <button onClick={runReview} disabled={busy || !hasContent || left === 0} className={review ? buttonSecondary : buttonPrimary}>
-          {busy ? "Pip is reading the day..." : review ? "Review again" : "Review this day with Pip"}
-        </button>
-      </div>
+      {!(weekly && review) && !usedUp && (
+        <div className="mt-3">
+          <button onClick={runReview} disabled={busy || !hasContent || left === 0} className={review ? buttonSecondary : buttonPrimary}>
+            {busy ? "Pip is reading the day..." : review ? "Review again" : "Review this day with Pip"}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

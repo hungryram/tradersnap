@@ -58,6 +58,28 @@ async function getUser(request: NextRequest) {
   return user
 }
 
+// Free plans get a taste: one review a week. Counted from the saved reviews (one per day reviewed); null when that
+// table isn't there yet, in which case free reviews stay off rather than going unlimited.
+const usedThisWeek = async (userId: string) => {
+  const { count, error } = await supabase
+    .from("day_reviews")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+  return error ? null : count ?? 0
+}
+
+// What this plan allows: a daily number (paid), or one a week (free), and how many are used
+async function allowance(userId: string, plan: ReturnType<typeof effectivePlan>) {
+  const f = features(plan)
+  if (f.dayReviewsPerDay) return { period: "day" as const, limit: f.dayReviewsPerDay, used: await usedToday(userId) }
+  if (f.dayReviewsPerWeek) {
+    const used = await usedThisWeek(userId)
+    return { period: "week" as const, limit: f.dayReviewsPerWeek, used: used ?? f.dayReviewsPerWeek }
+  }
+  return { period: null, limit: 0, used: 0 }
+}
+
 const usedToday = async (userId: string) => {
   const { count, error } = await supabase
     .from("llm_usage")
@@ -76,9 +98,9 @@ export async function GET(request: NextRequest) {
   if (!dayPattern.test(day)) return NextResponse.json({ error: "Invalid day" }, { status: 400 })
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-  const limit = features(effectivePlan(profile)).dayReviewsPerDay
+  const { period, limit, used } = await allowance(user.id, effectivePlan(profile))
   const { data } = await supabase.from("day_reviews").select("review, created_at").eq("user_id", user.id).eq("day", day).maybeSingle()
-  return NextResponse.json({ review: data ? { ...data.review, created_at: data.created_at } : null, limit, used: limit ? await usedToday(user.id) : 0 })
+  return NextResponse.json({ review: data ? { ...data.review, created_at: data.created_at } : null, limit, used, period })
 }
 
 // POST /api/journal/review { day, timezone } — Pip writes (or rewrites) the review
@@ -94,10 +116,23 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
   const plan = effectivePlan(profile)
-  const limit = features(plan).dayReviewsPerDay
-  if (!limit) return NextResponse.json({ error: "Day reviews are part of Pro.", requiresUpgrade: true }, { status: 403 })
-  const used = await usedToday(user.id)
-  if (used >= limit) return NextResponse.json({ error: `You've used your ${limit} day reviews for today. They free up over the next 24 hours.`, limit, used }, { status: 429 })
+  const { period, limit, used } = await allowance(user.id, plan)
+  if (!period) return NextResponse.json({ error: "Day reviews are part of Pro.", requiresUpgrade: true }, { status: 403 })
+  if (used >= limit) {
+    return NextResponse.json({
+      error: period === "week" ? "You've used this week's free day review. Pro gives you 5 a day." : `You've used your ${limit} day reviews for today. They free up over the next 24 hours.`,
+      limit, used, period, requiresUpgrade: period === "week"
+    }, { status: 429 })
+  }
+  if (period === "week") {
+    // The free taste is one review of a recent day; a day can't be reviewed again, and history is limited like the journal's
+    const { data: existing } = await supabase.from("day_reviews").select("id").eq("user_id", user.id).eq("day", day).maybeSingle()
+    if (existing) return NextResponse.json({ error: "Pro lets you review a day again. Your review of this day is above.", requiresUpgrade: true }, { status: 403 })
+    const historyDays = features(plan).historyDays
+    if (historyDays && Date.now() - startOfDayUtc(day, timezone) > (historyDays + 1) * 24 * 60 * 60 * 1000) {
+      return NextResponse.json({ error: `Free keeps ${historyDays} days of history, so older days can't be reviewed. Pro keeps all of it.`, requiresUpgrade: true }, { status: 403 })
+    }
+  }
 
   // The day's trades (copies across accounts are one decision) and the trader's note
   const start = startOfDayUtc(day, timezone)
@@ -160,7 +195,7 @@ export async function POST(request: NextRequest) {
     }
     const saved = await supabase.from("day_reviews").upsert({ user_id: user.id, day, review, created_at: new Date().toISOString() }, { onConflict: "user_id,day" })
     if (saved.error && saved.error.code !== "42P01" && saved.error.code !== "PGRST205") console.error("[Day review] Save failed:", saved.error.message) // table missing until 20261026_day_reviews.sql runs
-    return NextResponse.json({ review: { ...review, created_at: new Date().toISOString() }, limit, used: used + 1 })
+    return NextResponse.json({ review: { ...review, created_at: new Date().toISOString() }, limit, used: used + 1, period })
   } catch (error) {
     console.error("[Day review] Failed:", error instanceof Error ? error.message : error)
     return NextResponse.json({ error: "Pip couldn't review this day just now. Try again in a moment." }, { status: 500 })

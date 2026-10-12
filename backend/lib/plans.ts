@@ -16,16 +16,17 @@ export type PlanFeatures = {
   pipReadsNotes: boolean      // Pip uses journal notes in coaching and memory
   journalNotesInMemory: number // how many of the latest journal notes Pip reads (0 = none)
   dayReviewsPerDay: number    // "Review this day" in the journal (0 = not on this plan)
+  dayReviewsPerWeek: number   // plans without daily reviews get a taste: this many a week (0 = none)
 }
 
 export const PLANS: Record<Plan, PlanFeatures> = {
   // 5 chart checks + 15 messages
-  free: { label: "Free", dailyCredits: 40, favorites: 3, activeStrategies: 1, rulesets: 3, rulesChars: 1000, historyDays: 7, pipReadsNotes: false, journalNotesInMemory: 0, dayReviewsPerDay: 0 },
+  free: { label: "Free", dailyCredits: 40, favorites: 3, activeStrategies: 1, rulesets: 3, rulesChars: 1000, historyDays: 7, pipReadsNotes: false, journalNotesInMemory: 0, dayReviewsPerDay: 0, dayReviewsPerWeek: 1 },
   // 30 chart checks + 150 messages
-  pro: { label: "Pro", dailyCredits: 300, favorites: 20, activeStrategies: 5, rulesets: 20, rulesChars: 5000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 10, dayReviewsPerDay: 5 },
+  pro: { label: "Pro", dailyCredits: 300, favorites: 20, activeStrategies: 5, rulesets: 20, rulesChars: 5000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 10, dayReviewsPerDay: 5, dayReviewsPerWeek: 0 },
   // 100 chart checks + 400 messages
-  pro_plus: { label: "Pro+", dailyCredits: 900, favorites: 50, activeStrategies: 50, rulesets: 50, rulesChars: 5000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 15, dayReviewsPerDay: 15 },
-  admin: { label: "Admin", dailyCredits: 1_000_000, favorites: 100, activeStrategies: 50, rulesets: 999, rulesChars: 10000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 15, dayReviewsPerDay: 50 },
+  pro_plus: { label: "Pro+", dailyCredits: 900, favorites: 50, activeStrategies: 50, rulesets: 50, rulesChars: 5000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 15, dayReviewsPerDay: 15, dayReviewsPerWeek: 0 },
+  admin: { label: "Admin", dailyCredits: 1_000_000, favorites: 100, activeStrategies: 50, rulesets: 999, rulesChars: 10000, historyDays: null, pipReadsNotes: true, journalNotesInMemory: 15, dayReviewsPerDay: 50, dayReviewsPerWeek: 0 },
 }
 
 // List prices in USD (shown on the site and used for MRR on the admin page)
