@@ -32,8 +32,8 @@ Lets the Pip dashboard hand the trader's sign-in to the extension after they log
 
 - **Personally identifiable information:** email address, optional first name (account).
 - **Authentication information:** sign-in session tokens.
-- **Personal communications:** messages the trader sends to Pip and Pip's replies.
-- **Financial and payment information:** trade history detected from the trading panel (symbol, size, prices, profit or loss). Payments are handled by Stripe on the website, not the extension.
+- **Personal communications:** messages the trader sends to Pip and Pip's replies. When a message reports a trade result (for example "I just made 200"), a smaller AI model checks it so Pip can offer to log it; nothing is saved unless the trader taps to confirm.
+- **Financial and payment information:** trade history detected from the trading panel (symbol, size, prices, profit or loss), and results the trader chooses to log by hand (amount, optional ticker, time). Payments are handled by Stripe on the website, not the extension.
 - **User activity:** feature usage events (chart checks, messages, check-ins shown).
 - **Website content:** chart screenshots, only when the trader asks for a chart check.
 
