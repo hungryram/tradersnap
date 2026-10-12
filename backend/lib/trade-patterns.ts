@@ -165,3 +165,31 @@ export async function loadRecentDays(supabase: SupabaseClient, userId: string, t
   if (error || !data) return []
   return recentDayLines(data as unknown as Parameters<typeof recentDayLines>[0], timezone)
 }
+
+// The most recent trading day before today, trade by trade (at most 15 lines), so Pip can talk about it in detail.
+export async function loadLastDayDetail(supabase: SupabaseClient, userId: string, todayStart: Date, timezone = "America/New_York"): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("trades")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("closed_at", new Date(todayStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString())
+    .lt("closed_at", todayStart.toISOString())
+    .order("closed_at", { ascending: true })
+    .limit(1000)
+  if (error || !data?.length) return []
+  const marked = prepareTrades(data as unknown as { account: string | null; symbol: string | null; side: string | null; opened_at: string | null; closed_at: string; realized_pnl: number | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null; kind?: string; source?: string }[])
+  const lastDay = marked.map(t => localParts(t.closed_at, timezone).day).sort().pop()!
+  const ofDay = marked.filter(t => localParts(t.closed_at, timezone).day === lastDay)
+  const accounts = new Set(ofDay.map(t => t.account).filter(Boolean))
+  const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" })
+  const price = (v: number | null) => (v === null ? "?" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }))
+  const [y, m, d] = lastDay.split("-").map(Number)
+  const label = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", month: "short", day: "numeric" })
+  const lines = ofDay.filter(t => !t.is_copy).slice(0, 15).map(t => {
+    if (t.kind === "day_total") return `${clock(t.closed_at)} adjustment so the journal matched the day total the trader reported (not a trade): ${money(Number(t.realized_pnl ?? 0))}`
+    if (t.source === "manual") return `${clock(t.closed_at)} reported by the trader: ${money(Number(t.realized_pnl ?? 0))}`
+    const where = t.copies > 1 ? ` (copied to ${t.copies} accounts, ${money(t.group_pnl)} combined)` : accounts.size > 1 && t.account ? ` [account ${t.account.replace(/^[a-z]+:/i, "")}]` : ""
+    return `${clock(t.opened_at ?? t.closed_at)} to ${clock(t.closed_at)} ${(t.symbol ?? "?").split(":").pop()} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(Number(t.realized_pnl ?? 0))}${where}`
+  })
+  return lines.length ? [`${label}:`, ...lines] : []
+}

@@ -34,7 +34,7 @@ export function estimateCost(usage: LlmUsage): number | null {
 export async function logLlmUsage(
   supabase: SupabaseClient,
   userId: string | null,
-  feature: "chat" | "analysis" | "notes" | "checkin" | "rules",
+  feature: "chat" | "analysis" | "notes" | "checkin" | "rules" | "review",
   usage: LlmUsage | null | undefined
 ) {
   if (!usage) return

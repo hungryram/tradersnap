@@ -43,7 +43,7 @@ export async function loadJournalNotes(supabase: SupabaseClient, userId: string,
 }
 
 // The memory block Pip sees (cached with the system prompt)
-export function memoryContext(notes: PipNote[], patterns: string[], journal: JournalNote[] = [], recentDays: string[] = []): string | null {
+export function memoryContext(notes: PipNote[], patterns: string[], journal: JournalNote[] = [], recentDays: string[] = [], lastDay: string[] = []): string | null {
   const parts: string[] = []
   if (notes.length) {
     parts.push(`PIP'S NOTES ABOUT THIS TRADER (what you've learned from past conversations; lines marked "trader" were written by them and override yours):
@@ -62,6 +62,12 @@ Bring a pattern up when it's relevant to the moment (for example a re-entry righ
 ${recentDays.map(d => `- ${d}`).join("\n")}
 
 Use these when they ask what they did on a recent day. If a day isn't listed, there were no detected or logged trades; say you can't see it, and don't guess.`)
+  }
+  if (lastDay.length) {
+    parts.push(`THEIR LAST TRADING DAY BEFORE TODAY, TRADE BY TRADE (in their local time):
+${lastDay.map(l => `- ${l}`).join("\n")}
+
+Use this when they ask about that day or when it bears on what they're doing now. Only this one day is in detail; other days are the summaries above.`)
   }
   if (journal.length) {
     parts.push(`THEIR JOURNAL NOTES (what they wrote about recent trading days, newest first):

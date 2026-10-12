@@ -8,7 +8,7 @@ import { allowanceUsedMessage, claimWelcomeCredit, consumeUsage, creditState, ge
 import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
-import { loadRecentDays, loadTradePatterns } from "@/lib/trade-patterns"
+import { loadLastDayDetail, loadRecentDays, loadTradePatterns } from "@/lib/trade-patterns"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock, strategiesFor } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims"
@@ -501,16 +501,18 @@ Use for time-based coaching when they ask about the next candle or how long they
     // Skipped entirely when the trader has turned memory off.
     const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits').eq('id', user.id).single()
     const memoryOn = memorySettings?.memory_enabled !== false
-    const [notes, patterns, journal, recentDays] = memoryOn
+    const [notes, patterns, journal, recentDays, lastDay] = memoryOn
       ? await Promise.all([
           loadNotes(supabase, user.id),
           loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone),
           // Pip reads journal notes on paid plans
-          features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id) : Promise.resolve([]),
-          loadRecentDays(supabase, user.id, dayStart, validatedRequest.timezone)
+          features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id, features(profile.plan).journalNotesInMemory) : Promise.resolve([]),
+          loadRecentDays(supabase, user.id, dayStart, validatedRequest.timezone),
+          // Paid plans: the last trading day, trade by trade
+          features(profile.plan).pipReadsNotes ? loadLastDayDetail(supabase, user.id, dayStart, validatedRequest.timezone) : Promise.resolve([])
         ])
-      : [[], [], [], []]
-    const memory = [favoritedContext, memoryContext(notes, patterns, journal, recentDays)].filter(Boolean).join('\n\n') || null
+      : [[], [], [], [], []]
+    const memory = [favoritedContext, memoryContext(notes, patterns, journal, recentDays, lastDay)].filter(Boolean).join('\n\n') || null
 
     // Recent conversation, the same size on every plan (see historyWindow)
     const fullHistory = validatedRequest.conversationHistory ?? []

@@ -30,8 +30,8 @@ interface UserData {
 
 const PLAN_LISTS = {
   free: ["About 5 chart checks and 15 messages a day", "1 strategy checked at a time", "Trade tracking, check-ins and daily limits", "Journal, calendar and notes: last 7 days", "Pip remembers 3 saved messages"],
-  pro: ["About 30 chart checks and 150 messages a day", "Up to 5 strategies checked at once", "Full journal, calendar and notes history", "Results per strategy", "Pip reads your journal notes", "Pip remembers 20 saved messages"],
-  pro_plus: ["About 100 chart checks and 400 messages a day", "Unlimited strategies", "Everything in Pro", "Pip remembers 50 saved messages", "For full-time and multi-account traders"],
+  pro: ["About 30 chart checks and 150 messages a day", "Up to 5 strategies checked at once", "Full journal, calendar and notes history", "Results per strategy", "Pip reads your last 10 journal notes and your last trading day", "Pip reviews any day in your journal (5 a day)", "Pip remembers 20 saved messages"],
+  pro_plus: ["About 100 chart checks and 400 messages a day", "Unlimited strategies", "Everything in Pro", "Pip reads your last 15 journal notes, and reviews up to 15 days a day", "Pip remembers 50 saved messages", "For full-time and multi-account traders"],
 }
 const PRICE = { pro: { month: 29, year: 249 }, pro_plus: { month: 99, year: 990 } }
 

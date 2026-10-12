@@ -5,6 +5,7 @@ import { api, forAccount, loadTradeWindow, pnlOf, realTrades, type StrategyOptio
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
 import { Card, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
+import DayReview from "./DayReview"
 
 type ColorBy = "discipline" | "pnl"
 type Day = { key: string; date: Date; trades: Trade[]; net: number; broken: string[]; locked: boolean; future: boolean }
@@ -256,6 +257,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
               {noteState !== "idle" && noteState !== "saving" && noteState !== "saved" && <span className="text-xs text-red-300">{noteState}</span>}
             </div>
           </div>
+          <DayReview day={selectedDay.key} hasContent={selectedDay.trades.length > 0 || !!notes[selectedDay.key]} noteUnsaved={draft !== (notes[selectedDay.key] ?? "")} />
         </div>
       )}
     </Card>
