@@ -31,7 +31,7 @@ export default function WelcomePage() {
         </div>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-3">Hi, I&apos;m Pip, your trading coach</h1>
         <p className="text-ink-text max-w-lg mx-auto">
-          I check your charts against your own rules and keep you disciplined while you trade. Two quick steps and we're ready.
+          I check your charts against your own rules and keep you disciplined while you trade. Two quick steps and we're ready. Your first 7 days of Pro are on us.
         </p>
       </div>
 
@@ -53,6 +53,7 @@ export default function WelcomePage() {
 
         <section className="rounded-2xl border border-ink-border bg-ink-surface p-6">
           <StepLabel n={2} title="Create your free account" />
+          <p className="mb-4 text-sm text-ink-text">Includes <span className="font-medium text-ink-body">7 days of Pro, free</span>. No card needed.</p>
           {signedIn === null ? null : signedIn ? (
             <div className="space-y-4">
               <p className="text-sm text-ink-text">You're already signed in.</p>
@@ -66,7 +67,7 @@ export default function WelcomePage() {
         </section>
       </div>
 
-      <p className="text-center text-xs text-ink-muted mt-8">Free plan: 5 chart checks and 15 coach messages a day. No card needed.</p>
+      <p className="text-center text-xs text-ink-muted mt-8">7 days of Pro, free, no card needed. After that you stay on the Free plan (about 5 chart checks and 15 coach messages a day) unless you upgrade.</p>
     </AuthShell>
   )
 }
