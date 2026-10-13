@@ -52,6 +52,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then(response => response.ok ? response.json() : null)
         .then(data => {
           setIsAdmin(!!data?.user?.is_admin)
+          // Accounts that finished the old onboarding haven't answered the newer questions (experience, trading day):
+          // send them through setup once. They can close it; it doesn't come back.
+          try {
+            if (data?.user?.onboarded && !data.user.trading_profile?.experience && localStorage.getItem("pip_setup_prompted") !== "1") {
+              localStorage.setItem("pip_setup_prompted", "1")
+              window.location.href = "/onboarding?redo=1"
+            }
+          } catch {}
           setPlatforms(data?.user?.trading_profile?.platforms ?? null)
           setTrialDaysLeft(data?.user?.subscribed_plan === "free" ? data?.user?.trial_days_left ?? 0 : 0)
         })
