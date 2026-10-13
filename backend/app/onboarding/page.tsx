@@ -33,6 +33,8 @@ export default function OnboardingPage() {
   const [extensionVersion, setExtensionVersion] = useState<string | null | undefined>(undefined)
 
   // Step 1
+  // Opened from the Account page ("Run setup again"): everything is prefilled, existing strategies are left alone
+  const [redo] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("redo") === "1")
   const [firstName, setFirstName] = useState("")
   const [markets, setMarkets] = useState<Market[]>(["futures"])
   const [platforms, setPlatforms] = useState<Platform[]>(["tradingview"])
@@ -63,8 +65,25 @@ export default function OnboardingPage() {
       const response = await fetch("/api/me", { headers: { Authorization: `Bearer ${session.access_token}` } })
       if (response.ok) {
         const { user, ruleset } = await response.json()
-        if (user?.onboarded && ruleset) router.replace("/dashboard")
+        if (user?.onboarded && ruleset && !redo) router.replace("/dashboard")
         if (user?.first_name) setFirstName(user.first_name)
+        if (redo && user) {
+          const profile = user.trading_profile
+          if (profile) {
+            if (Array.isArray(profile.markets)) setMarkets(profile.markets)
+            if (Array.isArray(profile.platforms)) setPlatforms(profile.platforms)
+            setPropFirm(typeof profile.prop_firm === "boolean" ? profile.prop_firm : null)
+            setExperience(profile.experience ?? null)
+          }
+          const limits = user.trading_limits
+          if (limits) {
+            setMaxTrades(limits.max_trades_per_day != null ? String(limits.max_trades_per_day) : "")
+            setStopAfterLosses(limits.stop_after_losses != null ? String(limits.stop_after_losses) : "")
+            setMaxDailyLoss(limits.max_daily_loss != null ? String(limits.max_daily_loss) : "")
+            setSessionStart(limits.session_start ?? "")
+            setSessionEnd(limits.session_end ?? "")
+          }
+        }
       }
     })
     detectExtension().then(setExtensionVersion)
@@ -136,6 +155,10 @@ export default function OnboardingPage() {
       })
       if (!profileResponse.ok) throw new Error("Couldn't save your profile")
 
+      if (redo) {
+        router.replace("/dashboard/account")
+        return
+      }
       fetch("/api/events", { method: "POST", headers, body: JSON.stringify({ event_type: "onboarding_completed", metadata: { platforms, prop_firm: !!propFirm } }) }).catch(() => {})
       setStep(3)
     } catch (err) {
@@ -162,8 +185,8 @@ export default function OnboardingPage() {
       {step === 1 && (
         <div className="space-y-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Tell Pip how you trade</h1>
-            <p className="text-ink-text">So he talks about the right things.</p>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">{redo ? "Update how you trade" : "Tell Pip how you trade"}</h1>
+            <p className="text-ink-text">{redo ? "Change anything below. Your strategies, trades and journal stay as they are." : "So he talks about the right things."}</p>
           </div>
 
           <Question title="What should Pip call you?">
@@ -205,13 +228,15 @@ export default function OnboardingPage() {
       {step === 2 && (
         <div className="space-y-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Your rules</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">{redo ? "Your daily limits" : "Your rules"}</h1>
             <p className="text-ink-text">
-              Pip checks every chart against these. Start from the closest template and tweak it, or write your own. You can change them any time
-              on the Rules page in your dashboard.
+              {redo
+                ? <>Your strategies and rules stay exactly as they are. Edit them any time on the <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200">Rules page</a>.</>
+                : "Pip checks every chart against these. Start from the closest template and tweak it, or write your own. You can change them any time on the Rules page in your dashboard."}
             </p>
           </div>
 
+          {!redo && (<>
           <div className="grid gap-3 sm:grid-cols-2">
             {RULE_TEMPLATES.map((template, index) => (
               <button
@@ -246,6 +271,7 @@ export default function OnboardingPage() {
               />
             )}
           </div>
+          </>)}
 
           <div className="rounded-2xl border border-ink-border bg-ink-surface p-6">
             <h2 className="font-semibold mb-1">Your daily limits</h2>
@@ -277,8 +303,12 @@ export default function OnboardingPage() {
           <div className="flex justify-between">
             <button onClick={() => setStep(1)} className="text-sm text-ink-text hover:text-ink-body">Back</button>
             <div className="flex items-center gap-4">
-              <button onClick={() => finish(true)} disabled={saving} className="text-sm text-ink-text hover:text-ink-body">Skip for now</button>
-              <button onClick={() => finish()} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
+              {redo ? (
+                <button onClick={() => finish(true)} disabled={saving} className={primary}>{saving ? "Saving..." : "Save"}</button>
+              ) : (<>
+                <button onClick={() => finish(true)} disabled={saving} className="text-sm text-ink-text hover:text-ink-body">Skip for now</button>
+                <button onClick={() => finish()} disabled={saving || !rulesText.trim()} className={primary}>{saving ? "Saving..." : "Save and continue"}</button>
+              </>)}
             </div>
           </div>
         </div>

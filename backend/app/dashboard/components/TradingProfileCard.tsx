@@ -68,7 +68,12 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
   return (
     <Card
       title="About your trading"
-      action={!editing && <button onClick={() => { reset(); setEditing(true) }} className="text-sm text-brand-300 hover:text-brand-200">Edit</button>}
+      action={!editing && (
+        <div className="flex items-center gap-4">
+          <a href="/onboarding?redo=1" className="text-sm text-ink-text hover:text-ink-body" title="Go through the setup questions again: about you, then your daily limits. Your strategies stay as they are.">Run setup again</a>
+          <button onClick={() => { reset(); setEditing(true) }} className="text-sm text-brand-300 hover:text-brand-200">Edit</button>
+        </div>
+      )}
     >
       {message && <div className="mb-4"><Notice tone={message.tone}>{message.text}</Notice></div>}
       {editing ? (
