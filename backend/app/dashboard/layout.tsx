@@ -18,6 +18,7 @@ const MAIN_NAV = [
 ]
 
 const HELP_NAV = [
+  { href: "/onboarding?redo=1", label: "Run setup again" },
   { href: "/dashboard/guide", label: "Guide" },
   { href: "/dashboard/faq", label: "FAQ" },
   { href: `${SITE_URL}/contact`, label: "Contact support", external: true },
