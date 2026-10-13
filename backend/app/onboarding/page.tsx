@@ -179,6 +179,11 @@ export default function OnboardingPage() {
 
   return (
     <AuthShell wide>
+      {redo && (
+        <div className="mb-4 flex justify-end">
+          <a href="/dashboard/account" className="rounded-lg border border-ink-border px-3 py-1.5 text-sm text-ink-text hover:border-ink-muted hover:text-ink-body">Close</a>
+        </div>
+      )}
       <div className="mb-8 flex items-center gap-2" aria-label={`Step ${step} of 3`}>
         {[1, 2, 3].map(n => (
           <div key={n} className={`h-1 flex-1 rounded-full ${n <= step ? "bg-brand-500" : "bg-ink-border"}`} />

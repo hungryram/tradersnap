@@ -169,7 +169,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Pip size={44} />
               <p className="flex-1 text-sm leading-relaxed text-ink-body">
                 <span className="font-semibold">Snapchart is now Pip, your AI trading coach.</span>{" "}
-                <span className="text-ink-text">Same account, same rules, same trades. Just a better name. You'll find us at tradewithpip.ai.</span>
+                <span className="text-ink-text">Same account, same rules, same trades. Just a better name. You'll find us at tradewithpip.ai.</span>{" "}
+                <span className="text-ink-text">Pip now tailors his coaching to what you trade and your trading day.</span>{" "}
+                <a href="/onboarding?redo=1" className="font-medium text-brand-300 hover:text-brand-200 underline">Update your setup (1 minute)</a>
               </p>
               <button
                 onClick={() => {
