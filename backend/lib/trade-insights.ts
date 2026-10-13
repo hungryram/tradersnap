@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { prepareTrades } from "./copy-trades"
+import { dayRuleOf, tradingDayKey } from "./trading-day"
 
 // Two things Pip tells traders from their own data:
 // - whether each trade was checked first (a chart check shortly before it opened)
@@ -79,8 +80,9 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
   let tz = timeZone
   try { new Intl.DateTimeFormat("en-CA", { timeZone: tz }) } catch { tz = "America/New_York" }
 
-  const { data: profile } = await supabase.from("profiles").select("trading_limits").eq("id", userId).single()
+  const { data: profile } = await supabase.from("profiles").select("trading_limits, trading_profile").eq("id", userId).single()
   const limits = profile?.trading_limits as Limits
+  const dayRule = dayRuleOf(profile?.trading_profile)
   if (!limits || !(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || (limits.session_start && limits.session_end))) return null
 
   const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
@@ -91,11 +93,11 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
   const rows = prepareTrades((data ?? []) as unknown as DayRow[])
   const byDay = new Map<string, DayRow[]>()
   for (const t of rows) {
-    const day = localParts(t.closed_at, tz).day
+    const day = tradingDayKey(t.closed_at, dayRule, tz)
     byDay.set(day, [...(byDay.get(day) ?? []), t])
   }
   const days = [...byDay.keys()].sort().reverse()
-  const today = localParts(new Date().toISOString(), tz).day
+  const today = tradingDayKey(new Date(), dayRule, tz)
 
   let count = 0
   for (const day of days) {

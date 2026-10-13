@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { loadNotes, MAX_NOTES } from "@/lib/pip-notes"
 import { loadTradePatterns } from "@/lib/trade-patterns"
+import { dayRuleOf } from "@/lib/trading-day"
 
 // Pip's memory for the dashboard's Memory page: read, add, edit and delete notes,
 // turn memory on or off, and see the trade patterns Pip uses.
@@ -31,14 +32,14 @@ export async function GET(request: NextRequest) {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("memory_enabled, notes_refreshed_at, trading_limits")
+    .select("memory_enabled, notes_refreshed_at, trading_limits, trading_profile")
     .eq("id", user.id)
     .single()
   if (error) return NextResponse.json({ error: "Memory isn't set up yet", setupNeeded: true }, { status: 503 })
 
   const [notes, patterns] = await Promise.all([
     loadNotes(supabase, user.id),
-    loadTradePatterns(supabase, user.id, dayStart, profile.trading_limits ?? null, params.get("tz") || undefined)
+    loadTradePatterns(supabase, user.id, dayStart, profile.trading_limits ?? null, params.get("tz") || undefined, dayRuleOf(profile.trading_profile))
   ])
   return NextResponse.json({
     enabled: profile.memory_enabled !== false,

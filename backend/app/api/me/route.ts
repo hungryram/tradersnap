@@ -218,7 +218,8 @@ const profilePatchSchema = z.object({
     markets: z.array(z.enum(["futures", "stocks", "options", "forex", "crypto"])).max(5),
     platforms: z.array(z.enum(["tradingview", "tradovate", "topstepx", "ninjatrader", "other"])).max(5),
     prop_firm: z.boolean(),
-    experience: z.enum(["new", "1-3", "3+"]).optional()
+    experience: z.enum(["new", "1-3", "3+"]).optional(),
+    day_start: z.union([z.literal("midnight"), hhmm]).optional()
   }).optional(),
   trading_limits: z.object({
     max_trades_per_day: z.number().int().min(1).max(100).nullable(),

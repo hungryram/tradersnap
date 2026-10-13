@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 import { mainJson } from "@/lib/llm"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { prepareTrades, instrumentOf } from "@/lib/copy-trades"
+import { addDays, dayRuleOf, tradingDayStart } from "@/lib/trading-day"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock } from "@/lib/strategies"
 
 // "Review this day": Pip reads one trading day from the journal (its trades and the trader's own note) and
@@ -36,20 +37,6 @@ Rules for the review:
 - Use the real numbers (counts, times, amounts). Don't invent anything you can't see. If you can't tell whether a rule was kept (for example an entry rule that needs the chart), say so.
 - If their note mentions a feeling or a reason, use it, gently. Don't quote it back at length.
 - Be warm, short and specific. No lectures. One core insight.`
-
-// Midnight of the trader's local day, as a UTC time
-function startOfDayUtc(day: string, timeZone: string) {
-  const [y, m, d] = day.split("-").map(Number)
-  const target = Date.UTC(y, m - 1, d)
-  let utc = target
-  for (let i = 0; i < 3; i++) {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(utc))
-    const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? 0)
-    const local = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"))
-    utc -= local - target
-  }
-  return utc
-}
 
 async function getUser(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
@@ -115,6 +102,7 @@ export async function POST(request: NextRequest) {
   try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }) } catch { timezone = "America/New_York" }
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const dayRule = dayRuleOf(profile?.trading_profile)
   const plan = effectivePlan(profile)
   const { period, limit, used } = await allowance(user.id, plan)
   if (!period) return NextResponse.json({ error: "Day reviews are part of Pro.", requiresUpgrade: true }, { status: 403 })
@@ -129,19 +117,20 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await supabase.from("day_reviews").select("id").eq("user_id", user.id).eq("day", day).maybeSingle()
     if (existing) return NextResponse.json({ error: "Pro lets you review a day again. Your review of this day is above.", requiresUpgrade: true }, { status: 403 })
     const historyDays = features(plan).historyDays
-    if (historyDays && Date.now() - startOfDayUtc(day, timezone) > (historyDays + 1) * 24 * 60 * 60 * 1000) {
+    if (historyDays && Date.now() - tradingDayStart(day, dayRule, timezone).getTime() > (historyDays + 1) * 24 * 60 * 60 * 1000) {
       return NextResponse.json({ error: `Free keeps ${historyDays} days of history, so older days can't be reviewed. Pro keeps all of it.`, requiresUpgrade: true }, { status: 403 })
     }
   }
 
   // The day's trades (copies across accounts are one decision) and the trader's note
-  const start = startOfDayUtc(day, timezone)
+  const start = tradingDayStart(day, dayRule, timezone).getTime()
+  const end = tradingDayStart(addDays(day, 1), dayRule, timezone).getTime()
   const { data: rows } = await supabase
     .from("trades")
     .select("*")
     .eq("user_id", user.id)
     .gte("closed_at", new Date(start).toISOString())
-    .lt("closed_at", new Date(start + 24 * 60 * 60 * 1000).toISOString())
+    .lt("closed_at", new Date(end).toISOString())
     .order("closed_at", { ascending: true })
     .limit(300)
   const marked = prepareTrades((rows ?? []) as { account: string | null; symbol: string | null; side: string | null; opened_at: string | null; closed_at: string; realized_pnl: number | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null; kind?: string; source?: string; pnl_source?: string }[])
@@ -177,7 +166,7 @@ export async function POST(request: NextRequest) {
   const rules = strategies.length || alwaysRules ? strategiesBlock(strategies, alwaysRules, profile?.trading_limits ?? null) : "The trader hasn't written any rules or limits yet."
 
   const prompt = [
-    `Day: ${day} (the trader's local time zone: ${timezone})`,
+    `Day: ${day} (the trader's local time zone: ${timezone}${dayRule ? `; their trading day starts at ${dayRule} New York time, so evening trades belong to the next date` : ""})`,
     `THE TRADER'S RULES AND LIMITS:\n${rules}`,
     decisions.length ? `THE DAY'S TRADES (${decisions.filter(t => t.kind !== "day_total").length} decisions, net ${money(marked.reduce((s, t) => s + pnl(t), 0))}${accounts.length > 1 ? ` across ${accounts.length} accounts` : ""}):\n${lines.join("\n")}` : "No trades were recorded this day.",
     perAccount ? `PER ACCOUNT (limits apply to each account separately):\n${perAccount}` : null,

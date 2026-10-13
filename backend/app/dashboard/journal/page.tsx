@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { accountLabel, accountsOf, api, forAccount, formatDay, loadStrategyOptions, loadTradeWindow, pnlOf, startOfLocalDay, summarize, tickerOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
+import { accountLabel, accountsOf, api, forAccount, formatDay, loadDayRule, loadStrategyOptions, loadTradeWindow, pnlOf, startOfLocalDay, summarize, tickerOf, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { Card, Loading, Notice, PageHeader, Stat, money } from "../components/ui"
 import TradeTable from "../components/TradeTable"
 import JournalCalendar from "../components/JournalCalendar"
+import { tradingDayKey } from "@/lib/trading-day"
 
 const RANGES = [7, 30, 90] as const
 const REENTRY_MINUTES = 15
@@ -18,23 +19,27 @@ export default function JournalPage() {
   const [showAll, setShowAll] = useState(false)
   const [historyFrom, setHistoryFrom] = useState<string | null>(null)
   const [limits, setLimits] = useState<TradingLimits | null>(null)
+  // When the trading day starts; undefined until it's known, so the first load already uses the right day
+  const [dayRule, setDayRule] = useState<string | null | undefined>(undefined)
   const [strategies, setStrategies] = useState<StrategyOption[]>([])
 
   useEffect(() => {
     api("/api/me").then(me => setLimits(me.user?.trading_limits ?? null)).catch(() => {})
     loadStrategyOptions().then(setStrategies).catch(() => {})
+    loadDayRule().then(setDayRule)
   }, [])
 
   useEffect(() => {
+    if (dayRule === undefined) return
     setLoaded(null)
-    loadTradeWindow(startOfLocalDay(days - 1), null)
+    loadTradeWindow(startOfLocalDay(days - 1, dayRule), null)
       .then(({ trades, historyFrom }) => { setLoaded(trades); setHistoryFrom(historyFrom) })
       .catch(err => setError(err.message))
-  }, [days])
+  }, [days, dayRule])
 
   const accounts = useMemo(() => (loaded ? accountsOf(loaded) : []), [loaded])
   const trades = useMemo(() => (loaded ? forAccount(loaded, account) : null), [loaded, account])
-  const view = useMemo(() => (trades ? analyze(trades, strategies) : null), [trades, strategies])
+  const view = useMemo(() => (trades ? analyze(trades, strategies, dayRule) : null), [trades, strategies, dayRule])
 
   // Tag a trade with a strategy (or clear it); the table shows the choice right away
   const setStrategy = (tradeId: string, strategyId: string | null) => {
@@ -81,7 +86,7 @@ export default function JournalPage() {
       )}
 
       <div className="mb-6">
-        <JournalCalendar limits={limits} strategies={strategies} onStrategyChange={setStrategy} account={account} />
+        <JournalCalendar dayRule={dayRule ?? null} limits={limits} strategies={strategies} onStrategyChange={setStrategy} account={account} />
       </div>
 
       {historyFrom && days > 7 && (
@@ -216,7 +221,7 @@ export default function JournalPage() {
 
 type Row = { label: string; value: number; detail: string }
 
-function analyze(allTrades: Trade[], strategies: StrategyOption[]) {
+function analyze(allTrades: Trade[], strategies: StrategyOption[], dayRule?: string | null) {
   // Day-total entries count in net P&L (the headline stats) but are not trades, so they stay out of every breakdown
   const trades = allTrades.filter(t => t.kind !== "day_total")
   const group = (keyOf: (t: Trade) => string, order: (a: string, b: string) => number) => {
@@ -233,10 +238,7 @@ function analyze(allTrades: Trade[], strategies: StrategyOption[]) {
     return { label, value: s.net, detail: `${s.count} ${s.count === 1 ? "trade" : "trades"}${s.winRate !== null ? ` · ${Math.round(s.winRate * 100)}%` : ""}` }
   }
 
-  const dayKey = (t: Trade) => {
-    const d = new Date(t.closed_at)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-  }
+  const dayKey = (t: Trade) => tradingDayKey(t.closed_at, dayRule)
   const byDay = group(dayKey, (a, b) => b.localeCompare(a))
     .map(({ key, list }) => toRow(formatDay(new Date(`${key}T12:00:00`)), list))
 

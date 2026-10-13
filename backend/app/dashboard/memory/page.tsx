@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api, startOfLocalDay } from "@/lib/dashboard-data"
+import { api, loadDayRule, startOfLocalDay } from "@/lib/dashboard-data"
 import Pip from "../../components/Pip"
 import { Card, Loading, Notice, PageHeader, buttonDanger, buttonPrimary, buttonSecondary, inputClass } from "../components/ui"
 
@@ -20,7 +20,8 @@ export default function MemoryPage() {
 
   const load = () => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    api<Memory>(`/api/notes?tz=${encodeURIComponent(tz)}&dayStart=${encodeURIComponent(startOfLocalDay().toISOString())}`)
+    loadDayRule()
+      .then(rule => api<Memory>(`/api/notes?tz=${encodeURIComponent(tz)}&dayStart=${encodeURIComponent(startOfLocalDay(0, rule).toISOString())}`))
       .then(setMemory)
       .catch(err => setError(err instanceof Error ? err.message : "Couldn't load your memory."))
   }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api, startOfLocalDay, summarize, type Trade, type TradingLimits, loadTodayWithStreak, type Streak, limitView } from "@/lib/dashboard-data"
+import { api, summarize, type Trade, type TradingLimits, loadTodayWithStreak, type Streak, limitView } from "@/lib/dashboard-data"
 import Pip, { type PipMood } from "../components/Pip"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"

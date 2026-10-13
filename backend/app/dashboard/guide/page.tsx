@@ -39,6 +39,7 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <p>On the <a href="/dashboard/rules" className={link}>Rules</a> page you write each setup you trade as its own strategy, plus the rules that apply to every trade. Be specific: exact indicator settings, timeframe, what a valid entry looks like. The clearer the rule, the better Pip can hold you to it.</p>
+        <p>Your <strong>trading day</strong> starts when your market's session does. For futures that's 6 PM Eastern (3 PM Pacific), so an evening trade counts toward the next day and your limits reset then. Pip sets it from what you trade; change it on the <a href="/dashboard/account" className={link}>Account</a> page.</p>
         <p>Daily limits (max trades, stop after N losses, max daily loss, session hours) are what the coach watches live. When you near or pass one, Pip speaks up. He can&apos;t touch your orders, you&apos;re always in control.</p>
         <p>Free includes 1 strategy. Pro checks up to 5 at once, Pro+ up to 50.</p>
       </>

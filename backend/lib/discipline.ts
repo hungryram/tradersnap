@@ -1,3 +1,4 @@
+import { tradingDayKey } from "./trading-day"
 import { accountLabel, accountsOf, type Trade, type TradingLimits } from "./dashboard-data"
 
 // Which of the trader's daily limits a day's trades broke. Same checks as Pip's
@@ -8,9 +9,9 @@ const pnl = (t: Trade) => Number(t.realized_pnl ?? 0)
 const decision = (t: Trade) => t.group_pnl ?? pnl(t)
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
 
-export function dayKeyOf(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+// Which trading day a time belongs to (see lib/trading-day: an evening futures trade is part of the next day)
+export function dayKeyOf(iso: string, dayRule?: string | null) {
+  return tradingDayKey(iso, dayRule)
 }
 
 // Each account has its own limits (an eval's loss limit is per account), so with several accounts each one is

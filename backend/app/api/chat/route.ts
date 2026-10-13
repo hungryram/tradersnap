@@ -9,6 +9,7 @@ import { verifyChartToken } from "@/lib/chart-token"
 import { buildTradesContext } from "@/lib/trades-context"
 import { loadJournalNotes, loadNotes, maybeRefreshNotes, memoryContext } from "@/lib/pip-notes"
 import { loadLastDayDetail, loadRecentDays, loadTradePatterns } from "@/lib/trade-patterns"
+import { dayRuleOf } from "@/lib/trading-day"
 import { loadActiveStrategies, loadAlwaysRules, strategiesBlock, strategiesFor } from "@/lib/strategies"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims"
@@ -512,17 +513,18 @@ Use for time-based coaching when they ask about the next candle or how long they
 
     // Long-term memory: Pip's notes and trading patterns (stable all day, so cached).
     // Skipped entirely when the trader has turned memory off.
-    const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits').eq('id', user.id).single()
+    const { data: memorySettings } = await supabase.from('profiles').select('memory_enabled, trading_limits, trading_profile').eq('id', user.id).single()
     const memoryOn = memorySettings?.memory_enabled !== false
+    const dayRule = dayRuleOf(memorySettings?.trading_profile)
     const [notes, patterns, journal, recentDays, lastDay] = memoryOn
       ? await Promise.all([
           loadNotes(supabase, user.id),
-          loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone),
+          loadTradePatterns(supabase, user.id, dayStart, memorySettings?.trading_limits ?? null, validatedRequest.timezone, dayRule),
           // Pip reads journal notes on paid plans
           features(profile.plan).pipReadsNotes ? loadJournalNotes(supabase, user.id, features(profile.plan).journalNotesInMemory) : Promise.resolve([]),
-          loadRecentDays(supabase, user.id, dayStart, validatedRequest.timezone),
+          loadRecentDays(supabase, user.id, dayStart, validatedRequest.timezone, dayRule),
           // Paid plans: the last trading day, trade by trade
-          features(profile.plan).pipReadsNotes ? loadLastDayDetail(supabase, user.id, dayStart, validatedRequest.timezone) : Promise.resolve([])
+          features(profile.plan).pipReadsNotes ? loadLastDayDetail(supabase, user.id, dayStart, validatedRequest.timezone, dayRule) : Promise.resolve([])
         ])
       : [[], [], [], [], []]
     const memory = [favoritedContext, memoryContext(notes, patterns, journal, recentDays, lastDay)].filter(Boolean).join('\n\n') || null

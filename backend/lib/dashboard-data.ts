@@ -1,6 +1,7 @@
 "use client"
 
 import { createClient } from "./supabase-client"
+import { currentTradingDayStart, dayRuleOf } from "./trading-day"
 
 export type Trade = {
   id: string
@@ -31,7 +32,8 @@ export type Streak = { days: number; brokenToday: boolean } | null
 // Today's trades plus the discipline streak (trading days in a row with no rule broken)
 export async function loadTodayWithStreak(): Promise<{ trades: Trade[]; streak: Streak }> {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const data = await api<{ trades: Trade[]; streak?: Streak }>(`/api/trades?since=${encodeURIComponent(startOfLocalDay().toISOString())}&limit=200&streak=1&tz=${encodeURIComponent(tz)}`)
+  const dayRule = await loadDayRule()
+  const data = await api<{ trades: Trade[]; streak?: Streak }>(`/api/trades?since=${encodeURIComponent(startOfLocalDay(0, dayRule).toISOString())}&limit=200&streak=1&tz=${encodeURIComponent(tz)}`)
   return { trades: data.trades ?? [], streak: data.streak ?? null }
 }
 
@@ -81,11 +83,18 @@ function signedOut(): never {
   throw new Error("Signed out")
 }
 
-export function startOfLocalDay(daysAgo = 0) {
-  const date = new Date()
-  date.setHours(0, 0, 0, 0)
-  date.setDate(date.getDate() - daysAgo)
-  return date
+// Start of the trading day (or of the one `daysAgo` before). Without a rule that's the trader's local midnight.
+export function startOfLocalDay(daysAgo = 0, dayRule?: string | null) {
+  return currentTradingDayStart(dayRule, undefined, daysAgo)
+}
+
+// When the trader's trading day starts (lib/trading-day), from their profile; read once per page load
+let dayRuleRequest: Promise<string | null> | null = null
+export function loadDayRule(): Promise<string | null> {
+  dayRuleRequest ??= api<{ user?: { trading_profile?: Parameters<typeof dayRuleOf>[0] } }>("/api/me")
+    .then(me => dayRuleOf(me.user?.trading_profile))
+    .catch(() => { dayRuleRequest = null; return null })
+  return dayRuleRequest
 }
 
 export async function loadTrades(since: Date, limit = 200): Promise<Trade[]> {

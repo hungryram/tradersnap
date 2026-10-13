@@ -5,6 +5,7 @@ import { smallText } from "@/lib/llm"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { loadNotes, memoryContext } from "@/lib/pip-notes"
 import { loadTradePatterns } from "@/lib/trade-patterns"
+import { dayRuleOf } from "@/lib/trading-day"
 
 // Writes any of Pip's check-ins in his own words, using what he knows about the
 // trader. The extension sends its rules-based version as the fallback and uses it
@@ -106,13 +107,13 @@ export async function POST(request: NextRequest) {
   if (!countError && (count ?? 0) >= MAX_PER_DAY) return fallback("daily_cap")
 
   try {
-    const { data: profile } = await supabase.from("profiles").select("memory_enabled, trading_limits").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("memory_enabled, trading_limits, trading_profile").eq("id", user.id).single()
     const memoryOn = profile?.memory_enabled !== false
     const todayStart = dayStart && !isNaN(Date.parse(dayStart)) ? new Date(dayStart) : new Date(Date.now() - 24 * 60 * 60 * 1000)
     const [notes, patterns] = memoryOn
       ? await Promise.all([
           loadNotes(supabase, user.id),
-          loadTradePatterns(supabase, user.id, todayStart, profile?.trading_limits ?? null, timezone)
+          loadTradePatterns(supabase, user.id, todayStart, profile?.trading_limits ?? null, timezone, dayRuleOf(profile?.trading_profile))
         ])
       : [[], []]
 

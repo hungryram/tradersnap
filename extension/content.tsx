@@ -7,6 +7,7 @@ import Pip, { type PipMood } from "./components/Pip"
 import CheckDetails, { ChecklistMeter, checklistProgress } from "./components/CheckDetails"
 import ResetBreak from "./components/ResetBreak"
 import { analytics } from "~lib/analytics"
+import { currentTradingDayStart, dayRuleOf } from "~lib/trading-day"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import { startTopstepTracking } from "~lib/trades/topstepx"
 import { startTradovateTracking } from "~lib/trades/tradovate"
@@ -435,6 +436,7 @@ const TradingBuddyWidget = () => {
             const meData = await meResponse.json()
             setTradingLimits(meData.user?.trading_limits ?? null)
             firstNameRef.current = meData.user?.first_name ?? null
+            dayRuleRef.current = dayRuleOf(meData.user?.trading_profile)
             setLimitsLoaded(true)
             if (meData.usage?.favorites) setSavedCount({ used: meData.usage.favorites.used, limit: meData.usage.favorites.limit })
             if (meData.usage) {
@@ -492,12 +494,11 @@ const TradingBuddyWidget = () => {
     }
   }, [])
 
-  // Today's trades, counted from the trader's local midnight
+  // Today's trades, counted from the start of the trader's trading day
   const fetchTradeStats = useCallback(async () => {
     const { supabase_session } = await chrome.storage.local.get('supabase_session')
     if (!supabase_session?.access_token) return
-    const midnight = new Date()
-    midnight.setHours(0, 0, 0, 0)
+    const midnight = currentTradingDayStart(dayRuleRef.current)
     try {
       const response = await fetch(
         `${process.env.PLASMO_PUBLIC_API_URL}/api/trades?since=${encodeURIComponent(midnight.toISOString())}&streak=1&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`,
@@ -656,6 +657,8 @@ const TradingBuddyWidget = () => {
   const tradesTodayRef = useRef(tradesToday)
   const limitsRef = useRef(tradingLimits)
   const firstNameRef = useRef<string | null>(null)
+  // When the trader's trading day starts (see lib/trading-day); null = their local midnight
+  const dayRuleRef = useRef<string | null>(null)
   const lastInfoAtRef = useRef(0)
   const openPositionsRef = useRef<Set<string> | null>(null)
   const onPositionsRef = useRef<(positions: Map<string, number>) => void>(() => {})
@@ -698,7 +701,7 @@ const TradingBuddyWidget = () => {
           fallback: checkIn.text,
           facts: checkIn.compose,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+          dayStart: currentTradingDayStart(dayRuleRef.current).toISOString()
         }),
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
@@ -726,8 +729,8 @@ const TradingBuddyWidget = () => {
           amount: proposal.amount,
           symbol: proposal.symbol,
           kind,
-          // A day total is logged as the difference from what the journal holds since the trader's local midnight
-          day_start: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+          // A day total is logged as the difference from what the journal holds since the start of the trader's trading day
+          day_start: currentTradingDayStart(dayRuleRef.current).toISOString(),
           strategy_id: kind === 'trade' ? tradeStrategy[proposal.id] || null : null
         })
       })
@@ -1743,7 +1746,7 @@ const TradingBuddyWidget = () => {
         historyStart,
         timestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        dayStart: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
+        dayStart: currentTradingDayStart(dayRuleRef.current).toISOString(),
         ...(selectedStrategyRef.current ? { strategyId: selectedStrategyRef.current } : {})
       }
       

@@ -3,12 +3,16 @@
 import { useEffect, useMemo, useState } from "react"
 import { api, forAccount, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
+import { tradingDayStart } from "@/lib/trading-day"
 import { Card, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
 import DayReview from "./DayReview"
 
 type ColorBy = "discipline" | "pnl"
 type Day = { key: string; date: Date; trades: Trade[]; net: number; broken: string[]; locked: boolean; future: boolean }
+
+// A calendar cell's date as YYYY-MM-DD (not a moment: the cell is a whole day)
+const cellKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 
 // Notes for a month: day (YYYY-MM-DD) -> text
 async function loadMonthNotes(from: string, to: string, today: string): Promise<Record<string, string>> {
@@ -20,8 +24,10 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Month calendar of trading days: trades and P&L per day, plus whether the day's
 // rules were kept. Colors by discipline by default; P&L is one click away.
-export default function JournalCalendar({ limits, strategies, onStrategyChange, account = "", load = loadTradeWindow, loadNotes = loadMonthNotes }: {
+export default function JournalCalendar({ dayRule = null, limits, strategies, onStrategyChange, account = "", load = loadTradeWindow, loadNotes = loadMonthNotes }: {
   limits: TradingLimits | null
+  // When the trading day starts (lib/trading-day); null = the trader's midnight
+  dayRule?: string | null
   // Show one account's trades ("" = all of them)
   account?: string
   strategies: StrategyOption[]
@@ -46,10 +52,11 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
     setData(null)
     setSelected(null)
     const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
-    load(month, next).then(setData).catch(err => setError(err instanceof Error ? err.message : "Couldn't load trades"))
+    // A trading day can start the evening before, so the month's trades are the ones between its first and last day boundaries
+    load(tradingDayStart(cellKey(month), dayRule), tradingDayStart(cellKey(next), dayRule)).then(setData).catch(err => setError(err instanceof Error ? err.message : "Couldn't load trades"))
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
-    loadNotes(dayKeyOf(month.toISOString()), dayKeyOf(last.toISOString()), dayKeyOf(new Date().toISOString())).then(setNotes).catch(() => setNotes({}))
-  }, [month])
+    loadNotes(cellKey(month), cellKey(last), dayKeyOf(new Date().toISOString(), dayRule)).then(setNotes).catch(() => setNotes({}))
+  }, [month, dayRule])
 
   // Opening a day loads its note into the editor
   useEffect(() => {
@@ -61,7 +68,7 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
     if (!selected) return
     setNoteState("saving")
     try {
-      await api("/api/journal-notes", { method: "PUT", body: JSON.stringify({ day: selected, text: draft, today: dayKeyOf(new Date().toISOString()) }) })
+      await api("/api/journal-notes", { method: "PUT", body: JSON.stringify({ day: selected, text: draft, today: dayKeyOf(new Date().toISOString(), dayRule) }) })
       setNotes(n => { const next = { ...n }; if (draft.trim()) next[selected] = draft.trim(); else delete next[selected]; return next })
       setNoteState("saved")
     } catch (err) {
@@ -74,10 +81,11 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
     try { localStorage.setItem("journal_color_by", value) } catch {}
   }
 
+  const today = dayKeyOf(new Date().toISOString(), dayRule)
   const { weeks, totals } = useMemo(() => {
     const byDay = new Map<string, Trade[]>()
     for (const t of forAccount(data?.trades ?? [], account)) {
-      const key = dayKeyOf(t.closed_at)
+      const key = dayKeyOf(t.closed_at, dayRule)
       byDay.set(key, [...(byDay.get(key) ?? []), t])
     }
     const lockedBefore = data?.historyFrom ? Date.parse(data.historyFrom) : null
@@ -89,15 +97,15 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
       const week: Day[] = []
       for (let i = 0; i < 7; i++) {
         const date = new Date(cursor)
-        const key = dayKeyOf(date.toISOString())
+        const key = cellKey(date)
         const trades = date.getMonth() === month.getMonth() ? byDay.get(key) ?? [] : []
-        const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
+        const endOfDay = tradingDayStart(cellKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)), dayRule).getTime()
         week.push({
           key, date, trades,
           net: trades.reduce((s, t) => s + pnlOf(t), 0),
           broken: brokenRules(trades, limits),
           locked: lockedBefore !== null && endOfDay <= lockedBefore,
-          future: date.getTime() > Date.now()
+          future: key > today
         })
         cursor.setDate(cursor.getDate() + 1)
       }
@@ -114,10 +122,9 @@ export default function JournalCalendar({ limits, strategies, onStrategyChange, 
         keptDays: tradingDays.filter(d => d.broken.length === 0).length,
       }
     }
-  }, [data, month, limits, account])
+  }, [data, month, limits, account, dayRule])
 
   const selectedDay = selected ? weeks.flat().find(d => d.key === selected) ?? null : null
-  const today = dayKeyOf(new Date().toISOString())
   const thisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() === month.getTime()
   const label = month.toLocaleDateString("en-US", { month: "long", year: "numeric" })
 

@@ -16,6 +16,8 @@ const money = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(0)}`
 const pct = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`
 const winRate = (trades: PatternTrade[]) => trades.filter(t => pnl(t) > 0).length / trades.length
 
+import { tradingDayKey } from "./trading-day"
+
 function localParts(iso: string, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "numeric", hour12: false })
     .formatToParts(new Date(iso))
@@ -26,7 +28,7 @@ function localParts(iso: string, timezone: string) {
 const hourLabel = (h: number) => `${h % 12 || 12}${h < 12 ? "am" : "pm"}`
 
 // Plain-language lines, most useful first. Empty when there isn't enough data to say anything fair.
-export function tradePatterns(trades: PatternTrade[], limits: PatternLimits, timezone = "America/New_York"): string[] {
+export function tradePatterns(trades: PatternTrade[], limits: PatternLimits, timezone = "America/New_York", dayRule?: string | null): string[] {
   const sorted = [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
   if (sorted.length < MIN_TRADES) return []
   let tz = timezone
@@ -35,7 +37,7 @@ export function tradePatterns(trades: PatternTrade[], limits: PatternLimits, tim
   const lines: string[] = []
   const days = new Map<string, PatternTrade[]>()
   for (const t of sorted) {
-    const day = localParts(t.opened_at ?? t.closed_at, tz).day
+    const day = tradingDayKey(t.opened_at ?? t.closed_at, dayRule, tz)
     days.set(day, [...(days.get(day) ?? []), t])
   }
   const overall = winRate(sorted)
@@ -100,7 +102,8 @@ export async function loadTradePatterns(
   userId: string,
   todayStart: Date,
   limits: PatternLimits,
-  timezone?: string
+  timezone?: string,
+  dayRule?: string | null
 ): Promise<string[]> {
   const load = (cols: string) => supabase
     .from("trades")
@@ -115,7 +118,7 @@ export async function loadTradePatterns(
   if (error || !data) return []
   // Day-total entries are not trades, and a trade copied to several accounts is one decision (its result is the group's)
   const marked = prepareTrades(data as unknown as (PatternTrade & { kind?: string; account: string | null; symbol: string | null; side: string | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null })[])
-  return tradePatterns(marked.filter(t => t.kind !== "day_total" && !t.is_copy).map(t => ({ ...t, realized_pnl: t.group_pnl })), limits, timezone)
+  return tradePatterns(marked.filter(t => t.kind !== "day_total" && !t.is_copy).map(t => ({ ...t, realized_pnl: t.group_pnl })), limits, timezone, dayRule)
 }
 
 // One plain line per recent trading day (before today), so Pip can answer "what did I do yesterday?".
@@ -123,12 +126,13 @@ export async function loadTradePatterns(
 export function recentDayLines(
   trades: { closed_at: string; realized_pnl: number | null; kind?: string; account?: string | null; symbol?: string | null; side?: string | null; opened_at?: string | null; platform?: string | null; qty?: number | null; entry_price?: number | null; exit_price?: number | null }[],
   timezone = "America/New_York",
-  days = 7
+  days = 7,
+  dayRule?: string | null
 ): string[] {
   const byDay = new Map<string, { count: number; wins: number; losses: number; net: number; adjustment: number }>()
   const marked = prepareTrades(trades.map(t => ({ account: null, symbol: null, side: null, opened_at: null, ...t })))
   for (const t of marked) {
-    const day = localParts(t.closed_at, timezone).day
+    const day = tradingDayKey(t.closed_at, dayRule, timezone)
     const row = byDay.get(day) ?? { count: 0, wins: 0, losses: 0, net: 0, adjustment: 0 }
     row.net += Number(t.realized_pnl ?? 0)
     if (t.kind === "day_total") row.adjustment += Number(t.realized_pnl ?? 0)
@@ -152,7 +156,7 @@ export function recentDayLines(
     })
 }
 
-export async function loadRecentDays(supabase: SupabaseClient, userId: string, todayStart: Date, timezone?: string): Promise<string[]> {
+export async function loadRecentDays(supabase: SupabaseClient, userId: string, todayStart: Date, timezone?: string, dayRule?: string | null): Promise<string[]> {
   const load = (cols: string) => supabase
     .from("trades")
     .select(cols)
@@ -163,11 +167,11 @@ export async function loadRecentDays(supabase: SupabaseClient, userId: string, t
   let { data, error } = await load("closed_at, opened_at, realized_pnl, kind, account, symbol, side, platform, qty, entry_price, exit_price")
   if (error) ({ data, error } = await load("closed_at, opened_at, realized_pnl, account, symbol, side, platform, qty, entry_price, exit_price")) // before 20261024_day_totals.sql
   if (error || !data) return []
-  return recentDayLines(data as unknown as Parameters<typeof recentDayLines>[0], timezone)
+  return recentDayLines(data as unknown as Parameters<typeof recentDayLines>[0], timezone, 7, dayRule)
 }
 
 // The most recent trading day before today, trade by trade (at most 15 lines), so Pip can talk about it in detail.
-export async function loadLastDayDetail(supabase: SupabaseClient, userId: string, todayStart: Date, timezone = "America/New_York"): Promise<string[]> {
+export async function loadLastDayDetail(supabase: SupabaseClient, userId: string, todayStart: Date, timezone = "America/New_York", dayRule?: string | null): Promise<string[]> {
   const { data, error } = await supabase
     .from("trades")
     .select("*")
@@ -178,8 +182,8 @@ export async function loadLastDayDetail(supabase: SupabaseClient, userId: string
     .limit(1000)
   if (error || !data?.length) return []
   const marked = prepareTrades(data as unknown as { account: string | null; symbol: string | null; side: string | null; opened_at: string | null; closed_at: string; realized_pnl: number | null; platform: string; qty: number | null; entry_price: number | null; exit_price: number | null; kind?: string; source?: string }[])
-  const lastDay = marked.map(t => localParts(t.closed_at, timezone).day).sort().pop()!
-  const ofDay = marked.filter(t => localParts(t.closed_at, timezone).day === lastDay)
+  const lastDay = marked.map(t => tradingDayKey(t.closed_at, dayRule, timezone)).sort().pop()!
+  const ofDay = marked.filter(t => tradingDayKey(t.closed_at, dayRule, timezone) === lastDay)
   const accounts = new Set(ofDay.map(t => t.account).filter(Boolean))
   const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" })
   const price = (v: number | null) => (v === null ? "?" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }))

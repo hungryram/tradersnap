@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase-client"
 import { RULE_TEMPLATES } from "@/lib/rule-templates"
 import { detectExtension } from "@/lib/extension-bridge"
 import AuthShell from "../components/AuthShell"
+import DayStartPicker, { dayStartOf, type DayStartChoice } from "../dashboard/components/DayStartPicker"
 
 type Market = "futures" | "stocks" | "options" | "forex" | "crypto"
 type Platform = "tradingview" | "tradovate" | "topstepx" | "ninjatrader" | "other"
@@ -39,6 +40,7 @@ export default function OnboardingPage() {
   const [markets, setMarkets] = useState<Market[]>(["futures"])
   const [platforms, setPlatforms] = useState<Platform[]>(["tradingview"])
   const [propFirm, setPropFirm] = useState<boolean | null>(null)
+  const [dayStart, setDayStart] = useState<DayStartChoice>("auto")
   const [experience, setExperience] = useState<"new" | "1-3" | "3+" | null>(null)
 
   // Step 2
@@ -74,6 +76,7 @@ export default function OnboardingPage() {
             if (Array.isArray(profile.platforms)) setPlatforms(profile.platforms)
             setPropFirm(typeof profile.prop_firm === "boolean" ? profile.prop_firm : null)
             setExperience(profile.experience ?? null)
+            setDayStart(dayStartOf(profile.day_start))
           }
           const limits = user.trading_limits
           if (limits) {
@@ -142,7 +145,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           onboarded: true,
           ...(firstName.trim() ? { first_name: firstName.trim() } : {}),
-          trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}) },
+          trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}), ...(dayStart !== "auto" ? { day_start: dayStart } : {}) },
           trading_limits: {
             max_trades_per_day: numberOrNull(maxTrades),
             max_daily_loss: numberOrNull(maxDailyLoss),
@@ -218,6 +221,8 @@ export default function OnboardingPage() {
             <button onClick={() => setExperience("1-3")} className={chip(experience === "1-3")}>1–3 years</button>
             <button onClick={() => setExperience("3+")} className={chip(experience === "3+")}>3+ years</button>
           </Question>
+
+          <DayStartPicker markets={markets} value={dayStart} onChange={setDayStart} />
 
           <div className="flex justify-end">
             <button onClick={() => setStep(2)} disabled={markets.length === 0 || platforms.length === 0} className={primary}>Continue</button>

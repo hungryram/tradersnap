@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { api } from "@/lib/dashboard-data"
 import { Card, Notice, buttonPrimary, buttonSecondary } from "./ui"
+import DayStartPicker, { dayStartOf, type DayStartChoice } from "./DayStartPicker"
+import { DAY_START_CHOICES, dayRuleOf } from "@/lib/trading-day"
 
 // What the trader told us at onboarding (markets, platforms, prop firm, experience), editable any time.
 // Pip uses the experience answer to decide how much to explain.
@@ -12,6 +14,7 @@ export type TradingProfile = {
   platforms: string[]
   prop_firm: boolean
   experience?: "new" | "1-3" | "3+"
+  day_start?: string
 } | null
 
 const MARKETS = [
@@ -37,6 +40,7 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
   const [platforms, setPlatforms] = useState<string[]>(profile?.platforms ?? [])
   const [propFirm, setPropFirm] = useState<boolean | null>(profile ? profile.prop_firm : null)
   const [experience, setExperience] = useState<"new" | "1-3" | "3+" | null>(profile?.experience ?? null)
+  const [dayStart, setDayStart] = useState<DayStartChoice>(dayStartOf(profile?.day_start))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
 
@@ -45,6 +49,7 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
     setPlatforms(profile?.platforms ?? [])
     setPropFirm(profile ? profile.prop_firm : null)
     setExperience(profile?.experience ?? null)
+    setDayStart(dayStartOf(profile?.day_start))
   }
 
   async function save() {
@@ -53,7 +58,7 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
     try {
       await api("/api/me", {
         method: "PATCH",
-        body: JSON.stringify({ trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}) } })
+        body: JSON.stringify({ trading_profile: { markets, platforms, prop_firm: !!propFirm, ...(experience ? { experience } : {}), ...(dayStart !== "auto" ? { day_start: dayStart } : {}) } })
       })
       setMessage({ tone: "good", text: "Saved. Pip will use this from now on." })
       setEditing(false)
@@ -99,6 +104,7 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
             </div>
             <p className="mt-2 text-xs text-ink-muted">If you&apos;re new, Pip explains terms in plain language and suggests the basics. Otherwise he keeps it short.</p>
           </div>
+          <DayStartPicker markets={markets} value={dayStart} onChange={setDayStart} />
           <div className="flex gap-2">
             <button onClick={save} disabled={busy || markets.length === 0 || platforms.length === 0} className={buttonPrimary}>{busy ? "Saving..." : "Save"}</button>
             <button onClick={() => { setEditing(false); setMessage(null) }} disabled={busy} className={buttonSecondary}>Cancel</button>
@@ -109,6 +115,7 @@ export default function TradingProfileCard({ profile, onSaved }: { profile: Trad
           <div><dt className="text-xs text-ink-muted">Trades</dt><dd className="mt-0.5">{labelOf(MARKETS, profile.markets) || <span className="text-ink-muted">Not set</span>}</dd></div>
           <div><dt className="text-xs text-ink-muted">Platforms</dt><dd className="mt-0.5">{labelOf(PLATFORMS, profile.platforms) || <span className="text-ink-muted">Not set</span>}</dd></div>
           <div><dt className="text-xs text-ink-muted">Prop firm account</dt><dd className="mt-0.5">{profile.prop_firm ? "Yes" : "No"}</dd></div>
+          <div className="sm:col-span-2"><dt className="text-xs text-ink-muted">Trading day starts</dt><dd className="mt-0.5">{(() => { const rule = dayRuleOf(profile); const label = rule ? DAY_START_CHOICES.find(c => c.id === rule)?.label ?? rule : "Midnight, my time"; return profile.day_start ? label : `${label} (automatic)` })()}</dd></div>
           <div><dt className="text-xs text-ink-muted">Experience</dt><dd className="mt-0.5">{EXPERIENCE.find(e => e.id === profile.experience)?.label ?? <span className="text-ink-muted">Not set</span>}</dd></div>
         </dl>
       ) : (
