@@ -116,6 +116,9 @@ export default function Pricing() {
       <p className="mt-6 text-center text-sm text-ink-muted">
         Every plan works with several accounts (copied trades count once, limits apply per account) and lets you tell Pip about a trade and log it in one tap. Every new account gets 7 days of Pro, free, no card. Usage resets daily at midnight UTC. Busy day? Buy extra usage on any plan; it never expires.
       </p>
+      <p className="mt-3 text-center text-xs text-ink-muted">
+        Prices and plan allowances may change as Pip grows. If a price changes, current subscribers get at least 30 days&apos; notice before it applies to them.
+      </p>
     </div>
   )
 }

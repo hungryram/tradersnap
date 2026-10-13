@@ -39,6 +39,7 @@ export const FAQ: FaqGroup[] = [
       { q: "What do I get with Pro?", a: "About 30 chart checks and 150 messages a day, up to 5 strategies at once (Pip works out which one each chart fits), your full journal, calendar and notes history with results per strategy, Pip reading your last 10 journal notes and your last trading day, and a day review in the journal (up to 5 a day) where Pip tells you how the day went against your rules. Pro+ raises that to about 100 checks and 400 messages a day with unlimited strategies, for full-time and multi-account traders." },
       { q: "How does usage work?", a: "You get a daily allowance, shown as a percentage. A chart check uses more of it than a message. It resets every day at midnight UTC." },
       { q: "What if I run out?", a: "Wait for the daily reset, move to a bigger plan (Pro is about 7 times Free, Pro+ about 20 times), or buy extra usage on any plan. Extra usage is used after your daily allowance and never expires." },
+      { q: "Can prices or plan limits change?", a: "They can. Pip is new and we're still learning what it costs to run, so prices, daily allowances and what each plan includes may change over time. If the price of a subscription you already have changes, we'll email you at least 30 days before it applies to you, and you can cancel before then. Launch prices may end for new sign-ups at any time." },
       { q: "How do I cancel Pro?", a: "Go to Account, then Manage billing. You keep Pro until the end of the period you paid for." },
     ],
   },
