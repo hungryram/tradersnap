@@ -1,6 +1,10 @@
 // Public addresses. Set NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_SITE_URL per environment to override.
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://admin.tradewithpip.ai"
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://tradewithpip.ai"
+// Only the origin is used, so a value pasted with a path (like a sign-in callback) can't break checkout and billing return links
+const originOf = (value: string | undefined, fallback: string) => {
+  try { return value ? new URL(value).origin : fallback } catch { return fallback }
+}
+export const APP_URL = originOf(process.env.NEXT_PUBLIC_APP_URL, "https://admin.tradewithpip.ai")
+export const SITE_URL = originOf(process.env.NEXT_PUBLIC_SITE_URL, "https://tradewithpip.ai")
 export const SUPPORT_EMAIL = "hello@tradewithpip.ai"
 
 // The marketing site, which hosts the feedback form
