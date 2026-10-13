@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: title, template: "%s | Pip" },
   description,
+  verification: { google: "AwUUo7Zngi_NeR2QG3tLmtmFsRFo5Iy3yVx38Hucc3Y" },
   openGraph: { title, description, url: SITE_URL, siteName: "Pip", type: "website" },
   twitter: { card: "summary", title, description },
 }
