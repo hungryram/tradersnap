@@ -6,9 +6,10 @@ import Pip, { type PipMood } from "../components/Pip"
 import { Card, Loading, Notice, PageHeader, Stat, buttonPrimary, buttonSecondary, money } from "./components/ui"
 import TradeTable from "./components/TradeTable"
 import UsageMeter, { type Credits } from "./components/UsageMeter"
+import OpenPlatformButtons from "./components/OpenPlatformButtons"
 
 type Me = {
-  user: { first_name: string | null; plan: string; trading_limits: TradingLimits | null }
+  user: { first_name: string | null; plan: string; trading_limits: TradingLimits | null; trading_profile?: { platforms?: string[] } | null }
   ruleset: { id: string; name: string } | null
   usage: { messages: { used: number; limit: number }; screenshots: { used: number; limit: number }; credits?: Credits; canBuyMore?: boolean }
 }
@@ -40,7 +41,7 @@ export default function TodayPage() {
       <PageHeader
         title={`${greeting}${me.user.first_name ? `, ${me.user.first_name}` : ""}`}
         subtitle={new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        actions={<a href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer" className={buttonPrimary}>Open TradingView</a>}
+        actions={<OpenPlatformButtons platforms={me.user.trading_profile?.platforms} layout="row" />}
       />
 
       <PipSays {...pipLine(stats, limits, scope)} />

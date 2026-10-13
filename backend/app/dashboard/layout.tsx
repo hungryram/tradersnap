@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-client"
 import { signOutExtension } from "@/lib/extension-bridge"
 import Pip from "../components/Pip"
 import { SUPPORT_EMAIL } from "@/lib/urls"
+import OpenPlatformButtons from "./components/OpenPlatformButtons"
 
 const MAIN_NAV = [
   { href: "/dashboard", label: "Today", icon: SunIcon },
@@ -33,6 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameNotice, setRenameNotice] = useState(false)
   const [trialDaysLeft, setTrialDaysLeft] = useState(0)
+  const [platforms, setPlatforms] = useState<string[] | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -49,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then(response => response.ok ? response.json() : null)
         .then(data => {
           setIsAdmin(!!data?.user?.is_admin)
+          setPlatforms(data?.user?.trading_profile?.platforms ?? null)
           setTrialDaysLeft(data?.user?.subscribed_plan === "free" ? data?.user?.trial_days_left ?? 0 : 0)
         })
         .catch(() => {})
@@ -101,14 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </ul>
 
       <div className="mt-6 px-3">
-        <a
-          href="https://www.tradingview.com/chart/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 hover:bg-brand-400 px-3 py-2 text-sm font-medium text-ink-bg transition-colors"
-        >
-          Open TradingView
-        </a>
+        <OpenPlatformButtons platforms={platforms} layout="stack" />
       </div>
 
       <div className="mt-auto pt-8">
