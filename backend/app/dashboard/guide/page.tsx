@@ -1,469 +1,166 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { SUPPORT_EMAIL } from "@/lib/urls"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
+import { SITE_URL } from "@/lib/urls"
+import { Card, PageHeader } from "../components/ui"
+
+const STORE_URL = "https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
+const link = "text-brand-300 hover:text-brand-200 underline"
+
+type Section = { title: string; body: React.ReactNode }
+
+const STEPS: React.ReactNode[] = [
+  <>Install Pip from the <a href={STORE_URL} target="_blank" rel="noopener noreferrer" className={link}>Chrome Web Store</a> and pin it to your toolbar (puzzle piece, then pin).</>,
+  <>Set your <a href="/dashboard/rules" className={link}>strategies and daily limits</a>. Pip checks every chart and every trade against them.</>,
+  <>Open your chart in Chrome (TradingView, Tradovate or TopstepX). The Pip button sits at the bottom right. Click it, or press <Kbd>Alt + Shift + S</Kbd>.</>,
+  <>Click <strong className="text-ink-body">Check this setup</strong> before you enter, or type a question and send it with your chart.</>,
+  <>Turn on <strong className="text-ink-body">Auto-detect trades</strong> in the widget&apos;s ⋮ menu so your <a href="/dashboard/journal" className={link}>journal</a> fills itself.</>,
+]
+
+const SECTIONS: Section[] = [
+  {
+    title: "Checking a setup",
+    body: (
+      <>
+        <p>Before you enter, click <strong>Check this setup</strong>. Pip looks at your chart, compares it to the strategy you&apos;ve written, and tells you whether it lines up or what&apos;s missing. If you keep several strategies, he works out which one the chart fits (or tells you it fits none).</p>
+        <p>Pip never tells you to buy or sell, never predicts price and never gives entries, stops or targets. He holds you to the rules you wrote.</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>Send with chart</strong> (<Kbd>Ctrl + Enter</Kbd>, <Kbd>Cmd + Enter</Kbd> on Mac) adds a screenshot to a question. Plain messages without a chart use much less of your allowance.</li>
+          <li>The chart is only captured when you click one of those. Screenshots stay in your browser and are not saved on our servers.</li>
+          <li>Use the strategy picker in the chat box to say which strategy you&apos;re trading.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    title: "Your strategies and daily limits",
+    body: (
+      <>
+        <p>On the <a href="/dashboard/rules" className={link}>Rules</a> page you write each setup you trade as its own strategy, plus the rules that apply to every trade. Be specific: exact indicator settings, timeframe, what a valid entry looks like. The clearer the rule, the better Pip can hold you to it.</p>
+        <p>Daily limits (max trades, stop after N losses, max daily loss, session hours) are what the coach watches live. When you near or pass one, Pip speaks up. He can&apos;t touch your orders, you&apos;re always in control.</p>
+        <p>Free includes 1 strategy. Pro checks up to 5 at once, Pro+ up to 50.</p>
+      </>
+    ),
+  },
+  {
+    title: "Trade tracking and your journal",
+    body: (
+      <>
+        <p>With Auto-detect on, Pip logs each trade and its result as it happens. Nothing to export and no broker login.</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>TradingView:</strong> keep the trading panel open (it can be small). Pip reads your Order history.</li>
+          <li><strong>Tradovate and TopstepX:</strong> Pip reads the trade data the page already loads. Nothing to keep open.</li>
+          <li><strong>Several accounts?</strong> Each account is tracked separately. One trade copied to five accounts counts as one trade, and your limits apply per account. The journal has an account filter.</li>
+          <li><strong>Tell Pip instead:</strong> say &quot;I just made 200&quot; and tap to log it, with a choice of strategy. Say &quot;I&apos;m up 381 today&quot; and Pip logs only what&apos;s missing as a day total. Nothing is logged until you tap.</li>
+        </ul>
+        <p>The <a href="/dashboard/journal" className={link}>Journal</a> shows a calendar, your trades, results per strategy and notes for each day. Use <strong>Review this day</strong> to have Pip walk through how the day went against your rules (Free gets one a week, Pro up to 5 a day, Pro+ up to 15).</p>
+      </>
+    ),
+  },
+  {
+    title: "Check-ins from the coach",
+    body: (
+      <>
+        <p>After a losing streak, a quick re-entry after a loss, or when you near your limits, Pip messages you first. Short and only when something happened. In the widget&apos;s ⋮ menu you can switch check-ins to warnings only or off, and ask for a short cooldown timer when you want a pause.</p>
+      </>
+    ),
+  },
+  {
+    title: "What Pip remembers",
+    body: (
+      <>
+        <p>Pip keeps a few short notes about you so he doesn&apos;t start from zero each time. See and edit all of it on the <a href="/dashboard/memory" className={link}>Memory</a> page. Star a reply to save it to <a href="/dashboard/saved-messages" className={link}>Saved for Pip</a> and he&apos;ll keep it in mind (Free keeps 3, Pro 20, Pro+ 50).</p>
+        <p>On Pro and Pro+, Pip also reads your recent journal notes and your last trading day. On Free, he coaches from your rules, trades and chat.</p>
+        <p>Tell Pip how long you&apos;ve been trading on the <a href="/dashboard/account" className={link}>Account</a> page. If you&apos;re new, he explains terms in plain language. You can change it or run setup again any time.</p>
+      </>
+    ),
+  },
+  {
+    title: "Usage and plans",
+    body: (
+      <>
+        <p>You get a daily allowance, shown as a percentage on your Account page and in the widget. A chart check uses more than a message. It resets every day at midnight UTC. New accounts start with 7 days of Pro, no card needed.</p>
+        <p>If you run out, wait for the reset, move up a plan, or buy extra usage, which is used after your daily allowance and never expires. Plans and prices are on the <a href={`${SITE_URL}/pricing`} className={link}>pricing page</a>.</p>
+      </>
+    ),
+  },
+]
+
+const TIPS = [
+  ["Check before you enter", "Pip is most useful before the trade, when it's still a decision."],
+  ["Write rules you can test", "\"Price above the 20 EMA on the 5-minute, pullback to it\" beats \"trade with the trend\"."],
+  ["Add a note at the end of the day", "Even one line. On paid plans Pip reads it and uses it next time."],
+  ["Update your rules as you learn", "What you write in March may not fit in June. Edit them on the Rules page."],
+]
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return <span className="rounded border border-ink-border bg-ink-elevated px-1.5 py-0.5 font-mono text-xs text-ink-body">{children}</span>
+}
 
 export default function GuidePage() {
-    const router = useRouter()
-    const supabase = createClient()
-    const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
+  const [isLoading, setIsLoading] = useState(true)
 
-    useEffect(() => {
-        checkAuth()
-    }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/")
+        return
+      }
+      setIsLoading(false)
+    })
+  }, [])
 
-    const checkAuth = async () => {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
-        if (!session) {
-            router.push("/")
-            return
-        }
-        setIsLoading(false)
-    }
-
-    if (isLoading) {
-        return (
-            <div>
-                <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-                    <div className="text-ink-body text-xl">Loading...</div>
-                </div>
-            </div>
-        )
-    }
-
+  if (isLoading) {
     return (
-        <div>
-            <div className="max-w-4xl">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-2xl font-semibold tracking-tight text-ink-body mb-2">
-                        Getting Started with Pip
-                    </h1>
-                    <p className="text-ink-text">
-                        A complete guide to analyzing charts, creating trading rules, and
-                        building better trading habits with AI assistance.
-                    </p>
-                </div>
-
-                {/* Quick Start */}
-                <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-6 mb-8">
-                    <h2 className="text-xl font-semibold text-ink-body mb-3">
-                        🚀 Quick Start
-                    </h2>
-                    <ol className="space-y-2 text-ink-text">
-                        {[
-                            <>Pin the Pip extension to your Chrome toolbar (puzzle icon → pin).</>,
-                            <>Set up your <a href="/dashboard/rules" className="text-brand-300 hover:text-brand-200 underline">rules and daily limits</a>. Your coach checks every chart against them.</>,
-                            <>Open your chart in Chrome (TradingView, Tradovate or TopstepX) and click the <strong className="text-ink-body">Pip</strong> button at the bottom right.</>,
-                            <>Click <strong className="text-ink-body">Check this setup</strong> for a verdict against your rules, or type a question and use <strong className="text-ink-body">Send with Chart</strong>.</>,
-                            <>On TradingView, Tradovate or TopstepX, turn on <strong className="text-ink-body">Auto-detect trades</strong> (⋮ menu) so your <a href="/dashboard/journal" className="text-brand-300 hover:text-brand-200 underline">journal</a> fills itself.</>,
-                        ].map((step, i) => (
-                            <li key={i} className="flex items-start">
-                                <span className="font-semibold text-brand-300 mr-2">{i + 1}.</span>
-                                <span>{step}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-
-                {/* Main Guide Sections */}
-                <div className="space-y-8">
-                    {/* Section 1: Installing & Setting Up */}
-                    <section className="bg-ink-surface rounded-lg border border-ink-border p-6">
-                        <h2 className="text-xl font-semibold text-ink-body mb-4">
-                            1. Installing & Setting Up
-                        </h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Install the Extension
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    Visit the{" "}
-                                    <a
-                                        href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-brand-300 hover:text-brand-200 underline"
-                                    >
-                                        Chrome Web Store
-                                    </a>{" "}
-                                    and click "Add to Chrome". The extension will appear in your
-                                    browser toolbar.
-                                </p>
-                                <div className="bg-ink-elevated border border-ink-border rounded-lg p-4 text-sm text-ink-text">
-                                    💡 <strong>Tip:</strong> Pin the extension to your toolbar for
-                                    easy access. Right-click the extension icon and select "Pin".
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Grant Permissions
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    When you first use Pip on a trading platform, Chrome
-                                    may ask for permission to access that site. This is required
-                                    to capture chart screenshots and display the chat widget.
-                                </p>
-                                <p className="text-ink-text text-sm">
-                                    <strong>What we access:</strong> Only chart images you
-                                    explicitly request to analyze. We never access your trading
-                                    accounts or execute trades.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Sign In
-                                </h3>
-                                <p className="text-ink-text">
-                                    Click the extension icon and sign in with your Pip
-                                    account. You'll be authenticated across all your browser tabs
-                                    automatically.
-                                </p>
-                            </div>
-                            <div className="mt-4">
-                                <img
-                                    src="/image.png"
-                                    alt="Pip extension installation"
-                                    className="w-full rounded-lg border border-ink-border"
-                                />
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Section 2: Analyzing Charts */}
-                    <section className="bg-ink-surface rounded-lg border border-ink-border p-6">
-                        <h2 className="text-xl font-semibold text-ink-body mb-4">
-                            2. Analyzing Your First Chart
-                        </h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Open a Trading Chart
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    Navigate to any web-based trading platform like TradingView or
-                                    Tradovate. Open a chart you want to
-                                    analyze.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Activate the Chat Widget
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    You'll see a small Pip widget appear on your chart
-                                    (bottom right corner). Click it to open the chat interface.
-                                </p>
-                                <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg p-4 text-sm text-brand-200">
-                                    📍 <strong>Can't see the widget?</strong> Make sure you're
-                                    signed in to the extension and have granted site permissions.
-                                    Try refreshing the page.
-                                </div>
-                                <div className="mt-4">
-                                    <img
-                                        src="/image2.png"
-                                        alt="Pip extension widget on trading chart"
-                                        className="w-full rounded-lg border border-ink-border"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Get AI Analysis
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    Click the <strong>"Check this setup"</strong> button in the chat
-                                    widget. Our AI will:
-                                </p>
-                                <ul className="list-disc list-inside text-ink-text space-y-1 ml-4">
-                                    <li>Capture your current chart screenshot</li>
-                                    <li>Identify patterns, support/resistance, and indicators</li>
-                                    <li>Check against your active ruleset (if you have one)</li>
-                                    <li>Provide detailed feedback</li>
-                                </ul>
-                                <p className="text-ink-text text-sm mt-2">
-                                    ⏱️ Messages with screenshot analysis typically takes 5-10 seconds.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Ask Follow-Up Questions
-                                </h3>
-                                <p className="text-ink-text">
-                                    After getting an analysis, you can chat with the AI to ask
-                                    questions like following up on that analysis.
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Section 3: Creating Trading Rules */}
-                    <section className="bg-ink-surface rounded-lg border border-ink-border p-6">
-                        <h2 className="text-xl font-semibold text-ink-body mb-4">
-                            3. Creating Custom Trading Rules
-                        </h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Why Use Rulesets?
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    Rulesets help you stick to your trading plan and avoid
-                                    emotional decisions. When you analyze a chart, the AI checks
-                                    if your setup follows your rules and gives you specific
-                                    feedback.
-                                </p>
-                                <p className="text-ink-text text-sm italic">
-                                    Example: "Only trade when RSI is below 30" or "Never risk more
-                                    than 2% per trade"
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Create a Ruleset
-                                </h3>
-                                <ol className="list-decimal list-inside text-ink-text space-y-2 ml-4">
-                                    <li>
-                                        Go to the <strong>Rules</strong> page in your dashboard
-                                    </li>
-                                    <li>Click "Create New Ruleset"</li>
-                                    <li>Give it a descriptive name (e.g., "9 EMA Day Trading Rules")</li>
-                                    <li>Add your trading rules one by one</li>
-                                    <li>Click "Save" when done</li>
-                                </ol>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Rule Examples
-                                </h3>
-                                <div className="bg-ink-elevated border border-ink-border rounded-lg p-4 space-y-2">
-                                    <p className="text-sm text-ink-text">
-                                        ✅ <strong>Entry Rules:</strong> "Only enter when price is
-                                        above 20 EMA on 15-min chart"
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        ✅ <strong>Risk Management:</strong> "Stop loss must be at
-                                        recent swing low/high"
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        ✅ <strong>Psychology:</strong> "Never trade after 2
-                                        consecutive losses"
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        ✅ <strong>Confirmation:</strong> "Wait for 3 consecutive
-                                        green candles before entry"
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Activate a Ruleset
-                                </h3>
-                                <p className="text-ink-text">
-                                    You can have multiple rulesets for different strategies
-                                    (scalping, swing trading, etc.) but only one can be active at
-                                    a time. Click the toggle switch next to a ruleset to activate
-                                    it. All future chart analyses will reference that ruleset.
-                                </p>
-                                <p className="text-ink-text">
-                                    This allows for the AI to focus on one ruleset at a time and not give mixed feedback.
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Section 4: Saving Favorites */}
-                    <section className="bg-ink-surface rounded-lg border border-ink-border p-6">
-                        <h2 className="text-xl font-semibold text-ink-body mb-4">
-                            4. Saving & Organizing Analyses
-                        </h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Save Important Analyses
-                                </h3>
-                                <p className="text-ink-text mb-2">
-                                    When you receive particularly good analysis or insights, click
-                                    the <strong>star icon</strong> (☆) next to the message to
-                                    save it to your Favorites. It will highlight in gold signaling message is saved.
-                                </p>
-                                <p className="text-ink-text">
-                                    Favorited messages are kept permanently (or until you delete
-                                    them), while regular chat history is only kept for 30 days. If you delete chat history, favorites remain safe.
-                                </p>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold text-ink-body mb-2">
-                                    Review Your Favorites
-                                </h3>
-                                <p className="text-ink-text">
-                                    Visit the <strong>Favorites</strong> page in your dashboard to
-                                    see all saved analyses. This is great for:
-                                </p>
-                                <ul className="list-disc list-inside text-ink-text space-y-1 ml-4 mt-2">
-                                    <li>Reviewing what worked in past trades</li>
-                                    <li>Liking an inspiring feedback on a particular setup or emotions</li>
-                                    <li>Building a library of good setups</li>
-                                    <li>Learning from previous analysis</li>
-                                    <li>Creating study materials for improvement</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Section 6: Tips & Best Practices */}
-                    <section className="bg-ink-surface rounded-lg border border-ink-border p-6">
-                        <h2 className="text-xl font-semibold text-ink-body mb-4">
-                            6. Tips & Best Practices
-                        </h2>
-
-                        <div className="space-y-3">
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">📊</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">
-                                        Clean Your Charts
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        Remove unnecessary indicators and clutter before analysis for
-                                        more accurate AI feedback.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">🎯</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">
-                                        Be Specific in Rules
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        The more specific your trading rules, the better the AI can
-                                        check compliance. Include exact indicator values and
-                                        conditions.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">💬</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">Ask Questions</p>
-                                    <p className="text-sm text-ink-text">
-                                        Use the chat to ask follow-up questions. The AI can explain
-                                        its reasoning and help you understand market structure better.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">📝</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">
-                                        Keep a Trading Journal
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        Save good analyses to Favorites and review them weekly. Track
-                                        what setups work best for you.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">⚡</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">
-                                        Analyze Before Entry
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        Get AI feedback BEFORE placing trades, not after. Use it as a
-                                        decision-making tool to see if your setup meets your rules.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start">
-                                <span className="text-2xl mr-3">🔄</span>
-                                <div>
-                                    <p className="font-semibold text-ink-body">
-                                        Update Your Rules
-                                    </p>
-                                    <p className="text-sm text-ink-text">
-                                        As your trading strategy evolves, update your rulesets. What
-                                        worked 3 months ago might not work today.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-
-                {/* Footer CTA */}
-                <div className="mt-8 bg-brand-500/10 border border-brand-500/30 rounded-lg p-6 text-center">
-                    <h2 className="text-xl font-semibold text-ink-body mb-2">
-                        Ready to Trade Smarter?
-                    </h2>
-                    <p className="text-ink-text mb-4">
-                        Start analyzing your charts with AI-powered feedback and build
-                        better trading habits today.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <a
-                            href="https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center px-6 py-3 bg-brand-500 hover:bg-brand-400 text-ink-bg font-medium rounded-lg transition-colors"
-                        >
-                            Install Extension
-                        </a>
-                        <a
-                            href="/dashboard/rules"
-                            className="inline-flex items-center justify-center px-6 py-3 bg-ink-surface hover:bg-ink-elevated text-ink-text font-medium rounded-lg transition-colors border border-ink-border"
-                        >
-                            Create Your First Ruleset
-                        </a>
-                    </div>
-                </div>
-
-                {/* Help Section */}
-                <div className="mt-6 text-center text-sm text-ink-text">
-                    <p>
-                        Need help?{" "}
-                        <a
-                            href="/dashboard/faq"
-                            className="text-brand-300 hover:text-brand-200 underline"
-                        >
-                            Check out our FAQ
-                        </a>{" "}
-                        or{" "}
-                        <a
-                            href={`mailto:${SUPPORT_EMAIL}`}
-                            className="text-brand-300 hover:text-brand-200 underline"
-                        >
-                            contact support
-                        </a>
-                        .
-                    </p>
-                </div>
-            </div>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <div className="text-ink-body text-xl">Loading...</div>
+      </div>
     )
+  }
+
+  return (
+    <div className="max-w-4xl">
+      <PageHeader title="Guide" subtitle="How to set Pip up and get the most out of it while you trade." />
+
+      <div className="mb-8 rounded-lg border border-brand-500/30 bg-brand-500/10 p-6">
+        <h2 className="mb-3 text-lg font-semibold text-ink-body">Quick start</h2>
+        <ol className="space-y-2 text-ink-text">
+          {STEPS.map((step, i) => (
+            <li key={i} className="flex items-start">
+              <span className="mr-2 font-semibold text-brand-300">{i + 1}.</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-4 text-sm text-ink-muted">Can&apos;t see the Pip button? Refresh the page and make sure you&apos;re signed in from the extension icon.</p>
+      </div>
+
+      <div className="space-y-6">
+        {SECTIONS.map(section => (
+          <Card key={section.title} title={section.title}>
+            <div className="space-y-3 text-sm leading-relaxed text-ink-text [&_strong]:text-ink-body">{section.body}</div>
+          </Card>
+        ))}
+
+        <Card title="Tips">
+          <ul className="space-y-3 text-sm text-ink-text">
+            {TIPS.map(([title, text]) => (
+              <li key={title}>
+                <p className="font-medium text-ink-body">{title}</p>
+                <p>{text}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      <p className="mt-8 text-center text-sm text-ink-text">
+        Need help? <a href="/dashboard/faq" className={link}>Read the FAQ</a> or <a href={`${SITE_URL}/contact`} target="_blank" rel="noopener noreferrer" className={link}>contact us</a>.
+      </p>
+    </div>
+  )
 }
