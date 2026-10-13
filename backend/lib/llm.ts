@@ -11,11 +11,11 @@ import { isPaid } from "./plans"
 export type Provider = "openai" | "anthropic"
 export const provider: Provider = process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai"
 
-// Main model: chart analysis and rare judgment jobs (rules review). Opus reads charts best.
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5"
+// Main model: chat, chart analysis and judgment jobs (rules review). Set ANTHROPIC_MODEL=claude-opus-5-5 to run Opus instead.
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"
 // Model for chart analysis; set ANTHROPIC_ANALYZE_MODEL to try another model without touching the rest
 const ANTHROPIC_ANALYZE_MODEL = process.env.ANTHROPIC_ANALYZE_MODEL || ANTHROPIC_MODEL
-// Coaching chat. Defaults to the main model; set ANTHROPIC_CHAT_MODEL=claude-sonnet-5-5 to run chat on Sonnet (cheaper)
+// Coaching chat. Defaults to the main model; set ANTHROPIC_CHAT_MODEL=claude-opus-5-5 to run chat on Opus
 const ANTHROPIC_CHAT_MODEL = process.env.ANTHROPIC_CHAT_MODEL || ANTHROPIC_MODEL
 // Model for free-tier chat, if it should differ from the chat model
 const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_CHAT_MODEL
