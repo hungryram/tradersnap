@@ -245,7 +245,7 @@ export default function AccountPage() {
             </div>
             {isPro && user.plan !== "admin" && (
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-border pt-5">
-                <p className="text-sm text-ink-text">Payment method, invoices and cancellation are in the billing portal.</p>
+                <p className="text-sm text-ink-text">Payment method, invoices and cancellation are in the billing portal. If you cancel, you keep your plan until the period ends, and nothing is deleted after that: older journal days and extra strategies are kept and come back if you upgrade.</p>
                 <button onClick={openBillingPortal} disabled={busy} className={buttonSecondary}>{busy ? "Loading..." : "Manage billing"}</button>
               </div>
             )}

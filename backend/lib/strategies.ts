@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { features } from "./plans"
+import { features, loadPlan } from "./plans"
 
 // A trader can have several strategies (rulesets) active at once. Pip checks a
 // chart against all of them and says which one fits; rules that apply to every
@@ -33,7 +33,9 @@ export async function loadActiveStrategies(supabase: SupabaseClient, userId: str
   } else {
     rows = (withActive.data ?? []) as Strategy[]
   }
-  const active = rows.filter(r => r.is_active)
+  // More switched on than the plan allows (after a downgrade): use the main one first, then the oldest. Nothing is switched off or deleted.
+  const limit = activeStrategyLimit((await loadPlan(supabase, userId)).plan)
+  const active = rows.filter(r => r.is_active).sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).slice(0, limit)
   if (active.length) return active
   const fallback = rows.find(r => r.id === fallbackId) ?? rows.find(r => r.is_primary) ?? rows[0]
   return fallback ? [fallback] : []

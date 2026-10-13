@@ -87,8 +87,8 @@ export default function JournalPage() {
       {historyFrom && days > 7 && (
         <div className="mb-6">
           <Notice tone="info">
-            Showing your last 7 days. The Free plan keeps a week of history;{" "}
-            <a href="/dashboard/account#plans" className="underline">Pro keeps all of it</a>, so your stats cover months, not days.
+            Showing your last 7 days. Older days are saved, not deleted, and the Free plan just shows a week;{" "}
+            <a href="/dashboard/account#plans" className="underline">Pro shows all of it</a>, so your stats cover months, not days.
           </Notice>
         </div>
       )}

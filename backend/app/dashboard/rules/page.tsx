@@ -40,6 +40,8 @@ export default function RulesPage() {
   // userPlan is the effective plan from /api/me (a trial counts as Pro)
   const { rulesChars: maxChars, rulesets: maxRulesets, activeStrategies: maxActive } = features(userPlan)
   const activeCount = rulesets.filter(isOn).length
+  // Switched on but over the plan's limit (after a downgrade): Pip uses the main one first, then the oldest
+  const pausedIds = new Set(rulesets.filter(isOn).sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).slice(maxActive).map(r => r.id))
 
   useEffect(() => { load() }, [])
 
@@ -162,7 +164,7 @@ export default function RulesPage() {
         {/* Strategies */}
         <Card
           title="Your strategies"
-          action={rulesets.length > 0 ? <span className="text-xs text-ink-muted">{activeCount} of {maxActive} on{userPlan === "free" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro checks up to 5</a></> : userPlan === "pro" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro+ is unlimited</a></> : null}</span> : undefined}
+          action={rulesets.length > 0 ? <span className="text-xs text-ink-muted">{Math.min(activeCount, maxActive)} of {maxActive} on{userPlan === "free" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro checks up to 5</a></> : userPlan === "pro" ? <> · <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro+ is unlimited</a></> : null}</span> : undefined}
         >
           {rulesets.length === 0 ? (
             <>
@@ -179,6 +181,7 @@ export default function RulesPage() {
                   <div key={r.id} className={`flex items-center gap-2 rounded-xl border py-1.5 pl-3 pr-1.5 ${currentRuleset?.id === r.id ? "border-brand-500/60 bg-brand-500/10" : "border-ink-border"}`}>
                     <button onClick={() => select(r)} className="text-sm font-medium">{r.name}</button>
                     {r.is_primary && <span className="rounded bg-ink-elevated px-1.5 py-0.5 text-[10px] text-ink-muted" title="Pip's chat saves here when no strategy is named">Main</span>}
+                    {pausedIds.has(r.id) && <span className="rounded bg-ink-elevated px-1.5 py-0.5 text-[10px] text-ink-muted" title="Your plan checks fewer strategies at once. This one is kept and comes back when you upgrade.">Paused</span>}
                     <Switch on={isOn(r)} onClick={() => toggleActive(r)} disabled={isSaving} label={isOn(r) ? `Turn ${r.name} off` : `Turn ${r.name} on`} />
                   </div>
                 ))}
@@ -189,6 +192,12 @@ export default function RulesPage() {
                 )}
               </div>
               <p className="-mt-2 text-xs text-ink-muted">Switched on: Pip checks charts against it. Off: kept, but ignored.</p>
+              {pausedIds.size > 0 && (
+                <Notice tone="info">
+                  Your plan checks {maxActive} {maxActive === 1 ? "strategy" : "strategies"} at once, so {pausedIds.size} {pausedIds.size === 1 ? "is" : "are"} paused. Nothing is deleted;{" "}
+                  <a href="/dashboard/account#plans" className="underline">upgrade</a> and {pausedIds.size === 1 ? "it comes" : "they come"} back.
+                </Notice>
+              )}
 
               {currentRuleset && (
                 <div className="space-y-4 border-t border-ink-border pt-5">
