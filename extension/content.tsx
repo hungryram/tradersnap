@@ -250,6 +250,24 @@ const TradingBuddyWidget = () => {
   }
   const busyRef = useRef(false)
 
+  // Pip's check-ins and the trade pills aren't stored with the chat on the server, so the last day and a half of
+  // them is kept here (shared by every tab) and merged back in whenever the chat loads
+  const readLocalLog = async (): Promise<any[]> => {
+    const { pip_local_log } = await chrome.storage.local.get('pip_local_log').catch(() => ({ pip_local_log: null }))
+    return (Array.isArray(pip_local_log) ? pip_local_log : []).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+  }
+  const withLocalLog = (dbMessages: any[], local: any[]) => {
+    const oldest = dbMessages[0]?.timestamp.getTime() ?? 0
+    const seen = new Set<string>()
+    const extra = local.filter(m => {
+      const key = localKeyOf(m)
+      if (seen.has(key) || new Date(m.timestamp).getTime() < oldest) return false
+      seen.add(key)
+      return true
+    })
+    return [...dbMessages, ...extra].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }
+
   // Function to load chat history from database
   const loadChatHistoryFromDB = async (keepLocal = false) => {
     const result = await chrome.storage.local.get('supabase_session')
@@ -305,13 +323,10 @@ const TradingBuddyWidget = () => {
           a.timestamp.getTime() - b.timestamp.getTime() || (a.type === 'user' ? -1 : 0) - (b.type === 'user' ? -1 : 0)
         )
         
-        // Syncing from another tab: keep this tab's own Pip check-ins and notices (they are not stored in the database)
-        setMessages(prev => {
-          if (!keepLocal) return formattedMessages
-          const oldest = formattedMessages[0]?.timestamp.getTime() ?? 0
-          const local = prev.filter(m => (m.type === 'checkin' || m.type === 'info' || m.type === 'event') && !m.id && new Date(m.timestamp).getTime() >= oldest)
-          return [...formattedMessages, ...local].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        })
+        // Check-ins and trade pills aren't in the database: add back the saved ones (and, when syncing from another
+        // tab, this tab's own notices)
+        const saved = await readLocalLog()
+        setMessages(prev => withLocalLog(formattedMessages, [...saved, ...(keepLocal ? prev.filter(m => isLocalOnly(m) || (m.type === 'info' && !m.id)) : [])]))
         
         // Update cache
         chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
@@ -1016,6 +1031,24 @@ const TradingBuddyWidget = () => {
     document.addEventListener('visibilitychange', ensureSession)
     return () => document.removeEventListener('visibilitychange', ensureSession)
   }, [])
+
+  // Keep the check-ins and trade pills (see readLocalLog): merge this tab's into the shared log, newest 150, last 36 hours
+  useEffect(() => {
+    const local = messages.filter(isLocalOnly)
+    if (local.length === 0) return
+    readLocalLog().then(saved => {
+      const keys = new Set(saved.map(localKeyOf))
+      const added = local.filter(m => !keys.has(localKeyOf(m)))
+      if (added.length === 0) return
+      const since = Date.now() - 36 * 60 * 60 * 1000
+      const items = [...saved, ...added]
+        .filter(m => new Date(m.timestamp).getTime() >= since)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .slice(-150)
+        .map(m => ({ ...m, timestamp: new Date(m.timestamp).toISOString() }))
+      chrome.storage.local.set({ pip_local_log: items }).catch(() => {})
+    }).catch(() => {})
+  }, [messages])
 
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {
@@ -3293,6 +3326,11 @@ const TradingBuddyWidget = () => {
     </>
   )
 }
+
+
+// Messages that only exist in the browser: Pip's check-ins and the trade pills
+const isLocalOnly = (m: any) => (m.type === 'checkin' || m.type === 'event') && !m.id
+const localKeyOf = (m: any) => `${m.type}|${new Date(m.timestamp).getTime()}|${typeof m.content === 'string' ? m.content : ''}`
 
 export default TradingBuddyWidget
 
