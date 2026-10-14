@@ -40,6 +40,7 @@ export async function loadTodayWithStreak(): Promise<{ trades: Trade[]; streak: 
 export type TradingLimits = {
   max_trades_per_day: number | null
   max_daily_loss: number | null
+  max_contracts?: number | null // largest position size allowed, per account
   stop_after_losses: number | null
   session_start: string | null
   session_end: string | null

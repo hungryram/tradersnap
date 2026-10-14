@@ -40,6 +40,10 @@ function brokenRulesFor(dayTrades: Trade[], limits: TradingLimits | null): strin
     for (const t of trades) { streak = decision(t) < 0 ? streak + 1 : 0; worst = Math.max(worst, streak) }
     if (worst > limits.stop_after_losses) broken.push(`Kept trading after ${limits.stop_after_losses} losses in a row`)
   }
+  if (limits.max_contracts) {
+    const over = trades.filter(t => Math.abs(Number(t.qty ?? 0)) > limits.max_contracts!).length
+    if (over) broken.push(`${over} ${over === 1 ? "trade" : "trades"} over your ${limits.max_contracts}-contract size limit`)
+  }
   const net = dayTrades.reduce((sum, t) => sum + pnl(t), 0)
   if (limits.max_daily_loss && net < -limits.max_daily_loss) broken.push(`Past the $${limits.max_daily_loss} daily loss limit`)
   if (limits.session_start && limits.session_end) {
@@ -56,4 +60,4 @@ function brokenRulesFor(dayTrades: Trade[], limits: TradingLimits | null): strin
 
 // Whether the trader has any limit set at all (otherwise there's nothing to keep)
 export const hasLimits = (limits: TradingLimits | null) =>
-  !!limits && !!(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || (limits.session_start && limits.session_end))
+  !!limits && !!(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || limits.max_contracts || (limits.session_start && limits.session_end))

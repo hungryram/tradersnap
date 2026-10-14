@@ -7,7 +7,7 @@
 
 export type CheckInKind =
   | "morning_plan" | "loss_streak" | "daily_loss" | "revenge"
-  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap" | "announcement" | "loss_reset"
+  | "max_trades" | "over_max" | "outside_hours" | "big_win" | "session_recap" | "announcement" | "loss_reset" | "size_up" | "max_size"
 
 export type CheckIn = {
   id: string // unique per day and event, so the same check-in never repeats
@@ -25,6 +25,7 @@ export type CoachTrade = {
   source?: string // "manual": reported by the trader in chat
   symbol: string
   realized_pnl: number | null
+  qty?: number | null // contracts or shares, on this trade's account
   opened_at: string | null
   closed_at: string
   account?: string | null
@@ -38,6 +39,7 @@ export type CoachLimits = {
   max_trades_per_day: number | null
   max_daily_loss: number | null
   stop_after_losses: number | null
+  max_contracts?: number | null // largest position allowed, per account
   session_start: string | null // "09:30", trader's local time
   session_end: string | null
 }
@@ -99,6 +101,27 @@ function withAccount(out: CheckIn[], label: string | null, kinds: string[]) {
   return out
 }
 
+// With several accounts the check-ins judge one account, so its amount says so. A trade copied to other accounts
+// also gives the combined result (the group's first trade carries it).
+function amountOf(t: CoachTrade, ctx: CoachContext, label: string | null) {
+  const own = money(pnlOf(t))
+  if (!label) return own
+  if ((t.copies ?? 1) > 1) {
+    const at = Date.parse(t.closed_at)
+    const lead = ctx.trades.find(o => !o.is_copy && o.copies === t.copies && o.symbol === t.symbol && Math.abs(Date.parse(o.closed_at) - at) <= 15_000)
+    if (lead?.group_pnl !== undefined) return `${own} on this account (${money(lead.group_pnl)} across ${t.copies})`
+  }
+  return `${own} on this account`
+}
+
+// Size of a trade (contracts or shares), 0 when unknown
+const sizeOf = (t: CoachTrade) => Math.abs(Number(t.qty ?? 0))
+
+function median(values: number[]) {
+  const v = [...values].sort((a, b) => a - b)
+  return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2
+}
+
 // Trades already in time order (oldest first)
 function lossStreak(trades: CoachTrade[]) {
   let streak = 0
@@ -123,6 +146,7 @@ export function morningPlan(ctx: CoachContext): CheckIn {
     l?.max_trades_per_day && `max ${l.max_trades_per_day} trades`,
     l?.stop_after_losses && `stop after ${l.stop_after_losses} losses in a row`,
     l?.max_daily_loss && `stop if down $${l.max_daily_loss}`,
+    l?.max_contracts && `no more than ${plural(l.max_contracts, "contract")} at a time`,
     l?.session_start && l?.session_end && `trade ${clock(l.session_start)} to ${clock(l.session_end)}`
   ].filter(Boolean) as string[]
   const name = ctx.name?.trim()
@@ -215,15 +239,16 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
   // A single loss (no streak warning above): a gentle offer to reset before the next trade
   if (pnlOf(last) < 0 && !out.some(c => c.kind === "loss_streak")) {
     const id = `${day}:loss_reset:${last.closed_at}`
+    const amount = amountOf(last, ctx, scope.label)
     out.push({
       id,
       kind: "loss_reset",
       level: "info",
       offerReset: true,
       text: pick([
-        `That one was a loss, ${money(pnlOf(last))}. Before the next trade, take 60 seconds to reset.`,
-        `Loss on that one (${money(pnlOf(last))}). It happens. A quick reset now keeps it from turning into two.`,
-        `${money(pnlOf(last))} on that trade. Shake it off with a 60-second reset before you look for the next one.`,
+        `That one was a loss, ${amount}. Before the next trade, take 60 seconds to reset.`,
+        `Loss on that one (${amount}). It happens. A quick reset now keeps it from turning into two.`,
+        `That trade: ${amount}. Shake it off with a 60-second reset before you look for the next one.`,
       ], id)
     })
   }
@@ -268,14 +293,15 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
     const bestBefore = Math.max(0, ...trades.slice(0, -1).map(pnlOf))
     if (typical > 0 && pnl >= 2 * typical && pnl > bestBefore) {
       const id = `${day}:big_win:${last.closed_at}`
+      const amount = amountOf(last, ctx, scope.label)
       out.push({
         id,
         kind: "big_win",
         level: "info",
         text: pick([
-          `Nice, ${money(pnl)}. Right after a big win is when overconfidence sneaks in. Good moment to stop while you're green.`,
-          `${money(pnl)}, nice trade. Big wins make the next trade feel easy. It isn't. Consider calling it a day.`,
-          `Great trade, ${money(pnl)}. The urge to size up after a win like that is real. Protect it.`,
+          `Nice, ${amount}. Right after a big win is when overconfidence sneaks in. Good moment to stop while you're green.`,
+          `${amount}, nice trade. Big wins make the next trade feel easy. It isn't. Consider calling it a day.`,
+          `Great trade, ${amount}. Keep your next one the same size as your plan says. Wins are when size creeps up.`,
         ], id)
       })
     }
@@ -285,12 +311,13 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
 }
 
 // A new position just opened (seen live in the trading panel)
-export function onPositionOpened(ctx: CoachContext, openedAt: Date): CheckIn[] {
+// `size` is the new position's size on one account (contracts or shares), when the platform shows it
+export function onPositionOpened(ctx: CoachContext, openedAt: Date, size = 0): CheckIn[] {
   const scope = scopeOf(ctx)
-  return withAccount(onPositionOpenedFor(ctx, openedAt, scope), scope.label, ["over_max"])
+  return withAccount(onPositionOpenedFor(ctx, openedAt, scope, size), scope.label, ["over_max", "max_size"])
 }
 
-function onPositionOpenedFor(ctx: CoachContext, openedAt: Date, scope: ReturnType<typeof scopeOf>): CheckIn[] {
+function onPositionOpenedFor(ctx: CoachContext, openedAt: Date, scope: ReturnType<typeof scopeOf>, size: number): CheckIn[] {
   const day = dayKey(ctx.now)
   const trades = scope.trades
   const l = ctx.limits
@@ -331,6 +358,50 @@ function onPositionOpenedFor(ctx: CoachContext, openedAt: Date, scope: ReturnTyp
         `That's ${trades.length + 1} trades today against a limit of ${l.max_trades_per_day}. Worth closing this one and calling it a day.`,
       ], id)
     })
+  }
+
+  // Bigger than their size limit, or clearly bigger than they've been trading today
+  if (size > 0) {
+    const last = trades[trades.length - 1]
+    const after = last && pnlOf(last) > 0 ? "win" : last && pnlOf(last) < 0 ? "loss" : null
+    const sizes = trades.filter(t => t.source !== "manual").map(sizeOf).filter(v => v > 0)
+    const usual = sizes.length ? median(sizes) : 0
+    if (l?.max_contracts && size > l.max_contracts) {
+      const id = `${day}:max_size:${openedAt.getTime()}`
+      out.push({
+        id,
+        kind: "max_size",
+        level: "warning",
+        text: pick([
+          `That's ${plural(size, "contract")}. Your limit is ${l.max_contracts}. Bring it back down before this trade gets away from you.`,
+          `${plural(size, "contract")} on, and your max is ${l.max_contracts}. Is this size on your plan?`,
+          `You're in with ${size}, over your ${l.max_contracts}-contract limit. That limit is there for exactly this moment.`,
+        ], id)
+      })
+    } else if (usual > 0 && size >= 2 * usual) {
+      // Once per step up (each new size)
+      const id = `${day}:size_up:${size}`
+      const from = `${plural(Math.round(usual), "contract")}`
+      out.push({
+        id,
+        kind: "size_up",
+        level: after === "loss" ? "warning" : "info",
+        text: after === "win"
+          ? pick([
+              `You've gone from ${from} to ${size} right after a ${money(pnlOf(last))} win. Same setup, bigger risk. Was that the plan?`,
+              `${size} contracts now. You've been trading ${from} today, and you just won ${money(pnlOf(last))}. Wins are when size creeps up.`,
+            ], id)
+          : after === "loss"
+            ? pick([
+                `You've gone from ${from} to ${size} right after a ${money(pnlOf(last))} loss. Sizing up to make it back is how a bad trade becomes a bad day.`,
+                `${size} contracts after a loss, up from ${from}. Is this the setup, or trying to win it back faster?`,
+              ], id)
+            : pick([
+                `That's ${size} contracts. You've been trading ${from} today. Is the bigger size part of your plan?`,
+                `Size check: ${size} contracts, up from ${from} earlier today.`,
+              ], id)
+      })
+    }
   }
 
   // Outside their trading hours (once per hour)
@@ -374,6 +445,8 @@ export function sessionRecap(ctx: CoachContext, hasOpenPositions: boolean): Chec
   for (const t of trades) { streak = pnlOf(t) < 0 ? streak + 1 : 0; worst = Math.max(worst, streak) }
   if (l?.stop_after_losses && worst > l.stop_after_losses) broken.push(`kept trading after ${l.stop_after_losses} losses in a row`)
   if (l?.max_daily_loss && net < -l.max_daily_loss) broken.push(`went past your $${l.max_daily_loss} daily loss limit`)
+  const oversized = l?.max_contracts ? trades.filter(t => sizeOf(t) > l.max_contracts!).length : 0
+  if (oversized) broken.push(`${plural(oversized, "trade")} over your ${l!.max_contracts}-contract limit`)
   const outside = trades.filter(t => outsideWindow(l, new Date(t.opened_at ?? t.closed_at))).length
   if (outside) broken.push(`${plural(outside, "trade")} outside your hours`)
 

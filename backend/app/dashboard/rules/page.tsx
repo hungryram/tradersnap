@@ -139,7 +139,7 @@ export default function RulesPage() {
     }
   }
 
-  const numberField = (key: "max_trades_per_day" | "stop_after_losses" | "max_daily_loss", decimal = false) => ({
+  const numberField = (key: "max_trades_per_day" | "stop_after_losses" | "max_daily_loss" | "max_contracts", decimal = false) => ({
     inputMode: (decimal ? "decimal" : "numeric") as "decimal" | "numeric",
     value: limits[key] ?? "",
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,7 +266,7 @@ export default function RulesPage() {
                 className={`${inputClass} font-mono leading-relaxed`}
               />
             </label>
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs text-ink-text">Max trades per day</span>
                 <input {...numberField("max_trades_per_day")} placeholder="e.g. 3" />
@@ -278,6 +278,10 @@ export default function RulesPage() {
               <label className="block">
                 <span className="mb-1.5 block text-xs text-ink-text">Max daily loss ($)</span>
                 <input {...numberField("max_daily_loss", true)} placeholder="e.g. 500" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-ink-text" title="The most contracts (or shares) you'll hold in one position, per account. Pip speaks up when you go over it.">Max position size</span>
+                <input {...numberField("max_contracts")} placeholder="e.g. 2" />
               </label>
             </div>
             <label className="mt-4 block">

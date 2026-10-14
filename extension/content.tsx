@@ -567,7 +567,7 @@ const TradingBuddyWidget = () => {
         sendTrades()
       },
       onStatus: setTrackingStatus,
-      onPositions: positions => onPositionsRef.current(positions)
+      onPositions: (positions, largest) => onPositionsRef.current(positions, largest)
     })
     const retryTimer = setInterval(sendTrades, 30000)
 
@@ -661,7 +661,7 @@ const TradingBuddyWidget = () => {
   const dayRuleRef = useRef<string | null>(null)
   const lastInfoAtRef = useRef(0)
   const openPositionsRef = useRef<Set<string> | null>(null)
-  const onPositionsRef = useRef<(positions: Map<string, number>) => void>(() => {})
+  const onPositionsRef = useRef<(positions: Map<string, number>, largest?: Map<string, number>) => void>(() => {})
   useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
   useEffect(() => { checkinsModeRef.current = checkinsMode }, [checkinsMode])
   useEffect(() => { tradesTodayRef.current = tradesToday }, [tradesToday])
@@ -880,7 +880,7 @@ const TradingBuddyWidget = () => {
   }, [tradesToday])
 
   // A position opened in the trading panel: revenge trade, over max, outside hours
-  onPositionsRef.current = (positions) => {
+  onPositionsRef.current = (positions, largest) => {
     const open = new Set([...positions].filter(([, qty]) => qty !== 0).map(([symbol]) => symbol))
     const previous = openPositionsRef.current
     openPositionsRef.current = open
@@ -892,7 +892,9 @@ const TradingBuddyWidget = () => {
         const qty = positions.get(symbol) ?? 0
         return { type: 'event', tone: 'opened', content: `${eventTime(now)} · New ${shortSymbol(symbol)} position opened${qty ? ` · ${qty > 0 ? 'long' : 'short'} ${Math.abs(qty)}` : ''}`, timestamp: now }
       })])
-      deliverCheckIns(onPositionOpened(coachContext(), now))
+      // Size on one account (copying to several accounts isn't sizing up)
+      const size = Math.max(...opened.map(symbol => largest?.get(symbol) ?? Math.abs(positions.get(symbol) ?? 0)))
+      deliverCheckIns(onPositionOpened(coachContext(), now, size))
     }
   }
 

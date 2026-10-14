@@ -12,7 +12,7 @@ type TvContract = { id: number; name: string; valuePerPoint?: number | null }
 export function startTradovateTracking(options: {
   onTrades: (trades: ClosedTrade[]) => void
   onStatus: (status: TrackingStatus) => void
-  onPositions?: (positions: Map<string, number>) => void
+  onPositions?: (positions: Map<string, number>, largest?: Map<string, number>) => void
 }): () => void {
   const accounts = new Map<number, string>()
   const contracts = new Map<number, TvContract>()
@@ -31,12 +31,15 @@ export function startTradovateTracking(options: {
   const reportPositions = () => {
     if (!synced || !options.onPositions) return
     const bySymbol = new Map<string, number>()
+    const largest = new Map<string, number>()
     for (const [key, qty] of netPos) {
       if (!qty) continue
       const name = contracts.get(Number(key.split("|")[1]))?.name
-      if (name) bySymbol.set(name, (bySymbol.get(name) ?? 0) + qty)
+      if (!name) continue
+      bySymbol.set(name, (bySymbol.get(name) ?? 0) + qty)
+      largest.set(name, Math.max(largest.get(name) ?? 0, Math.abs(qty)))
     }
-    options.onPositions(bySymbol)
+    options.onPositions(bySymbol, largest)
   }
 
   const flush = () => {

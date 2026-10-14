@@ -33,6 +33,7 @@ type Limits = {
   max_trades_per_day?: number | null
   max_daily_loss?: number | null
   stop_after_losses?: number | null
+  max_contracts?: number | null
   session_start?: string | null
   session_end?: string | null
 } | null
@@ -47,12 +48,13 @@ function localParts(iso: string, timeZone: string) {
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
 
 // Same checks as the journal calendar and Pip's recap, in the trader's timezone
-function dayBroken(trades: { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string; is_copy?: boolean; group_pnl?: number }[], limits: NonNullable<Limits>, timeZone: string) {
+function dayBroken(trades: { opened_at: string | null; closed_at: string; realized_pnl: number | null; kind?: string; is_copy?: boolean; group_pnl?: number; qty?: number | null }[], limits: NonNullable<Limits>, timeZone: string) {
   const all = [...trades].sort((a, b) => a.closed_at.localeCompare(b.closed_at))
   // A day-total entry counts in the day's P&L but is not a trade, and a trade copied to several accounts counts once
   const sorted = all.filter(t => t.kind !== "day_total" && !t.is_copy)
   const pnl = (t: { realized_pnl: number | null; group_pnl?: number }) => t.group_pnl ?? Number(t.realized_pnl ?? 0)
   if (limits.max_trades_per_day && sorted.length > limits.max_trades_per_day) return true
+  if (limits.max_contracts && sorted.some(t => Math.abs(Number(t.qty ?? 0)) > limits.max_contracts!)) return true
   if (limits.stop_after_losses) {
     let streak = 0
     for (const t of sorted) { streak = pnl(t) < 0 ? streak + 1 : 0; if (streak > limits.stop_after_losses) return true }
@@ -83,7 +85,7 @@ export async function disciplineStreak(supabase: SupabaseClient, userId: string,
   const { data: profile } = await supabase.from("profiles").select("trading_limits, trading_profile").eq("id", userId).single()
   const limits = profile?.trading_limits as Limits
   const dayRule = dayRuleOf(profile?.trading_profile)
-  if (!limits || !(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || (limits.session_start && limits.session_end))) return null
+  if (!limits || !(limits.max_trades_per_day || limits.stop_after_losses || limits.max_daily_loss || limits.max_contracts || (limits.session_start && limits.session_end))) return null
 
   const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
   const load = (cols: string) => supabase.from("trades").select(cols).eq("user_id", userId).gte("closed_at", since).order("closed_at", { ascending: false }).limit(3000)

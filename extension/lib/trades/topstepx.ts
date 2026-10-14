@@ -89,7 +89,7 @@ export function buildTopstepTrades(records: TopstepRecord[], accountNames: Map<n
 export function startTopstepTracking(options: {
   onTrades: (trades: ClosedTrade[]) => void
   onStatus: (status: TrackingStatus) => void
-  onPositions?: (positions: Map<string, number>) => void
+  onPositions?: (positions: Map<string, number>, largest?: Map<string, number>) => void
 }): () => void {
   const records = new Map<number, TopstepRecord>()
   const names = new Map<number, string>()
@@ -100,8 +100,12 @@ export function startTopstepTracking(options: {
   const reportPositions = () => {
     if (!open || !options.onPositions) return
     const bySymbol = new Map<string, number>()
-    for (const { symbol, qty } of open.values()) bySymbol.set(symbol, (bySymbol.get(symbol) ?? 0) + qty)
-    options.onPositions(bySymbol)
+    const largest = new Map<string, number>()
+    for (const { symbol, qty } of open.values()) {
+      bySymbol.set(symbol, (bySymbol.get(symbol) ?? 0) + qty)
+      largest.set(symbol, Math.max(largest.get(symbol) ?? 0, Math.abs(qty)))
+    }
+    options.onPositions(bySymbol, largest)
   }
   const symbolOf = (p: any) => String(p.contractDisplayName ?? p.symbolName ?? p.contractId ?? "?")
   let flushTimer: ReturnType<typeof setTimeout> | undefined

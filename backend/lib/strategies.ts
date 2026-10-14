@@ -14,6 +14,7 @@ type Limits = {
   max_trades_per_day?: number | null
   max_daily_loss?: number | null
   stop_after_losses?: number | null
+  max_contracts?: number | null
   session_start?: string | null
   session_end?: string | null
 } | null
@@ -53,6 +54,7 @@ function limitsLines(limits: Limits): string[] {
     limits.max_trades_per_day && `Max ${limits.max_trades_per_day} trades per day`,
     limits.stop_after_losses && `Stop for the day after ${limits.stop_after_losses} losses in a row`,
     limits.max_daily_loss && `Stop for the day if down $${limits.max_daily_loss}`,
+    limits.max_contracts && `Never trade more than ${limits.max_contracts} ${limits.max_contracts === 1 ? "contract" : "contracts"} (or shares) at once per account`,
     limits.session_start && limits.session_end && `Only trade between ${limits.session_start} and ${limits.session_end} (trader's local time)`,
   ].filter(Boolean) as string[]
 }

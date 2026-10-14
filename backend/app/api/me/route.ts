@@ -225,6 +225,7 @@ const profilePatchSchema = z.object({
     max_trades_per_day: z.number().int().min(1).max(100).nullable(),
     max_daily_loss: z.number().positive().max(1_000_000).nullable(),
     stop_after_losses: z.number().int().min(1).max(20).nullable(),
+    max_contracts: z.number().int().min(1).max(10_000).nullable().optional(),
     session_start: hhmm.nullable(),
     session_end: hhmm.nullable(),
     timezone: z.string().max(60).nullable()

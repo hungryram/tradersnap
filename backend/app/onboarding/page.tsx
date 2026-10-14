@@ -41,6 +41,8 @@ export default function OnboardingPage() {
   const [platforms, setPlatforms] = useState<Platform[]>(["tradingview"])
   const [propFirm, setPropFirm] = useState<boolean | null>(null)
   const [dayStart, setDayStart] = useState<DayStartChoice>("auto")
+  // Set on the Rules page, not here; kept as it is when setup is run again
+  const [maxContracts, setMaxContracts] = useState<number | null>(null)
   const [experience, setExperience] = useState<"new" | "1-3" | "3+" | null>(null)
 
   // Step 2
@@ -85,6 +87,7 @@ export default function OnboardingPage() {
             setMaxDailyLoss(limits.max_daily_loss != null ? String(limits.max_daily_loss) : "")
             setSessionStart(limits.session_start ?? "")
             setSessionEnd(limits.session_end ?? "")
+            setMaxContracts(limits.max_contracts ?? null)
           }
         }
       }
@@ -152,6 +155,7 @@ export default function OnboardingPage() {
             stop_after_losses: numberOrNull(stopAfterLosses),
             session_start: sessionStart || null,
             session_end: sessionEnd || null,
+            max_contracts: maxContracts,
             timezone
           }
         })

@@ -117,7 +117,7 @@ export function startTradeTracking(options: {
   onTrades: (trades: ClosedTrade[]) => void
   onStatus: (status: TrackingStatus) => void
   // Open positions each tick the panel is visible (symbol -> signed size)
-  onPositions?: (positions: Map<string, number>) => void
+  onPositions?: (positions: Map<string, number>, largest?: Map<string, number>) => void
   intervalMs?: number
 }): () => void {
   const reported = new Set<string>()
