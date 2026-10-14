@@ -3045,8 +3045,17 @@ const TradingBuddyWidget = () => {
                         : m))
                     }
 
+                    // Pip's read of the chart comes first: what price is doing, then his observations
+                    const read = [analysis.summary, ...(analysis.bullets ?? [])]
+                      .filter((t): t is string => !!t && !!t.trim())
+                      .map(t => (/[.!?]$/.test(t.trim()) ? t.trim() : `${t.trim()}.`))
+                      .join(' ')
+
                     return (
                       <>
+                        {read && (
+                          <div className={`mb-2.5 leading-relaxed ${dark ? 'text-dark-body' : 'text-slate-900'}`}>{read}</div>
+                        )}
                         {/* Which of their strategies this chart was checked against */}
                         {'matched_strategy' in analysis && (
                           <div className={`mb-1.5 text-[11px] ${muted}`}>
@@ -3061,10 +3070,7 @@ const TradingBuddyWidget = () => {
                         {analysis.headline_reason && (
                           <div className={dark ? 'text-dark-body' : 'text-slate-900'}>{analysis.headline_reason}</div>
                         )}
-                        {/* Pip's read of the chart, up front (the extra observations are in Details) */}
-                        {analysis.summary && (
-                          <div className={`mt-1.5 text-[13px] leading-relaxed ${dark ? 'text-dark-text' : 'text-slate-600'}`}>{analysis.summary}</div>
-                        )}
+
                         {nextStep && (
                           <div className="mt-2 flex gap-1.5 text-[13px]">
                             <span className={`shrink-0 font-semibold ${muted}`}>Wait for:</span>

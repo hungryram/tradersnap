@@ -188,21 +188,6 @@ export default function CheckDetails({ analysis, dark, ticked, onTick, skipFirst
         </div>
       )}
 
-      {/* More from Pip (his one-line read is on the card itself) */}
-      {(analysis.bullets?.length ?? 0) > 0 && (
-        <div className="flex gap-2.5">
-          <Pip size={22} mood="idle" animated={false} />
-          <div className="min-w-0">
-            <div className={`mb-1 text-[11px] font-semibold uppercase tracking-wide ${muted}`}>More from Pip</div>
-            <p className={`leading-relaxed ${strong}`}>
-              {(analysis.bullets ?? [])
-                .filter(Boolean)
-                .map(t => (/[.!?]$/.test(t!.trim()) ? t!.trim() : `${t!.trim()}.`))
-                .join(" ")}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
