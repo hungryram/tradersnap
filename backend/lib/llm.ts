@@ -153,6 +153,8 @@ export async function chat(opts: {
   image?: string | null
   plan?: string | null
   cacheKey: string
+  // Called with each new piece of the reply as the model writes it (Anthropic only; otherwise the reply arrives whole)
+  onText?: (delta: string) => void
 }): Promise<ChatResult> {
   if (provider === "anthropic") return chatAnthropic(opts)
   return chatOpenAI(opts)
@@ -188,15 +190,25 @@ async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResu
   // Operator context after the user turn, so it never invalidates the cached prefix
   if (opts.volatileContext) messages.push({ role: "system", content: opts.volatileContext })
 
-  const response = await anthropic().beta.messages.create({
+  const params = {
     model,
     max_tokens: 16000,
     betas: [FALLBACK_BETA],
-    fallbacks: "default",
+    fallbacks: "default" as const,
     output_config: { effort: opts.image ? CHAT_IMAGE_EFFORT : CHAT_EFFORT },
     system,
     messages
-  })
+  }
+  // Streaming: pieces go out as they're written; the final message is still the source of truth (a refusal
+  // fallback can re-run on another model, so the caller replaces what it showed with this text at the end)
+  let response: Anthropic.Beta.BetaMessage
+  if (opts.onText) {
+    const stream = anthropic().beta.messages.stream(params)
+    stream.on("text", delta => opts.onText!(delta))
+    response = await stream.finalMessage()
+  } else {
+    response = await anthropic().beta.messages.create(params)
+  }
 
   const text = response.content
     .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text")

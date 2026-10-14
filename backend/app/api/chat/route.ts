@@ -148,6 +148,7 @@ const chatRequestSchema = z.object({
     content: z.string().max(8000)
   })).max(50).optional(),
   historyStart: z.number().int().min(0).optional(), // position of conversationHistory[0] in the whole chat
+  stream: z.boolean().optional(), // newer extensions: send the reply as it's written (one JSON line per piece)
   timestamp: z.string().optional(), // ISO timestamp from client
   timezone: z.string().optional(), // IANA timezone (e.g., "America/New_York")
   dayStart: z.string().optional(), // ISO time of the trader's local midnight
@@ -382,8 +383,11 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
     // 8. Call the model (provider + model selection live in lib/llm). When the message may report
     // a trade result, a cheap model checks it alongside, so the reply isn't delayed.
     const recentTurns = history.slice(-2).map(turn => `${turn.role === 'user' ? 'Trader' : 'Coach'}: ${turn.content.slice(0, 300)}`).join('\n')
+    let afterReply: (() => Promise<void>) | null = null
+    const produce = async (onText?: (delta: string) => void) => {
     const claimCheck = detectTradeClaim(validatedRequest.message, recentTurns)
     const result = await llmChat({
+      onText,
       system: coachingPrompt,
       memory,
       volatileContext: [timeContext, tradesContext].filter(Boolean).join("\n\n") || null,
@@ -418,6 +422,19 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
       }
     }
 
+    // A break Pip started: the "TIMEOUT: 10" line becomes the timer and is taken out of the text
+    let action = null
+    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(\d+)/)
+    if (timeoutMatch) {
+      const minutes = parseInt(timeoutMatch[1])
+      action = {
+        type: 'timeout',
+        duration: minutes * 60, // Convert to seconds
+        reason: 'Mandatory break to reset'
+      }
+      aiResponse = aiResponse.replace(/^[ \t]*TIMEOUT:\s*\d+[ \t]*$/gm, '').trim() || "Good call. Step away for a bit."
+    }
+
     // "I just made 200": offer to log it (the trader confirms in the widget; nothing is saved here)
     const { claim, tokens: claimTokens } = await claimCheck
     let tradeProposal: { id: string; kind: string; amount: number; symbol: string | null; logged_net: number; logged_count: number; strategies: { id: string; name: string }[] } | null = null
@@ -434,12 +451,12 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
       }
     }
 
-    // Cost tracking, and the once-a-day notes update, after the reply is sent
-    after(async () => {
+    // Cost tracking, and the once-a-day notes update, after the reply is sent (scheduled below)
+    afterReply = async () => {
       await logLlmUsage(supabase, user.id, 'chat', result.tokens)
       await logLlmUsage(supabase, user.id, 'chat', claimTokens)
       if (memoryOn) await maybeRefreshNotes(supabase, user.id)
-    })
+    }
 
     // Track token usage (check the provider dashboard for actual costs)
     const usage = result.usage
@@ -504,18 +521,6 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
       // Continue anyway - chat works even if audit trail fails
     }
 
-    // 10. Check if AI recommended a timeout
-    let action = null
-    const timeoutMatch = aiResponse.match(/TIMEOUT:\s*(\d+)/)
-    if (timeoutMatch) {
-      const minutes = parseInt(timeoutMatch[1])
-      action = {
-        type: 'timeout',
-        duration: minutes * 60, // Convert to seconds
-        reason: 'Mandatory break to reset'
-      }
-    }
-
     // 11. Usage was reserved up front; give it back if the response failed
     if (responseFailed) {
       console.log('[Chat API] Response failed - not counting towards usage limits')
@@ -528,8 +533,8 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
     if (welcomeFree) await refundUsage(supabase, user.id, quota.reservation)
     const refunded = responseFailed || welcomeFree
 
-    // 12. Return response with message IDs and action
-    const response = NextResponse.json({ 
+    // 12. The finished reply with message IDs and action
+    return {
       message: aiResponse,
       userMessageId,
       assistantMessageId,
@@ -546,8 +551,47 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
         },
         limits
       )
-    })
-    return addCorsHeaders(response, origin)
+    }
+    }
+
+    // Newer extensions: the reply goes out as Pip writes it, one JSON line per piece, then a "done" line with
+    // everything above. If something fails partway, an "error" line says so and the usage is given back.
+    if (validatedRequest.stream) {
+      // After-work has to be scheduled while the request is still being handled, so it waits for the stream to end
+      let streamEnded: () => void = () => {}
+      const ended = new Promise<void>(resolve => { streamEnded = resolve })
+      after(async () => {
+        await ended
+        await afterReply?.()
+      })
+      const encoder = new TextEncoder()
+      const body = new ReadableStream({
+        async start(controller) {
+          const send = (event: object) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"))
+          try {
+            const payload = await produce(text => send({ type: "delta", text }))
+            send({ type: "done", ...payload })
+          } catch (error) {
+            console.error("Chat stream error:", error)
+            if (reserved) {
+              await refundUsage(supabase, reserved.userId, reserved.reservation)
+              reserved = null
+            }
+            send({ type: "error", message: "I couldn't finish that reply. Send it again? It didn't count against your usage." })
+          } finally {
+            controller.close()
+            streamEnded()
+          }
+        }
+      })
+      return addCorsHeaders(new NextResponse(body, {
+        headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" }
+      }), origin)
+    }
+
+    const payload = await produce()
+    after(async () => { await afterReply?.() })
+    return addCorsHeaders(NextResponse.json(payload), origin)
 
   } catch (error) {
     console.error("Chat error:", error)

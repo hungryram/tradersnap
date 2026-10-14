@@ -192,6 +192,8 @@ const TradingBuddyWidget = () => {
   const [unreadCheckins, setUnreadCheckins] = useState<CheckIn[]>([])
   const [bubble, setBubble] = useState<CheckIn | null>(null)
   const [pipTyping, setPipTyping] = useState(false)
+  // Pip's reply is arriving piece by piece (the thinking bubble gives way to the text itself)
+  const [replyStreaming, setReplyStreaming] = useState(false)
   // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
   const [resetOpen, setResetOpen] = useState(false)
   // Which strategy chart checks and answers use ('' = all of the trader's active strategies)
@@ -450,7 +452,7 @@ const TradingBuddyWidget = () => {
       // Load cached messages for instant display
       if (result.chat_messages) {
         // Errors are transient; drop any saved by older versions
-        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error').map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp), fresh: false })))
+        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error').map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp), fresh: false, streaming: false })))
       }
       
       if (result.theme) {
@@ -1130,7 +1132,7 @@ const TradingBuddyWidget = () => {
 
   // Pip starts working on something (a reply, a chart check, a check-in): bring his thinking bubble into view, so it's
   // clear he's on it. Again a moment later, since a chart screenshot above it can finish loading and push it down.
-  const pipBusy = isAnalyzing || isSending || pipTyping
+  const pipBusy = (isAnalyzing || isSending || pipTyping) && !replyStreaming
   useEffect(() => {
     if (!pipBusy) return
     const toBottom = () => {
@@ -1872,6 +1874,9 @@ const TradingBuddyWidget = () => {
         requestBody.chartToken = lastChartToken
       }
       
+      // Pip's reply comes in as he writes it
+      requestBody.stream = true
+
       // Create abort controller for this request
       abortControllerRef.current = new AbortController()
       
@@ -1910,7 +1915,38 @@ const TradingBuddyWidget = () => {
         throw new Error(`API error: ${apiResponse.status}`)
       }
 
-      const chatResult = await apiResponse.json()
+      // Streamed: show the text as it arrives, then use the finished reply (and everything with it) from the last line
+      let chatResult: any
+      const shownAt = new Date()
+      if ((apiResponse.headers.get('content-type') || '').includes('ndjson') && apiResponse.body) {
+        let started = false
+        let pending: string | null = null
+        let frame = 0
+        const show = () => {
+          frame = 0
+          if (pending === null) return
+          const text = pending
+          pending = null
+          setMessages(prev => {
+            const last = prev[prev.length - 1]
+            if (last?.streaming) return prev.map((m, idx) => idx === prev.length - 1 ? { ...m, content: text } : m)
+            return [...prev, { type: 'assistant', content: text, timestamp: shownAt, streaming: true, chartImage: chartImage || null }]
+          })
+        }
+        try {
+          chatResult = await readChatStream(apiResponse.body, text => {
+            if (!started) { started = true; setReplyStreaming(true) }
+            // The "TIMEOUT: 10" line that starts a break is never shown
+            pending = text.replace(/(^|\n)[ \t]*T(I(M(E(O(U(T(:[ \t]*\d*)?)?)?)?)?)?)?[ \t]*$/, '').trimEnd()
+            if (!frame) frame = requestAnimationFrame(show)
+          })
+        } finally {
+          if (frame) cancelAnimationFrame(frame)
+          setReplyStreaming(false)
+        }
+      } else {
+        chatResult = await apiResponse.json()
+      }
       analytics.chatMessageSent(includeChart, { sessionId: session?.id })
       updateGettingStarted(includeChart ? { chatted: true, chartChatted: true } : { chatted: true })
       
@@ -1962,6 +1998,7 @@ const TradingBuddyWidget = () => {
       // Safety check - if response is empty or too short, don't animate
       if (!fullResponse || fullResponse.trim().length === 0) {
         console.error('[Content] Empty response from chat API')
+        setMessages(prev => prev.filter(m => !m.streaming))
         const errorMsg = {
           type: 'error',
           content: "I lost my train of thought there. Can you send that again? It didn't count against your usage.",
@@ -1990,14 +2027,27 @@ const TradingBuddyWidget = () => {
         isFavorited: false,
         tradeProposal: chatResult.tradeProposal || undefined
       }
-      setMessages(prev => [...prev, assistantMessage])
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.streaming) return prev.map((m, idx) => idx === prev.length - 1 ? { ...assistantMessage, timestamp: last.timestamp, fresh: false } : m)
+        return [...prev, assistantMessage]
+      })
       if (chatResult.tradeProposal) analytics.track('trade_log_offered', {})
       setIsSending(false)
       abortControllerRef.current = null
       setTimeout(() => inputRef.current?.focus(), 100)
       
     } catch (error) {
+      // Stopped with the stop button: keep what Pip had written so far
+      if (error instanceof Error && error.name === 'AbortError') {
+        setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m))
+        setIsSending(false)
+        abortControllerRef.current = null
+        return
+      }
       console.error("[Content] Chat failed:", error)
+      // A reply that broke off partway is removed; the error below says what happened
+      setMessages(prev => prev.filter(m => !m.streaming))
       
       // Check if it's a 401 error (session expired)
       if (error instanceof Error && error.message.includes('401')) {
@@ -3160,7 +3210,7 @@ const TradingBuddyWidget = () => {
             </button>
           )}
           
-          {(isAnalyzing || isSending || pipTyping) && (
+          {pipBusy && (
             <div className="flex justify-start">
               <div className="mr-2 mt-0.5 shrink-0"><Pip mood="thinking" size={26} /></div>
               <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
@@ -3376,6 +3426,38 @@ const TradingBuddyWidget = () => {
   )
 }
 
+
+// Reads a streamed chat reply: one JSON line per piece of text ("delta"), then "done" with the finished reply and
+// everything that goes with it, or "error". `onText` gets the text so far.
+async function readChatStream(body: ReadableStream<Uint8Array>, onText: (textSoFar: string) => void): Promise<any> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let text = ''
+  let finished: any = null
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let newline: number
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, newline).trim()
+      buffer = buffer.slice(newline + 1)
+      if (!line) continue
+      const event = JSON.parse(line)
+      if (event.type === 'delta') {
+        text += event.text
+        onText(text)
+      } else if (event.type === 'done') {
+        finished = event
+      } else if (event.type === 'error') {
+        throw new Error(event.message || 'The reply broke off')
+      }
+    }
+  }
+  if (!finished) throw new Error('The reply broke off')
+  return finished
+}
 
 // Check-ins and pills this tab made that haven't come back from the server yet
 const isLocalOnly = (m: any) => (m.type === 'checkin' || m.type === 'event') && !m.id
