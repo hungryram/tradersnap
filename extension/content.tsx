@@ -868,7 +868,7 @@ const TradingBuddyWidget = () => {
       if (checkIn.account) checkIn = { ...checkIn, text: `${checkIn.text} (account ${checkIn.account})` }
 
       const shownAt = new Date()
-      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset, timestamp: shownAt }])
+      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset, timestamp: shownAt, fresh: true }])
       saveNotices([{ client_key: checkIn.id, kind: 'checkin', content: checkIn.text, created_at: shownAt.toISOString(), meta: { level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset } }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
       if (!isOpenRef.current) {
@@ -1143,13 +1143,15 @@ const TradingBuddyWidget = () => {
       lastCountRef.current = messages.length
       if (!container) return
       const bottom = container.scrollHeight - container.clientHeight
+      const last = container.querySelector<HTMLElement>(`[data-msg-index="${messages.length - 1}"]`)
       if (!writing) {
-        container.scrollTop = bottom
+        // A new message: show it, but if it's taller than the chat, show its start rather than its end
+        const lastMessage = messages[messages.length - 1]
+        container.scrollTop = last && lastMessage?.type !== 'user' ? Math.min(bottom, last.offsetTop - 12) : bottom
         return
       }
       // While Pip types, follow the text only until the start of his reply reaches the top of the chat. After that the
       // reply grows below and the reader keeps their place instead of the text sliding up under them.
-      const last = container.querySelector<HTMLElement>(`[data-msg-index="${messages.length - 1}"]`)
       const replyTop = last ? last.offsetTop - 12 : bottom
       container.scrollTop = Math.min(bottom, Math.max(container.scrollTop, replyTop))
     }
@@ -1945,13 +1947,12 @@ const TradingBuddyWidget = () => {
       const hasDrawings = chatResult.drawings && chatResult.drawings.length > 0
       const responseChartImage = chartImage || (hasDrawings ? lastChartImage : null)
       
-      // Add empty message that will be filled with typing animation
+      // The whole reply appears at once with a short fade (typing it out letter by letter made it hard to read)
       const assistantMessage = {
         type: 'assistant',
-        content: '',
+        content: fullResponse,
         timestamp: new Date(),
-        isTyping: true,
-        fullContent: fullResponse,
+        fresh: true,
         chartImage: responseChartImage,
         drawings: hasDrawings ? chatResult.drawings : undefined,
         id: chatResult.assistantMessageId,
@@ -1960,33 +1961,9 @@ const TradingBuddyWidget = () => {
       }
       setMessages(prev => [...prev, assistantMessage])
       if (chatResult.tradeProposal) analytics.track('trade_log_offered', {})
-      
-      // Scroll to show the thinking bubble
-      setTimeout(() => scrollToBottom(), 100)
-      
-      // Animate typing effect
-      let charIndex = 0
-      const charsPerTick = Math.max(2, Math.ceil(fullResponse.length / 100)) // ~100 ticks, about 2 seconds
-      typingIntervalRef.current = setInterval(() => {
-        charIndex += charsPerTick
-        if (charIndex >= fullResponse.length) {
-          charIndex = fullResponse.length
-          clearInterval(typingIntervalRef.current!)
-          typingIntervalRef.current = null
-          // Mark typing as complete
-          setMessages(prev => prev.map((msg, idx) => 
-            idx === prev.length - 1 ? { ...msg, isTyping: false, content: fullResponse } : msg
-          ))
-          // Only now set isSending to false (after typing animation completes)
-          setIsSending(false)
-          abortControllerRef.current = null
-          setTimeout(() => inputRef.current?.focus(), 100)
-        } else {
-          setMessages(prev => prev.map((msg, idx) => 
-            idx === prev.length - 1 ? { ...msg, content: fullResponse.substring(0, charIndex) } : msg
-          ))
-        }
-      }, 20) // 20ms per update
+      setIsSending(false)
+      abortControllerRef.current = null
+      setTimeout(() => inputRef.current?.focus(), 100)
       
     } catch (error) {
       console.error("[Content] Chat failed:", error)
@@ -2729,7 +2706,7 @@ const TradingBuddyWidget = () => {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} data-msg-index={i} className="relative group">
+            <div key={i} data-msg-index={i} className={`relative group ${msg.fresh ? 'pip-reveal' : ''}`}>
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : msg.type === 'event' ? 'justify-center' : 'justify-start'}`}>
                 {msg.type !== 'user' && msg.type !== 'event' && (
                   <div className="mr-2 mt-0.5 shrink-0">
