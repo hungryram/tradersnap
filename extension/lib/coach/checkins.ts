@@ -1,3 +1,4 @@
+import { tradingDayKey } from "../trading-day"
 // Coach check-ins: short messages the coach starts on its own, only when
 // something real happened in the trader's day. Pure logic (no DOM/storage) so
 // it can be tested; content.tsx decides delivery, dedupe and the user's setting.
@@ -50,13 +51,16 @@ export type CoachContext = {
   limits: CoachLimits | null
   name?: string | null // first name, when the trader gave one
   streak?: number | null // trading days in a row with no rule broken
+  dayRule?: string | null // when their trading day starts (lib/trading-day); null = local midnight
 }
 
 export const REVENGE_MINUTES = 5
 
 const pnlOf = (t: CoachTrade) => Number(t.realized_pnl ?? 0)
 const money = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: Math.abs(v) % 1 ? 2 : 0 })}`
-const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+// Check-ins happen once per trading day, which for futures starts at the 6 PM Eastern session open (lib/trading-day)
+let currentRule: string | null | undefined = null
+const dayKey = (d: Date) => tradingDayKey(d, currentRule)
 const clock = (hhmm: string) => new Date(2000, 0, 1, Number(hhmm.slice(0, 2)), Number(hhmm.slice(3, 5))).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes()
 const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
@@ -140,6 +144,7 @@ function outsideWindow(limits: CoachLimits | null, at: Date) {
 
 // First visit of the day: today's plan in one breath
 export function morningPlan(ctx: CoachContext): CheckIn {
+  currentRule = ctx.dayRule
   const l = ctx.limits
   const id = `${dayKey(ctx.now)}:morning_plan`
   const parts = [
@@ -187,6 +192,7 @@ export function morningPlan(ctx: CoachContext): CheckIn {
 
 // After a trade closes (or today's trades load)
 export function afterTrades(ctx: CoachContext): CheckIn[] {
+  currentRule = ctx.dayRule
   const scope = scopeOf(ctx)
   return withAccount(afterTradesFor(ctx, scope), scope.label, ["loss_streak", "max_trades", "over_max", "daily_loss"])
 }
@@ -313,6 +319,7 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
 // A new position just opened (seen live in the trading panel)
 // `size` is the new position's size on one account (contracts or shares), when the platform shows it
 export function onPositionOpened(ctx: CoachContext, openedAt: Date, size = 0): CheckIn[] {
+  currentRule = ctx.dayRule
   const scope = scopeOf(ctx)
   return withAccount(onPositionOpenedFor(ctx, openedAt, scope, size), scope.label, ["over_max", "max_size"])
 }
@@ -426,6 +433,7 @@ function onPositionOpenedFor(ctx: CoachContext, openedAt: Date, scope: ReturnTyp
 
 // End of the session: their window closed (or 4pm without one), they traded, and they're flat
 export function sessionRecap(ctx: CoachContext, hasOpenPositions: boolean): CheckIn | null {
+  currentRule = ctx.dayRule
   const scope = scopeOf(ctx, true)
   const trades = scope.trades
   if (trades.length === 0 || hasOpenPositions) return null

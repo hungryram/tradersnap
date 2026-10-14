@@ -7,7 +7,7 @@ import Pip, { type PipMood } from "./components/Pip"
 import CheckDetails, { ChecklistMeter, checklistProgress } from "./components/CheckDetails"
 import ResetBreak from "./components/ResetBreak"
 import { analytics } from "~lib/analytics"
-import { currentTradingDayStart, dayRuleOf } from "~lib/trading-day"
+import { currentTradingDayStart, dayRuleOf, tradingDayKey } from "~lib/trading-day"
 import { startTradeTracking, type TrackingStatus } from "~lib/trades/tracker"
 import { startTopstepTracking } from "~lib/trades/topstepx"
 import { startTradovateTracking } from "~lib/trades/tradovate"
@@ -517,6 +517,21 @@ const TradingBuddyWidget = () => {
 
   // Auto-detect trades from TradingView's trading panel (opt-in from the menu)
   const isSignedIn = !!session
+
+  // A new trading day (midnight, or the 6 PM Eastern session open for futures) starts while the page is open:
+  // reload today's trades so counts and check-ins don't carry over the last session
+  useEffect(() => {
+    if (!isSignedIn) return
+    const keyNow = () => `${dayRuleRef.current}|${tradingDayKey(new Date(), dayRuleRef.current)}`
+    let last = keyNow()
+    const timer = setInterval(() => {
+      const key = keyNow()
+      if (key === last) return
+      last = key
+      fetchTradeStats()
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [isSignedIn, fetchTradeStats])
   useEffect(() => {
     if (!autoDetectTrades || !isSignedIn) return
     fetchTradeStats()
@@ -673,12 +688,12 @@ const TradingBuddyWidget = () => {
     }).catch(() => {})
   }, [])
 
-  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current, name: firstNameRef.current, streak: streakRef.current })
+  const coachContext = () => ({ now: new Date(), trades: tradesTodayRef.current, limits: limitsRef.current, name: firstNameRef.current, streak: streakRef.current, dayRule: dayRuleRef.current })
 
   // One list of shown check-ins per day in storage, so another tab never repeats one
   const claimCheckIn = async (id: string) => {
-    const now = new Date()
-    const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    // Kept for the trading day (which for futures starts at the evening session open), not the calendar day
+    const day = tradingDayKey(new Date(), dayRuleRef.current)
     const { checkins_fired } = await chrome.storage.local.get('checkins_fired')
     const ids: string[] = checkins_fired?.day === day ? checkins_fired.ids : []
     if (ids.includes(id)) return false

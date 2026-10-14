@@ -13,11 +13,13 @@ export const provider: Provider = process.env.AI_PROVIDER === "anthropic" ? "ant
 
 // Main model: chat, chart analysis and judgment jobs (rules review). Set ANTHROPIC_MODEL=claude-opus-5-5 to run Opus instead.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"
-// Model for chart analysis; set ANTHROPIC_ANALYZE_MODEL to try another model without touching the rest
-const ANTHROPIC_ANALYZE_MODEL = process.env.ANTHROPIC_ANALYZE_MODEL || ANTHROPIC_MODEL
-// Coaching chat. Defaults to the main model; set ANTHROPIC_CHAT_MODEL=claude-opus-5-5 to run chat on Opus
+// Reading a chart (Check this setup, or a message with the chart attached): Opus on paid plans and the trial,
+// where it reads charts best, and the main model on Free. Both checks of the same chart use the same model.
+const ANTHROPIC_CHART_MODEL = process.env.ANTHROPIC_CHART_MODEL || process.env.ANTHROPIC_ANALYZE_MODEL || "claude-opus-5-5"
+const ANTHROPIC_CHART_MODEL_FREE = process.env.ANTHROPIC_CHART_MODEL_FREE || ANTHROPIC_MODEL
+// Text-only coaching chat. Defaults to the main model; set ANTHROPIC_CHAT_MODEL=claude-opus-5-5 to run chat on Opus
 const ANTHROPIC_CHAT_MODEL = process.env.ANTHROPIC_CHAT_MODEL || ANTHROPIC_MODEL
-// Model for free-tier chat, if it should differ from the chat model
+// Model for free-tier text chat, if it should differ from the chat model
 const ANTHROPIC_MODEL_FREE = process.env.ANTHROPIC_MODEL_FREE || ANTHROPIC_CHAT_MODEL
 // Thinking effort for chart analysis: higher is more careful but slower
 const ANALYZE_EFFORT = (process.env.ANTHROPIC_ANALYZE_EFFORT || "medium") as "low" | "medium" | "high"
@@ -92,7 +94,7 @@ export async function analyzeChart(opts: {
 }): Promise<AnalysisResult> {
   if (provider === "anthropic") {
     const response = await anthropic().beta.messages.parse({
-      model: ANTHROPIC_ANALYZE_MODEL,
+      model: isPaidPlan(opts.plan) ? ANTHROPIC_CHART_MODEL : ANTHROPIC_CHART_MODEL_FREE,
       max_tokens: 16000,
       betas: [FALLBACK_BETA],
       fallbacks: "default",
@@ -157,7 +159,9 @@ export async function chat(opts: {
 }
 
 async function chatAnthropic(opts: Parameters<typeof chat>[0]): Promise<ChatResult> {
-  const model = isPaidPlan(opts.plan) ? ANTHROPIC_CHAT_MODEL : ANTHROPIC_MODEL_FREE
+  const model = opts.image
+    ? (isPaidPlan(opts.plan) ? ANTHROPIC_CHART_MODEL : ANTHROPIC_CHART_MODEL_FREE)
+    : (isPaidPlan(opts.plan) ? ANTHROPIC_CHAT_MODEL : ANTHROPIC_MODEL_FREE)
 
   // Cached prefix, most stable first. The system prompt and memory change at most
   // daily, so they're cached for an hour (trading sessions have long gaps between
