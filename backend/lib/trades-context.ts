@@ -54,7 +54,7 @@ export async function buildTradesContext(
   const trades = marked.filter(t => !t.is_copy)
   const accountsToday = new Set(marked.map(t => t.account).filter(Boolean))
   if (marked.length === 0) {
-    return `TODAY'S TRADES: none recorded. Trades are only recorded when the trader has "Auto-detect trades" on and TradingView's trading panel open, so they may still have traded elsewhere. If it matters, ask.`
+    return `TODAY'S TRADES: none recorded. Trades are only recorded with "Auto-detect trades" on, on TradingView (with the trading panel open), Tradovate or TopstepX, so they may still have traded. If it matters, ask.`
   }
 
   const pnl = (t: TradeRow) => Number(t.realized_pnl ?? 0)
@@ -106,5 +106,5 @@ export async function buildTradesContext(
 ${real.length} trades, ${wins} wins, ${losses} losses, net ${money(net)}${accountsToday.size > 1 ? ` across ${accountsToday.size} accounts (a trade copied to several accounts counts as one trade; the net adds up every account)` : ""}${streak >= 2 ? `, ${streak} losses in a row right now` : ""}.
 ${lines.join("\n")}
 ${perAccount}
-Use these when they ask about their day or when it bears on the rules (max trades, max losses, trading window). Trades made with the trading panel closed or on other platforms may be missing.`
+Use these when they ask about their day or when it bears on the rules (max trades, max losses, trading window). Trades can be missing (tracking off, TradingView's trading panel closed, or a platform Pip doesn't read).`
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
+import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
 import { createClient } from "@supabase/supabase-js"
 import { mainJson } from "@/lib/llm"
 import { logLlmUsage } from "@/lib/llm-cost"
@@ -27,7 +28,11 @@ const reviewSchema = z.object({
   })).describe("At most 8, most useful first; empty if the rules are already clear")
 })
 
-const SYSTEM = `You are Pip, an AI trading-discipline coach. A trader asked you to tighten their trading rules so you can check them reliably against their charts and trades.
+const SYSTEM = `${PIP_IDENTITY}
+
+${PIP_BOUNDARIES}
+
+A trader asked you to tighten their trading rules so you can check them reliably against their charts and trades.
 
 You help traders put THEIR OWN strategy into clear words. You never invent a strategy, never recommend entries, indicators or markets, and never predict anything.
 

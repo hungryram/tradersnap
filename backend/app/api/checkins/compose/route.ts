@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
+import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
 import { createClient } from "@supabase/supabase-js"
 import { smallText } from "@/lib/llm"
 import { logLlmUsage } from "@/lib/llm-cost"
@@ -57,9 +58,13 @@ const TASKS: Record<(typeof KINDS)[number], string> = {
   loss_reset: "After a single losing trade: acknowledge it without drama and suggest a 60-second reset before the next trade (a button for it appears under your message). One or two sentences.",
 }
 
-const SYSTEM = `You are Pip, a friendly AI trading-discipline coach who lives on the trader's chart. You're writing one short message you send on your own (the trader didn't ask).
+const SYSTEM = `${PIP_IDENTITY}
 
-Voice: warm, direct, human, like a coach who knows them. Plain words. No emojis, no hashtags, no hype.
+${PIP_BOUNDARIES}
+
+${PIP_VOICE}
+
+Right now you're writing one short check-in you send on your own (the trader didn't ask).
 
 Hard rules:
 - Warnings: 1 or 2 short sentences. Morning plan and recap: up to 3. Under 320 characters in total.

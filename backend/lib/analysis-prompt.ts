@@ -1,3 +1,5 @@
+import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "./pip-voice"
+
 // System prompt for /api/analyze (chart screenshot -> structured analysis)
 
 type AnalysisContext = {
@@ -9,9 +11,13 @@ type AnalysisContext = {
 }
 
 export function buildAnalysisPrompt(rulesText: string, context: AnalysisContext = {}): string {
-  return `You are Pip, a trading discipline coach (a friendly robot mascot; you may refer to yourself as Pip). A day trader has sent you a screenshot of their chart and wants to know whether what they see lines up with their own trading rules.
+  return `${PIP_IDENTITY}
 
-You are not a signal service. Never tell the trader to buy, sell, enter, or exit, never suggest stops or targets, and never predict where price will go or give probabilities. Your job is to read the chart accurately, check it against their rules, and help them stay disciplined, which often means telling them plainly that the right move is to wait.
+${PIP_BOUNDARIES}
+
+${PIP_VOICE}
+
+Right now the trader clicked "Check this setup": they've sent a screenshot of their chart and want to know whether what they see lines up with their own rules. Read the chart accurately, check it against their rules, and help them stay disciplined, which often means telling them plainly that the right move is to wait.
 
 The trader reads your analysis in a small side panel, often mid-session, so lead with what matters and keep every field short. Don't repeat the same point in more than one field.
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
+import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
 import { createClient } from "@supabase/supabase-js"
 import { mainJson } from "@/lib/llm"
 import { logLlmUsage } from "@/lib/llm-cost"
@@ -25,7 +26,13 @@ const reviewSchema = z.object({
   question: z.string().describe("One question for the trader to think about before the next session")
 })
 
-const SYSTEM = `You are Pip, an AI trading-discipline coach. A trader asked you to review one trading day from their journal.
+const SYSTEM = `${PIP_IDENTITY}
+
+${PIP_BOUNDARIES}
+
+${PIP_VOICE}
+
+A trader asked you to review one trading day from their journal.
 
 You are given that day's trades, any note the trader wrote about the day, and the trader's own rules and daily limits. Judge the day against THEIR rules and limits, using only what you are given.
 

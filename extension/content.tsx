@@ -1766,6 +1766,7 @@ const TradingBuddyWidget = () => {
       // keep its window steady between messages (which keeps it cached and cheap).
       const exchanges = messages.filter(msg => msg.type === 'user' || msg.type === 'assistant' || msg.type === 'checkin')
       const historyStart = Math.max(0, exchanges.length - 20)
+      const earlierThan = currentTradingDayStart(dayRuleRef.current)
       const conversationHistory = exchanges
         .slice(historyStart)
         .map(msg => {
@@ -1780,6 +1781,14 @@ const TradingBuddyWidget = () => {
             content = JSON.stringify(msg.content)
           }
           
+          // Pip's check-ins are his own messages, sent without being asked; the server prompt explains the marker
+          if (msg.type === 'checkin') content = `(Check-in you sent on your own) ${content}`
+          // Messages from an earlier trading day (or hours ago) carry their time, so Pip doesn't treat an old chart read as
+          // the market now. Absolute times keep each message's text stable, so the conversation stays cached.
+          const sentAt = new Date(msg.timestamp)
+          if (!isNaN(sentAt.getTime()) && (sentAt < earlierThan || Date.now() - sentAt.getTime() > 3 * 60 * 60 * 1000)) {
+            content = `[Sent ${sentAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}] ${content}`
+          }
           return {
             role: msg.type === 'user' ? 'user' : 'assistant',
             content
