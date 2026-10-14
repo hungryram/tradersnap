@@ -87,6 +87,8 @@ const ON_PIP_SITE = (() => {
 const CHECKIN_TYPING_MS = 1500
 // How long Pip may take to write a check-in in his own words before the plain version is used
 const COMPOSE_TIMEOUT_MS = { warning: 3000, info: 6000 }
+// Gap kept between the chat window and the edges of the screen
+const SCREEN_MARGIN = 8
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 // A strategy Pip drafted in a reply: a code block opened with ```rules <strategy name>
@@ -167,6 +169,9 @@ const TradingBuddyWidget = () => {
   const [lastChartImage, setLastChartImage] = useState<string | null>(null)
   const [lastChartToken, setLastChartToken] = useState<string | null>(null)
   const [size, setSize] = useState({ width: 384, height: 600 })
+  // The browser window's size: the chat never draws bigger than the screen, so its header and resize corner stay reachable
+  const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
+  const shown = { width: Math.min(size.width, Math.max(260, viewport.width - 2 * SCREEN_MARGIN)), height: Math.min(size.height, Math.max(240, viewport.height - 2 * SCREEN_MARGIN)) }
   const [isResizing, setIsResizing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -2006,11 +2011,15 @@ const TradingBuddyWidget = () => {
     }
   }
 
-  // Keep the window on screen: fully inside horizontally, header always reachable
-  const clampPosition = (pos: { x: number, y: number }, width = size.width) => ({
-    x: Math.min(Math.max(0, pos.x), Math.max(0, window.innerWidth - width)),
-    y: Math.min(Math.max(0, pos.y), Math.max(0, window.innerHeight - 80))
-  })
+  // Keep the whole window on screen (header, chat box and resize corner), sized as it's actually drawn
+  const clampPosition = (pos: { x: number, y: number }, width = size.width, height = size.height) => {
+    const w = Math.min(width, Math.max(260, window.innerWidth - 2 * SCREEN_MARGIN))
+    const h = Math.min(height, Math.max(240, window.innerHeight - 2 * SCREEN_MARGIN))
+    return {
+      x: Math.min(Math.max(SCREEN_MARGIN, pos.x), Math.max(0, window.innerWidth - w - SCREEN_MARGIN)),
+      y: Math.min(Math.max(SCREEN_MARGIN, pos.y), Math.max(0, window.innerHeight - h - SCREEN_MARGIN))
+    }
+  }
 
   // Drag from anywhere on the header except its buttons
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -2036,12 +2045,15 @@ const TradingBuddyWidget = () => {
       const width = Math.min(widget_layout?.width ?? size.width, window.innerWidth)
       const height = widget_layout?.height ?? size.height
       if (widget_layout) setSize({ width, height })
-      setPosition(clampPosition(widget_layout ? { x: widget_layout.x, y: widget_layout.y } : { x: window.innerWidth - width - 24, y: 60 }, width))
+      setPosition(clampPosition(widget_layout ? { x: widget_layout.x, y: widget_layout.y } : { x: window.innerWidth - width - 24, y: 60 }, width, height))
       if (launcher_pos) setLauncherPos(launcher_pos)
       layoutLoadedRef.current = true
     }).catch(() => { layoutLoadedRef.current = true })
 
-    const keepOnScreen = () => setPosition(pos => clampPosition(pos))
+    const keepOnScreen = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight })
+      setPosition(pos => clampPosition(pos))
+    }
     window.addEventListener('resize', keepOnScreen)
     return () => window.removeEventListener('resize', keepOnScreen)
   }, [])
@@ -2106,14 +2118,17 @@ const TradingBuddyWidget = () => {
 
   // Resize handlers
   const startSizeRef = useRef({ width: 0, height: 0 })
+  const startLeftTopRef = useRef({ x: 0, y: 0 })
   const startPosRef = useRef({ x: 0, y: 0 })
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsResizing(true)
-    startSizeRef.current = { width: size.width, height: size.height }
+    // Start from the size as drawn (it may be squeezed to fit the screen)
+    startSizeRef.current = { width: shown.width, height: shown.height }
     startPosRef.current = { x: e.clientX, y: e.clientY }
+    startLeftTopRef.current = { x: position.x, y: position.y }
   }
 
   const handleResizeMouseMove = useCallback((e: MouseEvent) => {
@@ -2122,8 +2137,8 @@ const TradingBuddyWidget = () => {
     e.stopPropagation()
     const deltaX = e.clientX - startPosRef.current.x
     const deltaY = e.clientY - startPosRef.current.y
-    const newWidth = Math.max(300, Math.min(800, startSizeRef.current.width + deltaX))
-    const newHeight = Math.max(400, Math.min(900, startSizeRef.current.height + deltaY))
+    const newWidth = Math.max(300, Math.min(800, window.innerWidth - startLeftTopRef.current.x - SCREEN_MARGIN, startSizeRef.current.width + deltaX))
+    const newHeight = Math.max(320, Math.min(900, window.innerHeight - startLeftTopRef.current.y - SCREEN_MARGIN, startSizeRef.current.height + deltaY))
     
     // Directly set DOM styles to bypass React and any site interference
     if (widgetRef.current) {
@@ -2348,12 +2363,12 @@ const TradingBuddyWidget = () => {
         left: `${position.x}px`,
         top: `${position.y}px`,
         zIndex: 2147483647,
-        width: `${size.width}px`,
-        height: `${size.height}px`,
+        width: `${shown.width}px`,
+        height: `${shown.height}px`,
         maxWidth: 'none',
         maxHeight: 'none',
-        minWidth: '300px',
-        minHeight: '400px'
+        minWidth: '260px',
+        minHeight: '240px'
       }}
       onKeyDown={(e) => {
         e.stopPropagation()
