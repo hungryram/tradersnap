@@ -7,12 +7,19 @@ const SUPABASE_ANON_KEY = process.env.PLASMO_PUBLIC_SUPABASE_ANON_KEY!
 // ---------------------------------------------------------------------------
 // First install: open the welcome page. Uninstall: ask why.
 // ---------------------------------------------------------------------------
+// Snapchart shipped as 1.0.x and 1.1.x; Pip starts at 1.2.0
+function fromSnapchart(previousVersion?: string) {
+  const [major = 0, minor = 0] = (previousVersion ?? "").split(".").map(Number)
+  return !!previousVersion && (major < 1 || (major === 1 && minor < 2))
+}
+
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     chrome.tabs.create({ url: `${API_URL}/welcome` })
   }
-  // People updating from the Snapchart days get a one-time hello from Pip (see content.tsx)
-  if (details.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+  // People updating from the Snapchart days (versions before 1.2) get a one-time hello from Pip (see content.tsx).
+  // Later updates, and reloading a development build, don't count.
+  if (details.reason === chrome.runtime.OnInstalledReason.UPDATE && fromSnapchart(details.previousVersion)) {
     chrome.storage.local.get("pip_rename_announced").then(({ pip_rename_announced }) => {
       if (!pip_rename_announced) chrome.storage.local.set({ pip_rename_pending: true })
     })
