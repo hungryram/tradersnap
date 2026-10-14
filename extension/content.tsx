@@ -279,7 +279,10 @@ const TradingBuddyWidget = () => {
     const seen = new Set<string>(dbMessages.map(localKeyOf))
     const extra = local.filter(m => {
       const key = localKeyOf(m)
-      if (seen.has(key) || new Date(m.timestamp).getTime() < oldest) return false
+      const at = new Date(m.timestamp).getTime()
+      // Only ones shown in the last 10 minutes (a save that may still be on its way). Older copies, such as ones read back
+      // from the browser's cache, are either on the server already or gone for good.
+      if (seen.has(key) || isNaN(at) || at < oldest || Date.now() - at > 10 * 60 * 1000) return false
       seen.add(key)
       return true
     })
@@ -352,7 +355,7 @@ const TradingBuddyWidget = () => {
         ))
         
         // Update cache
-        chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
+        chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp).toISOString() })) })
       }
     } catch (error) {
       // Silently fail - chat history is optional, app works fine without it
@@ -444,7 +447,7 @@ const TradingBuddyWidget = () => {
       // Load cached messages for instant display
       if (result.chat_messages) {
         // Errors are transient; drop any saved by older versions
-        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error'))
+        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error').map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp), fresh: false })))
       }
       
       if (result.theme) {
@@ -892,7 +895,9 @@ const TradingBuddyWidget = () => {
         level: 'info',
         text: "Hey, Snapchart is now Pip. That's me. Same account, same rules, same trades. Just a better name."
       }
-      setMessages(prev => [...prev, { type: 'checkin', content: hello.text, level: hello.level, kind: hello.kind, timestamp: new Date() }])
+      const shownAt = new Date()
+      setMessages(prev => [...prev, { type: 'checkin', content: hello.text, level: hello.level, kind: hello.kind, timestamp: shownAt, fresh: true }])
+      saveNotices([{ client_key: 'pip_rename', kind: 'checkin', content: hello.text, created_at: shownAt.toISOString(), meta: { level: hello.level, kind: hello.kind } }])
       if (!isOpenRef.current) {
         setUnreadCheckins(prev => [...prev, hello])
         setBubble(hello)
@@ -1060,11 +1065,13 @@ const TradingBuddyWidget = () => {
     const savable = messages.filter(msg => msg.type !== 'error' && msg.type !== 'event')
     if (savable.length > 0) {
       // Keep only last 20 messages to avoid storage quota exceeded errors
-      const recentMessages = savable.slice(-20)
+      // Times as text: chrome.storage can't hold Date objects
+      const toStored = (m: any) => ({ ...m, timestamp: isNaN(new Date(m.timestamp).getTime()) ? new Date().toISOString() : new Date(m.timestamp).toISOString() })
+      const recentMessages = savable.slice(-20).map(toStored)
       chrome.storage.local.set({ chat_messages: recentMessages }).catch(err => {
         console.error('[Content] Failed to save messages:', err)
         // If storage fails, try saving just last 10
-        chrome.storage.local.set({ chat_messages: savable.slice(-10) }).catch(() => {
+        chrome.storage.local.set({ chat_messages: savable.slice(-10).map(toStored) }).catch(() => {
           console.error('[Content] Storage quota critically exceeded')
         })
       })
