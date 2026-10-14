@@ -81,7 +81,13 @@ export default function JournalCalendar({ dayRule = null, limits, strategies, on
     try { localStorage.setItem("journal_color_by", value) } catch {}
   }
 
-  const today = dayKeyOf(new Date().toISOString(), dayRule)
+  // Today moves on while the page is open (at midnight, or at the session open for futures), so check every minute
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+  const today = dayKeyOf(new Date(now).toISOString(), dayRule)
   const { weeks, totals } = useMemo(() => {
     const byDay = new Map<string, Trade[]>()
     for (const t of forAccount(data?.trades ?? [], account)) {
@@ -122,7 +128,7 @@ export default function JournalCalendar({ dayRule = null, limits, strategies, on
         keptDays: tradingDays.filter(d => d.broken.length === 0).length,
       }
     }
-  }, [data, month, limits, account, dayRule])
+  }, [data, month, limits, account, dayRule, today])
 
   const selectedDay = selected ? weeks.flat().find(d => d.key === selected) ?? null : null
   const thisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() === month.getTime()

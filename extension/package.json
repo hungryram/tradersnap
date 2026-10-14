@@ -1,7 +1,7 @@
 {
   "name": "trading-buddy-extension",
   "displayName": "Pip: AI Trading Coach",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Pip, your AI trading coach (formerly Snapchart). Checks charts against your rules, logs trades and speaks up before revenge trades.",
   "author": "Pip",
   "scripts": {
