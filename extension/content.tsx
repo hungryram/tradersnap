@@ -375,7 +375,10 @@ const TradingBuddyWidget = () => {
   // Explicit scroll (sending a message, the down-arrow button): follow again
   const scrollToBottom = () => {
     stickToBottomRef.current = true
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    // Instant: a smooth scroll could end short of the bottom when content loads in during it (a chart screenshot), and
+    // its in-between positions would read as the reader scrolling up
+    const container = messagesContainerRef.current
+    if (container) container.scrollTop = container.scrollHeight
   }
 
   // Format timestamp like iPhone messages
@@ -1137,8 +1140,13 @@ const TradingBuddyWidget = () => {
       container.scrollTop = container.scrollHeight
     }
     requestAnimationFrame(() => requestAnimationFrame(toBottom))
-    const later = setTimeout(toBottom, 400)
-    return () => clearTimeout(later)
+    // Content above can keep growing while he works (a chart screenshot loading in, a check-in arriving), and that
+    // doesn't fire any scroll event, so keep the bubble pinned until he's done, unless the reader scrolls up
+    const keepPinned = setInterval(() => {
+      const container = messagesContainerRef.current
+      if (container && stickToBottomRef.current) container.scrollTop = container.scrollHeight
+    }, 150)
+    return () => clearInterval(keepPinned)
   }, [pipBusy])
 
   // Auto-scroll to bottom when messages change
