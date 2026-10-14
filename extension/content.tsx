@@ -2422,6 +2422,24 @@ const TradingBuddyWidget = () => {
                 onMouseDown={(e) => e.stopPropagation()}
                 className={`absolute top-12 right-0 rounded-lg shadow-xl border py-2 z-50 min-w-[180px] ${theme === 'dark' ? 'bg-dark-surface border-dark-border' : 'bg-white border-slate-200'}`}
               >
+                {currentUsage?.credits && (
+                  <div className={`mx-4 mb-2 mt-1 rounded-md px-0 pb-2 text-[11px] border-b ${theme === 'dark' ? 'border-dark-border text-dark-text' : 'border-slate-200 text-slate-500'}`}>
+                    <div className="mb-1 flex justify-between">
+                      <span>Today's usage</span>
+                      <span className="tabular-nums">{currentUsage.credits.percent}% used</span>
+                    </div>
+                    <div className={`h-1 rounded-full ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-200'}`}>
+                      <div
+                        className={`h-1 rounded-full ${currentUsage.credits.percent >= 100 && currentUsage.credits.bonus <= 0 ? 'bg-red-500' : currentUsage.credits.percent >= 80 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                        style={{ width: `${Math.min(100, currentUsage.credits.percent)}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex justify-between">
+                      <span>About {currentUsage.credits.checksLeft} chart {currentUsage.credits.checksLeft === 1 ? 'check' : 'checks'} left</span>
+                      <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Details</a>
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard`, '_blank')
@@ -3188,15 +3206,16 @@ const TradingBuddyWidget = () => {
                   onClick={handleAnalyze}
                   disabled={isAnalyzing || isSending}
                   title={isSending ? "Please wait for the reply" : "Check this chart against your rules"}
-                  className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
+                  className={`w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${getTextSizeClass()} transition-colors`}
                 >
                   <span className={`h-2 w-2 rounded-full bg-white ${isAnalyzing ? 'animate-pulse' : ''}`} />
                   {isAnalyzing ? ANALYZE_STAGES[analyzeStage] : "Check this setup"}
                 </button>
               )}
 
-              {/* Message box */}
+              {/* Message box: text, the chart toggle and send on one row */}
               <div className={`rounded-xl border transition-colors focus-within:border-blue-500 ${theme === 'dark' ? 'border-dark-border bg-dark-surface' : 'border-slate-300 bg-white'}`}>
+                <div className="flex items-center gap-1.5 py-1.5 pl-3 pr-1.5">
                 <textarea
                   ref={inputRef}
                   rows={1}
@@ -3217,30 +3236,54 @@ const TradingBuddyWidget = () => {
                   onKeyUp={(e) => e.stopPropagation()}
                   placeholder={isSending ? "Coach is replying..." : attachChart ? "Ask about this chart..." : "Ask your coach anything..."}
                   maxLength={500}
-                  className={`block w-full resize-none bg-transparent px-3 pt-2.5 pb-1 leading-relaxed ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
+                  className={`block min-w-0 flex-1 resize-none bg-transparent py-1 leading-relaxed ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
                 />
-                <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                  <div className="flex min-w-0 items-center gap-2">
                   {!ON_PIP_SITE && (
                   <button
                     onClick={() => setAttachChart(!attachChart)}
                     aria-pressed={attachChart}
-                    title="Send a screenshot of your chart with this message. Shortcut: Ctrl+Enter (Cmd+Enter on Mac) sends with the chart"
-                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                    aria-label={attachChart ? 'Chart included' : 'Include my chart'}
+                    title={attachChart ? "Your chart goes with this message. Click to leave it out" : "Include my chart with this message (or press Ctrl+Enter, Cmd+Enter on Mac, to send with it)"}
+                    className={`h-7 w-7 shrink-0 flex items-center justify-center rounded-full border transition-colors ${
                       attachChart
                         ? 'border-blue-500 bg-blue-500/15 text-blue-400'
-                        : theme === 'dark' ? 'border-dark-border text-dark-text hover:text-dark-body' : 'border-slate-300 text-slate-500 hover:text-slate-800'
+                        : theme === 'dark' ? 'border-transparent text-dark-text hover:text-dark-body hover:bg-dark-elevated' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                     }`}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                       <circle cx="8.5" cy="8.5" r="1.5"></circle>
                       <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
-                    {attachChart ? 'Chart included' : 'Include my chart'}
                   </button>
                   )}
-                  {strategyOptions.length > 1 && (
+                    {isSending ? (
+                      <button
+                        onClick={stopGeneration}
+                        className={`h-7 w-7 shrink-0 flex items-center justify-center rounded-full transition-colors ${theme === 'dark' ? 'bg-dark-elevated text-red-400 hover:bg-red-950' : 'bg-slate-100 text-red-600 hover:bg-red-50'}`}
+                        title="Stop"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (inputText.trim() && !isAnalyzing) {
+                            handleSendMessage(inputText, attachChart)
+                            setAttachChart(false)
+                          }
+                        }}
+                        disabled={!inputText.trim() || isAnalyzing}
+                        className="h-7 w-7 shrink-0 flex items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={attachChart ? "Send with chart" : "Send"}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                      </button>
+                    )}
+                </div>
+                {(strategyOptions.length > 1 || inputText.length >= 400) && (
+                  <div className="flex items-center justify-between gap-2 px-2 pb-1.5">
+                  {strategyOptions.length > 1 ? (
                     <select
                       value={selectedStrategy}
                       onChange={e => chooseStrategy(e.target.value)}
@@ -3255,66 +3298,21 @@ const TradingBuddyWidget = () => {
                       <option value="">All my strategies</option>
                       {strategyOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                  )}
-                  </div>
-                  <div className="flex items-center gap-2">
+                  ) : <span />}
                     {inputText.length >= 400 && (
                       <span className={`text-[11px] tabular-nums ${inputText.length >= 500 ? 'text-red-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>{inputText.length}/500</span>
                     )}
-                    {isSending ? (
-                      <button
-                        onClick={stopGeneration}
-                        className={`h-7 w-7 flex items-center justify-center rounded-full transition-colors ${theme === 'dark' ? 'bg-dark-elevated text-red-400 hover:bg-red-950' : 'bg-slate-100 text-red-600 hover:bg-red-50'}`}
-                        title="Stop"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (inputText.trim() && !isAnalyzing) {
-                            handleSendMessage(inputText, attachChart)
-                            setAttachChart(false)
-                          }
-                        }}
-                        disabled={!inputText.trim() || isAnalyzing}
-                        className="h-7 w-7 flex items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title={attachChart ? "Send with chart" : "Send"}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-                      </button>
-                    )}
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* What's left today */}
-              {currentUsage?.credits ? (
-                <div className={`px-1 text-[11px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`h-1 flex-1 rounded-full ${theme === 'dark' ? 'bg-dark-elevated' : 'bg-slate-200'}`}>
-                      <div
-                        className={`h-1 rounded-full ${currentUsage.credits.percent >= 100 && currentUsage.credits.bonus <= 0 ? 'bg-red-500' : currentUsage.credits.percent >= 80 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                        style={{ width: `${currentUsage.credits.percent}%` }}
-                      />
-                    </div>
-                    <span className="tabular-nums">{currentUsage.credits.percent}% used today</span>
-                  </div>
-                  <div className="mt-0.5 flex justify-between">
-                    <span>About {currentUsage.credits.checksLeft} chart {currentUsage.credits.checksLeft === 1 ? 'check' : 'checks'} left</span>
-                    {currentUsage.credits.percent >= 80 && (currentUsage.canBuyMore || currentUsage.limits?.maxScreenshots !== undefined) && (
-                      <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Get more</a>
-                    )}
-                  </div>
-                </div>
-              ) : currentUsage && (
-                <div className={`flex justify-between px-1 text-[11px] ${theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
-                  <span className={currentUsage.screenshots >= currentUsage.limits.maxScreenshots ? 'text-red-400' : ''}>
-                    {Math.max(0, currentUsage.limits.maxScreenshots - currentUsage.screenshots)} of {currentUsage.limits.maxScreenshots} chart checks left today
-                  </span>
-                  <span className={currentUsage.messages >= currentUsage.limits.maxMessages ? 'text-red-400' : ''}>
-                    {Math.max(0, currentUsage.limits.maxMessages - currentUsage.messages)} messages left
-                  </span>
+              {/* Nearly out: a one-line heads-up (the full meter is in the ⋮ menu) */}
+              {currentUsage?.credits && currentUsage.credits.percent >= 90 && (
+                <div className={`flex justify-between px-1 text-[11px] ${currentUsage.credits.percent >= 100 && currentUsage.credits.bonus <= 0 ? 'text-red-400' : 'text-amber-500'}`}>
+                  <span>{currentUsage.credits.percent >= 100 && currentUsage.credits.bonus <= 0 ? "Today's allowance is used up" : `${currentUsage.credits.percent}% of today's allowance used`}</span>
+                  {(currentUsage.canBuyMore || currentUsage.limits?.maxScreenshots !== undefined) && (
+                    <a href={`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/account`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Get more</a>
+                  )}
                 </div>
               )}
           </>
