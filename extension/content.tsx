@@ -250,15 +250,26 @@ const TradingBuddyWidget = () => {
   }
   const busyRef = useRef(false)
 
-  // Pip's check-ins and the trade pills aren't stored with the chat on the server, so the last day and a half of
-  // them is kept here (shared by every tab) and merged back in whenever the chat loads
-  const readLocalLog = async (): Promise<any[]> => {
-    const { pip_local_log } = await chrome.storage.local.get('pip_local_log').catch(() => ({ pip_local_log: null }))
-    return (Array.isArray(pip_local_log) ? pip_local_log : []).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+  // Saves check-ins and "position opened" rows with the chat (every device sees them, and so does Pip)
+  const saveNotices = async (items: { client_key: string; kind: 'checkin' | 'event'; content: string; created_at: string; meta?: Record<string, unknown> }[]) => {
+    if (items.length === 0) return
+    try {
+      const { supabase_session } = await chrome.storage.local.get('supabase_session')
+      if (!supabase_session?.access_token) return
+      await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/chat/notices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabase_session.access_token}` },
+        body: JSON.stringify({ items })
+      })
+      broadcastChat()
+    } catch {}
   }
+
+  // Check-ins and notices this tab showed that the server doesn't have yet (saving failed or is still on its way)
+  // are kept when the chat reloads; anything the server has replaces them
   const withLocalLog = (dbMessages: any[], local: any[]) => {
-    const oldest = dbMessages[0]?.timestamp.getTime() ?? 0
-    const seen = new Set<string>()
+    const oldest = dbMessages[0] ? new Date(dbMessages[0].timestamp).getTime() : 0
+    const seen = new Set<string>(dbMessages.map(localKeyOf))
     const extra = local.filter(m => {
       const key = localKeyOf(m)
       if (seen.has(key) || new Date(m.timestamp).getTime() < oldest) return false
@@ -284,7 +295,7 @@ const TradingBuddyWidget = () => {
       )
 
       if (historyResponse.ok) {
-        const { messages: dbMessages } = await historyResponse.json()
+        const { messages: dbMessages, trades: closedTrades } = await historyResponse.json()
         
         // If we got 20 messages, there might be more
         setHasMoreMessages(dbMessages.length === 20)
@@ -292,6 +303,9 @@ const TradingBuddyWidget = () => {
         
         // Convert DB format to UI format
         const formattedMessages = dbMessages.map((msg: any) => {
+          // Pip's check-ins and "position opened" rows, saved with the chat
+          if (msg.kind === 'checkin') return { id: msg.id, type: 'checkin', content: msg.content, level: msg.meta?.level ?? 'info', kind: msg.meta?.kind, offerReset: !!msg.meta?.offerReset, timestamp: new Date(msg.created_at) }
+          if (msg.kind === 'event') return { id: msg.id, type: 'event', tone: msg.meta?.tone ?? 'opened', content: msg.content, timestamp: new Date(msg.created_at) }
           let content = msg.content
           
           // Parse JSON content for analysis messages
@@ -323,10 +337,12 @@ const TradingBuddyWidget = () => {
           a.timestamp.getTime() - b.timestamp.getTime() || (a.type === 'user' ? -1 : 0) - (b.type === 'user' ? -1 : 0)
         )
         
-        // Check-ins and trade pills aren't in the database: add back the saved ones (and, when syncing from another
-        // tab, this tab's own notices)
-        const saved = await readLocalLog()
-        setMessages(prev => withLocalLog(formattedMessages, [...saved, ...(keepLocal ? prev.filter(m => isLocalOnly(m) || (m.type === 'info' && !m.id)) : [])]))
+        // "Trade closed" rows come from the trades themselves, so they match the journal on every device
+        const tradeRows = (closedTrades ?? []).map(closedTradeRow)
+        setMessages(prev => withLocalLog(
+          [...formattedMessages, ...tradeRows].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+          keepLocal ? prev.filter(m => isLocalOnly(m) || (m.type === 'info' && !m.id)) : prev.filter(isLocalOnly)
+        ))
         
         // Update cache
         chrome.storage.local.set({ chat_messages: formattedMessages.slice(-20) })
@@ -842,8 +858,11 @@ const TradingBuddyWidget = () => {
       ])
       setPipTyping(false)
       if (composed) checkIn = { ...checkIn, text: composed }
+      if (checkIn.account) checkIn = { ...checkIn, text: `${checkIn.text} (account ${checkIn.account})` }
 
-      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset, timestamp: new Date() }])
+      const shownAt = new Date()
+      setMessages(prev => [...prev, { type: 'checkin', content: checkIn.text, level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset, timestamp: shownAt }])
+      saveNotices([{ client_key: checkIn.id, kind: 'checkin', content: checkIn.text, created_at: shownAt.toISOString(), meta: { level: checkIn.level, kind: checkIn.kind, offerReset: !!checkIn.offerReset } }])
       analytics.track('checkin_shown', { kind: checkIn.kind, level: checkIn.level })
       if (!isOpenRef.current) {
         setUnreadCheckins(prev => [...prev, checkIn])
@@ -894,13 +913,7 @@ const TradingBuddyWidget = () => {
       : []
     seenTradesRef.current = new Set([...(seen ?? []), ...tradesToday.map(keyOf)])
     if (fresh.length === 0) return
-    setMessages(prev => [...prev, ...fresh.map(t => {
-      // A trade copied to several accounts is one row, with the combined result
-      const pnl = Number(t.group_pnl ?? t.realized_pnl ?? 0)
-      const money = `${pnl < 0 ? '-' : pnl > 0 ? '+' : ''}$${Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-      const accounts = (t.copies ?? 1) > 1 ? ` · ${t.copies} accounts` : ''
-      return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol)} trade closed · ${money}${accounts}`, timestamp: new Date(t.closed_at) }
-    })])
+    setMessages(prev => [...prev, ...fresh.map(closedTradeRow)])
   }, [tradesToday])
 
   // A trade closed (today's trades reloaded)
@@ -918,10 +931,12 @@ const TradingBuddyWidget = () => {
     const opened = [...open].filter(symbol => !previous.has(symbol))
     if (opened.length > 0) {
       const now = new Date()
-      setMessages(prev => [...prev, ...opened.map(symbol => {
+      const rows = opened.map(symbol => {
         const qty = positions.get(symbol) ?? 0
-        return { type: 'event', tone: 'opened', content: `${eventTime(now)} · New ${shortSymbol(symbol)} position opened${qty ? ` · ${qty > 0 ? 'long' : 'short'} ${Math.abs(qty)}` : ''}`, timestamp: now }
-      })])
+        return { type: 'event', tone: 'opened', content: `${eventTime(now)} · New ${shortSymbol(symbol)} position opened${qty ? ` · ${qty > 0 ? 'long' : 'short'} ${Math.abs(qty)}` : ''}`, timestamp: now, symbol }
+      })
+      setMessages(prev => [...prev, ...rows.map(({ symbol, ...row }) => row)])
+      saveNotices(rows.map(row => ({ client_key: `opened|${row.symbol}|${now.toISOString().slice(0, 16)}`, kind: 'event', content: row.content, created_at: now.toISOString(), meta: { tone: 'opened' } })))
       // Size on one account (copying to several accounts isn't sizing up)
       const size = Math.max(...opened.map(symbol => largest?.get(symbol) ?? Math.abs(positions.get(symbol) ?? 0)))
       deliverCheckIns(onPositionOpened(coachContext(), now, size))
@@ -1031,24 +1046,6 @@ const TradingBuddyWidget = () => {
     document.addEventListener('visibilitychange', ensureSession)
     return () => document.removeEventListener('visibilitychange', ensureSession)
   }, [])
-
-  // Keep the check-ins and trade pills (see readLocalLog): merge this tab's into the shared log, newest 150, last 36 hours
-  useEffect(() => {
-    const local = messages.filter(isLocalOnly)
-    if (local.length === 0) return
-    readLocalLog().then(saved => {
-      const keys = new Set(saved.map(localKeyOf))
-      const added = local.filter(m => !keys.has(localKeyOf(m)))
-      if (added.length === 0) return
-      const since = Date.now() - 36 * 60 * 60 * 1000
-      const items = [...saved, ...added]
-        .filter(m => new Date(m.timestamp).getTime() >= since)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        .slice(-150)
-        .map(m => ({ ...m, timestamp: new Date(m.timestamp).toISOString() }))
-      chrome.storage.local.set({ pip_local_log: items }).catch(() => {})
-    }).catch(() => {})
-  }, [messages])
 
   // Save messages to storage whenever they change (limit to last 20 to prevent quota issues)
   useEffect(() => {
@@ -1487,7 +1484,7 @@ const TradingBuddyWidget = () => {
       )
 
       if (historyResponse.ok) {
-        const { messages: dbMessages } = await historyResponse.json()
+        const { messages: dbMessages, trades: closedTrades } = await historyResponse.json()
 
 
         // If we got fewer than 20, we've reached the end
@@ -1496,6 +1493,9 @@ const TradingBuddyWidget = () => {
 
         // Convert DB format to UI format
         const formattedMessages = dbMessages.map((msg: any) => {
+          // Pip's check-ins and "position opened" rows, saved with the chat
+          if (msg.kind === 'checkin') return { id: msg.id, type: 'checkin', content: msg.content, level: msg.meta?.level ?? 'info', kind: msg.meta?.kind, offerReset: !!msg.meta?.offerReset, timestamp: new Date(msg.created_at) }
+          if (msg.kind === 'event') return { id: msg.id, type: 'event', tone: msg.meta?.tone ?? 'opened', content: msg.content, timestamp: new Date(msg.created_at) }
           let content = msg.content
           
           // Parse JSON content for analysis messages
@@ -1521,8 +1521,9 @@ const TradingBuddyWidget = () => {
           }
         })
 
-        // Prepend older messages to the beginning
-        setMessages(prev => [...formattedMessages, ...prev])
+        // Prepend older messages (and the trades that closed among them) to the beginning
+        const tradeRows = (closedTrades ?? []).map(closedTradeRow)
+        setMessages(prev => [...[...formattedMessages, ...tradeRows].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), ...prev])
       }
     } catch (error) {
       console.error('[Content] Error loading older messages:', error)
@@ -3328,8 +3329,16 @@ const TradingBuddyWidget = () => {
 }
 
 
-// Messages that only exist in the browser: Pip's check-ins and the trade pills
+// Check-ins and pills this tab made that haven't come back from the server yet
 const isLocalOnly = (m: any) => (m.type === 'checkin' || m.type === 'event') && !m.id
+
+// One "trade closed" row per trade; a trade copied to several accounts is one row with the combined result
+function closedTradeRow(t: { symbol: string | null; closed_at: string; realized_pnl: number | null; group_pnl?: number; copies?: number }) {
+  const pnl = Number(t.group_pnl ?? t.realized_pnl ?? 0)
+  const money = `${pnl < 0 ? '-' : pnl > 0 ? '+' : ''}$${Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+  const accounts = (t.copies ?? 1) > 1 ? ` · ${t.copies} accounts` : ''
+  return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol ?? '?')} trade closed · ${money}${accounts}`, timestamp: new Date(t.closed_at) }
+}
 const localKeyOf = (m: any) => `${m.type}|${new Date(m.timestamp).getTime()}|${typeof m.content === 'string' ? m.content : ''}`
 
 export default TradingBuddyWidget

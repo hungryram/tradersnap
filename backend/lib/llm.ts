@@ -291,6 +291,8 @@ export async function smallText(opts: { system: string; prompt: string; maxToken
     const response = await anthropic().beta.messages.create({
       model: ANTHROPIC_SMALL_MODEL,
       max_tokens: opts.maxTokens ?? 400,
+      // A short rewrite needs no thinking, and thinking can spend the whole budget before any text (and adds seconds)
+      thinking: { type: "disabled" },
       system: opts.system,
       messages: [{ role: "user", content: opts.prompt }]
     })

@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Privacy Policy" }
 export default function Page() {
   const mail = <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
   return (
-    <Legal title="Privacy Policy" updated="October 11, 2026">
+    <Legal title="Privacy Policy" updated="October 14, 2026">
       <h2>The short version</h2>
       <ul>
         <li>Pip never asks for your broker login and can&apos;t place, change or close trades.</li>
@@ -31,7 +31,7 @@ export default function Page() {
         <li><strong>Account details:</strong> your email address and, if you choose, your name. If you sign in with a password, it is stored by our authentication provider in hashed form; we never see it. If you sign in with Google, we receive your name and email from Google.</li>
         <li><strong>Setup answers:</strong> the markets and platforms you trade, whether you trade with a prop firm, and your experience level.</li>
         <li><strong>Your rules and limits:</strong> your rulesets and daily limits (such as max trades, max daily loss, losses in a row and trading hours).</li>
-        <li><strong>Conversations:</strong> the messages you send Pip and Pip&apos;s replies, messages you save, and your ratings of Pip&apos;s answers.</li>
+        <li><strong>Conversations:</strong> the messages you send Pip and Pip&apos;s replies, the check-ins Pip sends you on his own and the &quot;position opened&quot; notes in the chat (the time, symbol, side and size), messages you save, and your ratings of Pip&apos;s answers.</li>
         <li><strong>Feedback:</strong> anything you tell us when you uninstall the extension or delete your account, and messages you send to support, and anything you send through the feedback or bug-report form on this site (your message, and your email only if you add one).</li>
         <li><strong>Notes for Pip:</strong> anything you add on the Memory page of your dashboard.</li>
         <li><strong>Journal notes:</strong> what you write about your trading days in the journal calendar.</li>

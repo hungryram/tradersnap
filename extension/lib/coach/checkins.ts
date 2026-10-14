@@ -19,6 +19,8 @@ export type CheckIn = {
   compose?: Record<string, unknown>
   // Offer the 60-second reset with this check-in (after losses)
   offerReset?: boolean
+  // With several accounts: which one a limit message is about (added after Pip's wording)
+  account?: string
 }
 
 export type CoachTrade = {
@@ -101,7 +103,7 @@ function scopeOf(ctx: CoachContext, busiest = false): { trades: CoachTrade[]; ne
 
 // Say which account a limit message is about, when there's more than one
 function withAccount(out: CheckIn[], label: string | null, kinds: string[]) {
-  if (label) for (const c of out) if (kinds.includes(c.kind)) c.text += ` (account ${label})`
+  if (label) for (const c of out) if (kinds.includes(c.kind)) c.account = label
   return out
 }
 

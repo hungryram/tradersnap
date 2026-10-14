@@ -31,7 +31,7 @@ export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(new NextResponse(null, { status: 200 }), request.headers.get("origin"))
 }
 
-const KINDS = ["morning_plan", "session_recap", "loss_streak", "daily_loss", "revenge", "max_trades", "over_max", "outside_hours", "big_win", "loss_reset"] as const
+const KINDS = ["morning_plan", "session_recap", "loss_streak", "daily_loss", "revenge", "max_trades", "over_max", "outside_hours", "big_win", "loss_reset", "size_up", "max_size"] as const
 
 const bodySchema = z.object({
   kind: z.enum(KINDS),
@@ -52,6 +52,8 @@ const TASKS: Record<(typeof KINDS)[number], string> = {
   over_max: "A warning in the moment: they already opened a trade past their daily max (it's live now). Ask what's different about this one, gently.",
   outside_hours: "A heads-up: they just opened a trade outside the hours they set. Point it out and ask if it's worth breaking their rule.",
   big_win: "After a big winning trade: congratulate them briefly, then remind them that overconfidence follows big wins.",
+  size_up: "A heads-up in the moment: they just opened a position clearly bigger than their usual size today (it's live now). Name the jump plainly and ask whether the size is part of their plan. Firmer if it came right after a loss.",
+  max_size: "A warning in the moment: they just opened a position bigger than their own max position size (it's live now). Calm and direct: their rule says no more than that.",
   loss_reset: "After a single losing trade: acknowledge it without drama and suggest a 60-second reset before the next trade (a button for it appears under your message). One or two sentences.",
 }
 
@@ -64,6 +66,7 @@ Hard rules:
 - Keep every number, amount, time and limit from the plain version, written exactly the same way, as digits ("2", not "two"; "$500", not "500 dollars").
 - Never give signals, predictions or price targets, or tell them to buy or sell. You coach discipline and process, not the market.
 - Use at most one thing you know about them (a note or a pattern), only if it genuinely fits right now. Never say "according to my notes".
+- Only state what you were given. Never invent a past event or link two facts that weren't linked for you (for example, don't say a past mistake happened "after a loss" unless that's in the facts).
 - Never mention what you don't know or where your information comes from (no "no name on file", "based on your data", "my notes say").
 - Don't tell them how to respond (no "no need to answer", "reply below"); just say your piece or ask your question.
 - When a trade is already open, don't talk as if they haven't clicked yet.
@@ -117,11 +120,23 @@ export async function POST(request: NextRequest) {
         ])
       : [[], []]
 
+    // What Pip already told them today, so he builds on it instead of repeating himself
+    const { data: earlier } = await supabase
+      .from("chat_messages")
+      .select("content, created_at")
+      .eq("user_id", user.id)
+      .eq("kind", "checkin")
+      .gte("created_at", todayStart.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(8)
+    const earlierLines = (earlier ?? []).reverse().map(m => `- ${new Date(m.created_at).toLocaleTimeString("en-US", { timeZone: timezone || "America/New_York", hour: "numeric", minute: "2-digit" })}: ${m.content}`)
+
     const prompt = [
       `Write this check-in: ${TASKS[kind]}`,
       Object.keys(facts).length ? `Facts (JSON):\n${JSON.stringify(facts)}` : null,
       `The plain version (same facts; keep all of its numbers):\n${plain}`,
-      memoryContext(notes, patterns) ?? "You don't know anything else about this trader yet."
+      memoryContext(notes, patterns) ?? "You don't know anything else about this trader yet.",
+      earlierLines.length ? `What you already told them today (don't repeat it; if this is the same problem again, say so plainly):\n${earlierLines.join("\n")}` : null
     ].filter(Boolean).join("\n\n")
 
     const { text, tokens, stop } = await smallText({ system: SYSTEM, prompt, maxTokens: 300 })

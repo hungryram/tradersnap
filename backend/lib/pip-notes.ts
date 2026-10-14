@@ -138,9 +138,14 @@ export async function maybeRefreshNotes(supabase: SupabaseClient, userId: string
     const { data: claimed } = await claim.select("id")
     if (!claimed?.length) return
 
-    let messagesQuery = supabase.from("chat_messages").select("role, content, created_at").eq("user_id", userId)
-    if (last) messagesQuery = messagesQuery.gt("created_at", last)
-    const { data: messages } = await messagesQuery.order("created_at", { ascending: false }).limit(MAX_MESSAGES_READ)
+    const readMessages = (skipEvents: boolean) => {
+      let q = supabase.from("chat_messages").select("role, content, created_at").eq("user_id", userId)
+      if (skipEvents) q = q.or("kind.is.null,kind.neq.event")
+      if (last) q = q.gt("created_at", last)
+      return q.order("created_at", { ascending: false }).limit(MAX_MESSAGES_READ)
+    }
+    let { data: messages, error: readError } = await readMessages(true)
+    if (readError) ({ data: messages } = await readMessages(false)) // before 20261028_checkins_in_chat.sql
     if (!messages?.length) return
 
     const notes = await loadNotes(supabase, userId)
