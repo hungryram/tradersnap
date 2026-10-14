@@ -188,14 +188,14 @@ export default function CheckDetails({ analysis, dark, ticked, onTick, skipFirst
         </div>
       )}
 
-      {/* Pip's read */}
-      {(analysis.summary || (analysis.bullets?.length ?? 0) > 0) && (
+      {/* More from Pip (his one-line read is on the card itself) */}
+      {(analysis.bullets?.length ?? 0) > 0 && (
         <div className="flex gap-2.5">
           <Pip size={22} mood="idle" animated={false} />
           <div className="min-w-0">
-            <div className={`mb-1 text-[11px] font-semibold uppercase tracking-wide ${muted}`}>Pip&apos;s read</div>
+            <div className={`mb-1 text-[11px] font-semibold uppercase tracking-wide ${muted}`}>More from Pip</div>
             <p className={`leading-relaxed ${strong}`}>
-              {[analysis.summary, ...(analysis.bullets ?? [])]
+              {(analysis.bullets ?? [])
                 .filter(Boolean)
                 .map(t => (/[.!?]$/.test(t!.trim()) ? t!.trim() : `${t!.trim()}.`))
                 .join(" ")}

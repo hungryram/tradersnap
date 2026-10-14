@@ -3036,8 +3036,6 @@ const TradingBuddyWidget = () => {
                     const aligned = analysis.setup_status === 'aligned'
                     const waitFor: string[] = analysis.wait_for || []
                     const nextStep = !aligned ? waitFor[0] : undefined
-                    // The nudge earns a spot up front only on a rule break or an off-plan setup
-                    const nudgeUpFront = !!analysis.behavioral_nudge && (analysis.setup_status === 'violated' || analysis.matched_strategy === null)
                     const ticked: number[] = msg.checklistTicked || []
                     const checklist = checklistProgress(analysis, ticked)
                     const tick = (index: number) => {
@@ -3063,13 +3061,17 @@ const TradingBuddyWidget = () => {
                         {analysis.headline_reason && (
                           <div className={dark ? 'text-dark-body' : 'text-slate-900'}>{analysis.headline_reason}</div>
                         )}
+                        {/* Pip's read of the chart, up front (the extra observations are in Details) */}
+                        {analysis.summary && (
+                          <div className={`mt-1.5 text-[13px] leading-relaxed ${dark ? 'text-dark-text' : 'text-slate-600'}`}>{analysis.summary}</div>
+                        )}
                         {nextStep && (
                           <div className="mt-2 flex gap-1.5 text-[13px]">
                             <span className={`shrink-0 font-semibold ${muted}`}>Wait for:</span>
                             <span>{nextStep}</span>
                           </div>
                         )}
-                        {nudgeUpFront && (
+                        {analysis.behavioral_nudge && (
                           <div className={`mt-2 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
                         )}
 
@@ -3095,9 +3097,6 @@ const TradingBuddyWidget = () => {
                         {detailsOpen && (
                           <>
                             <CheckDetails analysis={analysis} dark={dark} ticked={ticked} onTick={tick} skipFirstWaitFor={!!nextStep} />
-                            {analysis.behavioral_nudge && !nudgeUpFront && (
-                              <div className={`mt-3 text-[13px] italic ${dark ? 'text-amber-200/90' : 'text-amber-800'}`}>{analysis.behavioral_nudge}</div>
-                            )}
                           </>
                         )}
 
