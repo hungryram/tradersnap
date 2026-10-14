@@ -1125,6 +1125,22 @@ const TradingBuddyWidget = () => {
     box.style.height = `${Math.min(box.scrollHeight, 128)}px`
   }, [inputText])
 
+  // Pip starts working on something (a reply, a chart check, a check-in): bring his thinking bubble into view, so it's
+  // clear he's on it. Again a moment later, since a chart screenshot above it can finish loading and push it down.
+  const pipBusy = isAnalyzing || isSending || pipTyping
+  useEffect(() => {
+    if (!pipBusy) return
+    const toBottom = () => {
+      const container = messagesContainerRef.current
+      if (!container) return
+      stickToBottomRef.current = true
+      container.scrollTop = container.scrollHeight
+    }
+    requestAnimationFrame(() => requestAnimationFrame(toBottom))
+    const later = setTimeout(toBottom, 400)
+    return () => clearTimeout(later)
+  }, [pipBusy])
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messages.length === 0) return
