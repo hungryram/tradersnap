@@ -241,6 +241,8 @@ const TradingBuddyWidget = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   // Follow new messages / typing only while the reader is at the bottom
   const stickToBottomRef = useRef(true)
+  // How many messages the chat had at the last scroll, to tell a new message from one that's still being written
+  const lastCountRef = useRef(0)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
   const isInitialLoadRef = useRef(true)
@@ -1135,10 +1137,21 @@ const TradingBuddyWidget = () => {
         })
       })
     } else if (stickToBottomRef.current) {
-      // New text while the reader is at the bottom: keep up instantly. A smooth
-      // scroll here would fight the typing updates and the reader's own scrolling.
+      // Instant scrolling: a smooth scroll would fight the typing updates and the reader's own scrolling
       const container = messagesContainerRef.current
-      if (container) container.scrollTop = container.scrollHeight
+      const writing = messages.length === lastCountRef.current // same count: the last message is still being written
+      lastCountRef.current = messages.length
+      if (!container) return
+      const bottom = container.scrollHeight - container.clientHeight
+      if (!writing) {
+        container.scrollTop = bottom
+        return
+      }
+      // While Pip types, follow the text only until the start of his reply reaches the top of the chat. After that the
+      // reply grows below and the reader keeps their place instead of the text sliding up under them.
+      const last = container.querySelector<HTMLElement>(`[data-msg-index="${messages.length - 1}"]`)
+      const replyTop = last ? last.offsetTop - 12 : bottom
+      container.scrollTop = Math.min(bottom, Math.max(container.scrollTop, replyTop))
     }
   }, [messages])
 
@@ -2716,7 +2729,7 @@ const TradingBuddyWidget = () => {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className="relative group">
+            <div key={i} data-msg-index={i} className="relative group">
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : msg.type === 'event' ? 'justify-center' : 'justify-start'}`}>
                 {msg.type !== 'user' && msg.type !== 'event' && (
                   <div className="mr-2 mt-0.5 shrink-0">
