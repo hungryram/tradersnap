@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
+import { SkeletonCard } from "../components/ui"
 
 interface FavoritedMessage {
   id: string
@@ -273,9 +274,8 @@ export default function SavedMessagesPage() {
 
         {/* Messages List */}
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-            <p className="text-ink-text mt-4">Loading saved messages...</p>
+          <div className="space-y-4" role="status" aria-label="Loading saved messages">
+            {[0, 1, 2].map(i => <SkeletonCard key={i} lines={3} />)}
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="text-center py-12 bg-ink-surface rounded-lg border border-ink-border">

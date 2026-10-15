@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { api } from "@/lib/dashboard-data"
-import { buttonPrimary, buttonSecondary } from "./ui"
+import { SkeletonCard, buttonPrimary, buttonSecondary } from "./ui"
 
 type Review = { summary: string; went_well: string[]; to_work_on: string[]; question: string; created_at?: string }
 type State = { review: Review | null; limit: number; used: number; period?: "day" | "week" | null }
@@ -37,7 +37,7 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
     }
   }
 
-  if (!state) return null
+  if (!state) return <SkeletonCard lines={3} className="mt-5" />
 
   // Free plans: a pointer to Pro, nothing else
   if (state.limit === 0) {

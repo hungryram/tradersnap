@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { api, forAccount, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
 import { tradingDayStart } from "@/lib/trading-day"
-import { Card, buttonPrimary, inputClass, money } from "./ui"
+import { Card, Skeleton, SkeletonCard, buttonPrimary, inputClass, money } from "./ui"
 import TradeTable from "./TradeTable"
 import DayReview from "./DayReview"
 
@@ -148,6 +148,8 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
   }, [data, month, limits, account, dayRule, today])
 
   const selectedDay = selected ? weeks.flat().find(d => d.key === selected) ?? null : null
+  // The month's trades are still on their way: show placeholders, not zeros
+  const loading = data === null && !error
   const thisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() === month.getTime()
   const label = month.toLocaleDateString("en-US", { month: "long", year: "numeric" })
 
@@ -172,6 +174,13 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
     >
       {error && <p className="text-sm text-red-300">{error}</p>}
 
+      {loading ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2" aria-hidden>
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-44" />
+        </div>
+      ) : (
       <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span className="text-ink-text">{totals.trades} trades</span>
         <span className={totals.net > 0 ? "text-green-400" : totals.net < 0 ? "text-red-400" : "text-ink-text"}>{money(totals.net)}</span>
@@ -179,6 +188,7 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
           ? <span className="text-ink-body">Rules kept on <span className="font-semibold text-brand-300">{totals.keptDays} of {totals.days}</span> trading days</span>
           : <a href="/dashboard/rules#limits" className="text-brand-300 hover:text-brand-200">Set daily limits to track rule-kept days</a>}
       </div>
+      )}
 
       {data?.historyFrom && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-sm">
@@ -209,12 +219,23 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
                 return (
                   <button
                     key={day.key}
-                    onClick={() => openable && setSelected(selected === day.key ? null : day.key)}
+                    onClick={() => {
+                      if (!openable) return
+                      const next = selected === day.key ? null : day.key
+                      setSelected(next)
+                      // The day's details open below the calendar: bring them into view
+                      if (next) setTimeout(() => document.getElementById("journal-day")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50)
+                    }}
                     disabled={!openable}
                     className={`relative h-20 rounded-lg border p-1.5 text-left transition-colors ${tone} ${!inMonth ? "invisible" : ""} ${selected === day.key ? "ring-2 ring-brand-400" : ""} ${openable ? "hover:border-ink-muted" : "cursor-default"}`}
                   >
                     <span className={`absolute left-1.5 top-1.5 text-[11px] leading-4 ${day.key === today ? "rounded bg-brand-500 px-1 font-semibold text-ink-bg" : "text-ink-muted"}`}>{day.date.getDate()}</span>
-                    {day.locked ? (
+                    {loading && inMonth && !day.future ? (
+                      <span className="absolute bottom-1.5 left-1.5 right-1.5 space-y-1" aria-hidden>
+                        <Skeleton className="h-2.5 w-10" />
+                        <Skeleton className="h-3 w-14" />
+                      </span>
+                    ) : day.locked ? (
                       <span className="absolute inset-0 flex items-center justify-center text-ink-muted" title="Pro keeps your full history">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
                       </span>
@@ -254,7 +275,8 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
         </div>
       </div>
 
-      {selectedDay && (
+      {selectedDay && loading && <SkeletonCard lines={4} className="mt-5" />}
+      {selectedDay && !loading && (
         <div id="journal-day" className="mt-5 border-t border-ink-border pt-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>

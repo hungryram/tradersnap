@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase-client"
 import { SITE_URL } from "@/lib/urls"
-import { Card, PageHeader } from "../components/ui"
+import { Card, Loading, PageHeader } from "../components/ui"
 
 const STORE_URL = "https://chromewebstore.google.com/detail/bppbpeodpbepcmjifjjihejcnofdnibe?utm_source=item-share-cb"
 const link = "text-brand-300 hover:text-brand-200 underline"
@@ -115,13 +115,7 @@ export default function GuidePage() {
     })
   }, [])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-        <div className="text-ink-body text-xl">Loading...</div>
-      </div>
-    )
-  }
+  if (isLoading) return <Loading />
 
   return (
     <div className="max-w-4xl">

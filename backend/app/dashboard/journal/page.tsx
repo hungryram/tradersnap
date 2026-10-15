@@ -117,6 +117,10 @@ export default function JournalPage() {
 
       {trades && view && trades.length > 0 && (
         <div className="space-y-6">
+          <div className="border-t border-ink-border pt-6">
+            <h2 className="text-lg font-semibold">Your last {days} days</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">Everything from here down covers the whole {days}-day range. To see one day, pick it on the calendar above.</p>
+          </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Net P&L" value={money(view.stats.net)} tone={view.stats.net > 0 ? "good" : view.stats.net < 0 ? "bad" : "default"} hint={`${view.stats.count} trades`} />
             <Stat label="Win rate" value={view.stats.winRate !== null ? `${Math.round(view.stats.winRate * 100)}%` : "—"} hint={`${view.stats.wins}W · ${view.stats.losses}L`} />

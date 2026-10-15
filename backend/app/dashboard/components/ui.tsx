@@ -47,10 +47,42 @@ export function Notice({ tone, children }: { tone: "good" | "bad" | "info" | "wa
   return <div className={`rounded-lg border px-4 py-3 text-sm ${styles}`}>{children}</div>
 }
 
+// A placeholder shaped like the content that's on its way
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-ink-elevated/70 ${className}`} aria-hidden />
+}
+
+export function SkeletonCard({ lines = 3, className = "" }: { lines?: number; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-ink-border bg-ink-surface p-5 sm:p-6 ${className}`} aria-hidden>
+      <Skeleton className="mb-4 h-4 w-32" />
+      <div className="space-y-2.5">
+        {Array.from({ length: lines }, (_, i) => <Skeleton key={i} className={`h-3.5 ${i === lines - 1 ? "w-2/3" : "w-full"}`} />)}
+      </div>
+    </div>
+  )
+}
+
+// Page-level loading: a header, a row of numbers and a couple of cards, so the page doesn't jump when it arrives
 export function Loading() {
   return (
-    <div className="flex justify-center py-24">
-      <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink-border border-t-brand-500" />
+    <div role="status" aria-label="Loading">
+      <div className="mb-8 space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="rounded-2xl border border-ink-border bg-ink-surface p-5">
+            <Skeleton className="mb-3 h-3 w-20" />
+            <Skeleton className="h-7 w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-6">
+        <SkeletonCard lines={4} />
+        <SkeletonCard lines={3} />
+      </div>
     </div>
   )
 }
