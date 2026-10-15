@@ -93,8 +93,7 @@
     "externally_connectable": {
       "matches": [
         "https://admin.tradewithpip.ai/*",
-        "https://admin.snapchartapp.com/*",
-        "http://localhost/*"
+        "https://admin.snapchartapp.com/*"
       ]
     },
     "commands": {
