@@ -355,8 +355,9 @@ const TradingBuddyWidget = () => {
         
         // "Trade closed" rows come from the trades themselves, so they match the journal on every device
         const tradeRows = (closedTrades ?? []).map(closedTradeRow)
+        const images = await loadChartImages()
         setMessages(prev => withLocalLog(
-          [...formattedMessages, ...tradeRows].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+          withChartImages([...formattedMessages, ...tradeRows], images).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
           keepLocal ? prev.filter(m => isLocalOnly(m) || (m.type === 'info' && !m.id)) : prev.filter(isLocalOnly)
         ))
         
@@ -456,7 +457,8 @@ const TradingBuddyWidget = () => {
       // Load cached messages for instant display
       if (result.chat_messages) {
         // Errors are transient; drop any saved by older versions
-        setMessages(result.chat_messages.filter((msg: any) => msg.type !== 'error').map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp), fresh: false, streaming: false })))
+        const images = await loadChartImages()
+        setMessages(withChartImages(result.chat_messages.filter((msg: any) => msg.type !== 'error').map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp), fresh: false, streaming: false })), images))
       }
       
       if (result.theme) {
@@ -1075,7 +1077,7 @@ const TradingBuddyWidget = () => {
     if (savable.length > 0) {
       // Keep only last 20 messages to avoid storage quota exceeded errors
       // Times as text: chrome.storage can't hold Date objects
-      const toStored = (m: any) => ({ ...m, timestamp: isNaN(new Date(m.timestamp).getTime()) ? new Date().toISOString() : new Date(m.timestamp).toISOString() })
+      const toStored = ({ chartImage, ...m }: any) => ({ ...m, timestamp: isNaN(new Date(m.timestamp).getTime()) ? new Date().toISOString() : new Date(m.timestamp).toISOString() })
       const recentMessages = savable.slice(-20).map(toStored)
       chrome.storage.local.set({ chat_messages: recentMessages }).catch(err => {
         console.error('[Content] Failed to save messages:', err)
@@ -1449,6 +1451,8 @@ const TradingBuddyWidget = () => {
       analytics.analysisFinished(analysis.setup_status || 'unknown', { sessionId: session?.id })
       updateGettingStarted({ analyzed: true }, 'first_analysis')
 
+      rememberChartImage([analysis.userMessageId], chartImage)
+
       // Update user message with database ID
       if (analysis.userMessageId) {
         setMessages(prev => prev.map(msg => 
@@ -1580,7 +1584,8 @@ const TradingBuddyWidget = () => {
 
         // Prepend older messages (and the trades that closed among them) to the beginning
         const tradeRows = (closedTrades ?? []).map(closedTradeRow)
-        setMessages(prev => [...[...formattedMessages, ...tradeRows].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), ...prev])
+        const images = await loadChartImages()
+        setMessages(prev => [...withChartImages([...formattedMessages, ...tradeRows], images).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), ...prev])
       }
     } catch (error) {
       console.error('[Content] Error loading older messages:', error)
@@ -1990,6 +1995,7 @@ const TradingBuddyWidget = () => {
       }
       
       // Update user message with database ID
+      rememberChartImage([chatResult.userMessageId, (chatResult.drawings?.length || chartImage) ? chatResult.assistantMessageId : null], chartImage || (chatResult.drawings?.length ? lastChartImage : null))
       if (chatResult.userMessageId) {
         setMessages(prev => prev.map(msg => 
           msg === userMessage ? { ...msg, id: chatResult.userMessageId, isFavorited: false } : msg
@@ -2626,7 +2632,7 @@ const TradingBuddyWidget = () => {
                           // Clear ALL messages from chatbox (including favorites locally)
                           // Favorites remain in database for dashboard
                           setMessages([])
-                          chrome.storage.local.remove('chat_messages')
+                          chrome.storage.local.remove(['chat_messages', 'chart_images'])
                           broadcastChat()
                           analytics.sessionCleared()
                           setShowMenu(false)
@@ -2634,7 +2640,7 @@ const TradingBuddyWidget = () => {
                           console.error('[Content] Error clearing chat:', error)
                           // Still clear locally even if API fails
                           setMessages([])
-                          chrome.storage.local.remove('chat_messages')
+                          chrome.storage.local.remove(['chat_messages', 'chart_images'])
                           setShowMenu(false)
                         }
                       }
@@ -3439,6 +3445,54 @@ const TradingBuddyWidget = () => {
   )
 }
 
+
+// Chart screenshots never go to our servers to be stored, so the extension keeps the most recent ones itself, by the
+// id of the message they belong to, and puts them back when the chat loads. They're shrunk to a JPEG first so a dozen
+// fit easily in Chrome's storage for extensions.
+const IMAGE_STORE = 'chart_images'
+const IMAGES_KEPT = 12
+
+async function shrinkImage(dataUrl: string): Promise<string> {
+  try {
+    const img = new Image()
+    img.src = dataUrl
+    await img.decode()
+    const scale = Math.min(1, 1600 / img.naturalWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.82)
+  } catch {
+    return dataUrl
+  }
+}
+
+async function loadChartImages(): Promise<Record<string, { url: string; at: number }>> {
+  try {
+    const { [IMAGE_STORE]: stored } = await chrome.storage.local.get(IMAGE_STORE)
+    return stored && typeof stored === 'object' ? stored : {}
+  } catch {
+    return {}
+  }
+}
+
+async function rememberChartImage(messageIds: (string | null | undefined)[], dataUrl: string | null | undefined) {
+  const ids = messageIds.filter((id): id is string => !!id)
+  if (!dataUrl || ids.length === 0) return
+  try {
+    const url = await shrinkImage(dataUrl)
+    const stored = await loadChartImages()
+    for (const id of ids) stored[id] = { url, at: Date.now() }
+    const newest = Object.entries(stored).sort(([, a], [, b]) => b.at - a.at).slice(0, IMAGES_KEPT)
+    await chrome.storage.local.set({ [IMAGE_STORE]: Object.fromEntries(newest) })
+  } catch {}
+}
+
+// Puts saved screenshots back on messages loaded from the server
+function withChartImages<T extends { id?: string; chartImage?: string | null }>(messages: T[], stored: Record<string, { url: string }>): T[] {
+  return messages.map(m => (m.id && stored[m.id] && !m.chartImage ? { ...m, chartImage: stored[m.id].url } : m))
+}
 
 // Reads a streamed chat reply: one JSON line per piece of text ("delta"), then "done" with the finished reply and
 // everything that goes with it, or "error". `onText` gets the text so far.
