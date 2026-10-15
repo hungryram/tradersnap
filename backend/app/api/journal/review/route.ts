@@ -43,6 +43,9 @@ Rules for the review:
 - A "day total" entry is an adjustment so the journal matches what the trader reported. It is not a trade.
 - Use the real numbers (counts, times, amounts). Don't invent anything you can't see. If you can't tell whether a rule was kept (for example an entry rule that needs the chart), say so.
 - If their note mentions a feeling or a reason, use it, gently. Don't quote it back at length.
+- Refer to a trade by the time it closed, as the journal lists it ("the 9:32 AM trade"), never by a number: the journal doesn't number trades.
+- Position size is part of discipline. A position far bigger than their usual size (you're told when one is) is the first thing to name under what slipped, plainly, whether or not they have a size rule, and even when it won. A win at many times normal size is luck with a big risk, not a good trade; never count it as something that held up.
+- Their trading day is the one described above. For a futures trader whose day starts in the evening, the evening and the next morning are the same trading day, not separate sessions, and their limits cover all of it.
 - Be warm, short and specific. No lectures. One core insight.`
 
 async function getUser(request: NextRequest) {
@@ -159,8 +162,17 @@ export async function POST(request: NextRequest) {
     if (t.kind === "day_total") return `${i + 1}. ${time(t.closed_at)} adjustment so the journal matches the day total the trader reported (not a trade): ${money(pnl(t))}`
     if (t.source === "manual") return `${i + 1}. ${time(t.closed_at)} ${t.symbol ? instrumentOf(t.symbol) + " " : ""}reported by the trader: ${money(pnl(t))}`
     const where = t.copies > 1 ? ` (copied to ${t.copies} accounts, ${money(t.group_pnl)} combined)` : accounts.length > 1 && t.account ? ` [account ${t.account.replace(/^[a-z]+:/i, "")}]` : ""
-    return `${i + 1}. ${time(t.opened_at ?? t.closed_at)} to ${time(t.closed_at)} ${instrumentOf(t.symbol ?? "?")} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${where}`
+    return `${i + 1}. closed ${time(t.closed_at)}${t.opened_at ? ` (opened ${time(t.opened_at)})` : ""} ${instrumentOf(t.symbol ?? "?")} ${t.side} ${t.qty} @ ${price(t.entry_price)} -> ${price(t.exit_price)}: ${money(pnl(t))}${where}`
   })
+  // Size: their usual size this day (per account, per decision) and anything far above it
+  const sizes = decisions.filter(t => t.kind !== "day_total" && t.source !== "manual").map(t => Math.abs(Number(t.qty ?? 0))).filter(q => q > 0).sort((a, b) => a - b)
+  const usualSize = sizes.length ? sizes[Math.floor((sizes.length - 1) / 2)] : 0
+  const oversized = usualSize ? decisions.filter(t => t.kind !== "day_total" && Math.abs(Number(t.qty ?? 0)) >= 2 * usualSize) : []
+  const timesUsual = (q: number) => { const x = q / usualSize; return x >= 10 ? Math.round(x).toString() : x.toFixed(1) }
+  const sizeLine = usualSize
+    ? `POSITION SIZE (per account): usually ${usualSize} this day.${oversized.length ? ` Far bigger: ${oversized.map(t => `the ${time(t.closed_at)} trade at ${Math.abs(Number(t.qty))} (${timesUsual(Math.abs(Number(t.qty)))}x usual), ${money(pnl(t))}`).join("; ")}.` : " No position was far above that."}`
+    : null
+
   const perAccount = accounts.length > 1
     ? accounts.map(a => {
         const own = marked.filter(t => t.account === a && t.kind !== "day_total")
@@ -173,9 +185,10 @@ export async function POST(request: NextRequest) {
   const rules = strategies.length || alwaysRules ? strategiesBlock(strategies, alwaysRules, profile?.trading_limits ?? null) : "The trader hasn't written any rules or limits yet."
 
   const prompt = [
-    `Day: ${day} (the trader's local time zone: ${timezone}${dayRule ? `; their trading day starts at ${dayRule} New York time, so evening trades belong to the next date` : ""})`,
+    `Day: ${day} (the trader's local time zone: ${timezone}${dayRule ? `; their trading day starts at ${dayRule} New York time the evening before, so the previous evening's trades and this morning's are one trading day` : ""})`,
     `THE TRADER'S RULES AND LIMITS:\n${rules}`,
     decisions.length ? `THE DAY'S TRADES (${decisions.filter(t => t.kind !== "day_total").length} decisions, net ${money(marked.reduce((s, t) => s + pnl(t), 0))}${accounts.length > 1 ? ` across ${accounts.length} accounts` : ""}):\n${lines.join("\n")}` : "No trades were recorded this day.",
+    sizeLine,
     perAccount ? `PER ACCOUNT (limits apply to each account separately):\n${perAccount}` : null,
     note ? `THE TRADER'S NOTE FOR THIS DAY:\n${note}` : "The trader didn't write a note for this day."
   ].filter(Boolean).join("\n\n")
