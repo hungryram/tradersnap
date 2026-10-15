@@ -42,7 +42,7 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
   // Free plans: a pointer to Pro, nothing else
   if (state.limit === 0) {
     return (
-      <div className="rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
+      <div className="mt-5 rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
         <p className="text-sm font-medium">Pip&apos;s read of this day</p>
         <p className="mt-1 text-sm text-ink-text">Pip can review any day in your journal against your rules: what held up, what slipped, and one question to take with you. It&apos;s part of <a href="/dashboard/account#plans" className="text-brand-300 hover:text-brand-200">Pro</a>.</p>
       </div>
@@ -55,7 +55,7 @@ export default function DayReview({ day, hasContent, noteUnsaved }: { day: strin
   // Free plans get one review a week; once it's used (and this day has none), Pro is the way to more
   const usedUp = weekly && left === 0 && !review
   return (
-    <div className="rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
+    <div className="mt-5 rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Pip&apos;s read of this day</p>
         <span className="text-xs text-ink-muted">{weekly ? (left ? "1 free review a week" : "Free review used this week") : `${left} of ${state.limit} reviews left today`}</span>

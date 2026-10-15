@@ -26,11 +26,10 @@ export type CopyMark = {
   is_copy: boolean // not the first of its group: leave it out of counts
   copies: number // trades in the group (accounts it was copied to); 1 when alone
   group_pnl: number // profit and loss of the whole group (for win/loss decisions)
-  group_of: string | null // the same for every trade in a copied group (the first trade's id), null when alone
 }
 
 export function markCopies<T extends CopyCandidate>(trades: T[]): (T & CopyMark)[] {
-  const out = trades.map(t => ({ ...t, is_copy: false, copies: 1, group_pnl: Number(t.realized_pnl ?? 0), group_of: null })) as (T & CopyMark)[]
+  const out = trades.map(t => ({ ...t, is_copy: false, copies: 1, group_pnl: Number(t.realized_pnl ?? 0) })) as (T & CopyMark)[]
   const timeOf = (t: CopyCandidate) => Date.parse(t.opened_at ?? t.closed_at)
 
   type Group = { rep: number; accounts: Set<string>; time: number; members: number[] }
@@ -59,11 +58,7 @@ export function markCopies<T extends CopyCandidate>(trades: T[]): (T & CopyMark)
   for (const groups of groupsByKey.values()) {
     for (const g of groups) {
       const pnl = g.members.reduce((sum, m) => sum + Number(out[m].realized_pnl ?? 0), 0)
-      const groupOf = g.members.length > 1 ? String((out[g.rep] as { id?: unknown }).id ?? `group-${g.rep}`) : null
-      for (const m of g.members) {
-        out[m].copies = g.members.length
-        out[m].group_of = groupOf
-      }
+      for (const m of g.members) out[m].copies = g.members.length
       out[g.rep].group_pnl = Math.round(pnl * 100) / 100
     }
   }
