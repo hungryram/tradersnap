@@ -1263,7 +1263,7 @@ const TradingBuddyWidget = () => {
       ALLOWED_ATTR: ['href', 'target', 'rel']
     })
     // Add target="_blank" and rel="noopener noreferrer" to all links
-    return sanitized.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href=')
+    return colorMoney(sanitized.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href='))
   }
 
   // Get text size classes based on current size setting
@@ -3549,6 +3549,13 @@ async function rememberChartImage(messageIds: (string | null | undefined)[], dat
 // Puts saved screenshots back on messages loaded from the server
 function withChartImages<T extends { id?: string; chartImage?: string | null }>(messages: T[], stored: Record<string, { url: string }>): T[] {
   return messages.map(m => (m.id && stored[m.id] && !m.chartImage ? { ...m, chartImage: stored[m.id].url } : m))
+}
+
+// Signed amounts in Pip's replies are colored, so wins and losses read at a glance (+$231 green, -$49 red). Only
+// amounts with a sign: a "$500 limit" stays plain. Text between tags only, never inside a link or attribute.
+function colorMoney(html: string): string {
+  return html.replace(/>([^<]*)</g, (_, text: string) => '>' + text.replace(/(^|[\s(])([+\-−])\$(\d[\d,]*(?:\.\d+)?)/g,
+    (__: string, before: string, sign: string, amount: string) => `${before}<span class="${sign === '+' ? 'pip-gain' : 'pip-loss'}">${sign}$${amount}</span>`) + '<')
 }
 
 // Reads a streamed chat reply: one JSON line per piece of text ("delta"), then "done" with the finished reply and

@@ -187,3 +187,20 @@
 @media (prefers-reduced-motion: reduce) {
   .pip-reveal { animation: none; }
 }
+
+/* Signed amounts in Pip's replies (see colorMoney in content.tsx) */
+.markdown-content .pip-gain { color: #15803d; font-weight: 600; }
+.markdown-content .pip-loss { color: #b91c1c; font-weight: 600; }
+.markdown-content.dark .pip-gain { color: #4ade80; }
+.markdown-content.dark .pip-loss { color: #f87171; }
+
+/* Pip quoting the trader's own rule: a teal bar, not grey italics, so "your rule" stands out from his comments */
+.markdown-content blockquote {
+  border-left-color: #14b8a6;
+  font-style: normal;
+  color: inherit;
+}
+.markdown-content.dark blockquote {
+  border-left-color: #2dd4bf;
+  color: #e7e5df;
+}
