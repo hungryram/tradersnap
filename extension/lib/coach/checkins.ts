@@ -309,8 +309,34 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
     })
   }
 
-  // Unusually big win: at least twice the typical size of today's other trades and the best so far
+  // A win on a position far bigger than usual is not a "nice win": it's a big risk that happened to work, and saying
+  // well done teaches the wrong lesson (often it was trying to win back losses)
   const pnl = pnlOf(last)
+  const otherSizes = trades.slice(0, -1).filter(t => t.source !== "manual").map(sizeOf).filter(v => v > 0)
+  const usualSize = otherSizes.length ? median(otherSizes) : 0
+  if (pnl > 0 && usualSize > 0 && sizeOf(last) >= 2 * usualSize) {
+    const id = `${day}:big_win:${last.closed_at}`
+    const amount = amountOf(last, ctx, scope.label)
+    const sized = `${sizeOf(last)} contracts against your usual ${Math.round(usualSize)}`
+    const wasDown = trades.slice(0, -1).reduce((sum, t) => sum + pnlOf(t), 0) < 0
+    out.push({
+      id,
+      kind: "big_win",
+      level: "warning",
+      text: pick(wasDown
+        ? [
+            `That got you back, ${amount}, but it was ${sized}. Winning back losses with size is the habit that ends accounts. Today's done.`,
+            `${amount}, and you're back. It came from ${sized} though, which is a big risk that happened to work. Lock it in and step away.`,
+          ]
+        : [
+            `${amount}, but at ${sized}. That's a big risk that happened to work, not a trade to repeat. Back to your normal size, or call it a day.`,
+            `It worked, ${amount}. It was also ${sized}. Don't let the result make that size feel normal.`,
+          ], id)
+    })
+    return out
+  }
+
+  // Unusually big win: at least twice the typical size of today's other trades and the best so far
   if (pnl > 0 && trades.length >= 2) {
     const others = trades.slice(0, -1).map(t => Math.abs(pnlOf(t))).filter(v => v > 0)
     const typical = others.length ? others.reduce((a, b) => a + b, 0) / others.length : 0

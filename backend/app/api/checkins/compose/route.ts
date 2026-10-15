@@ -52,7 +52,7 @@ const TASKS: Record<(typeof KINDS)[number], string> = {
   max_trades: "A heads-up: that was their last allowed trade for today. Acknowledge it and say the day's done by their rule.",
   over_max: "A warning in the moment: they already opened a trade past their daily max (it's live now). Ask what's different about this one, gently.",
   outside_hours: "A heads-up: they just opened a trade outside the hours they set. Point it out and ask if it's worth breaking their rule.",
-  big_win: "After a big winning trade: congratulate them briefly, then remind them that overconfidence follows big wins.",
+  big_win: "After a winning trade. If the plain version is about position size (a win at far more than their usual size) or winning back losses, do not congratulate them: say plainly it was a big risk that happened to work and steer them back to their plan. Otherwise acknowledge the win briefly, then remind them that overconfidence follows big wins.",
   size_up: "A heads-up in the moment: they just opened a position clearly bigger than their usual size today (it's live now). Name the jump plainly and ask whether the size is part of their plan. Firmer if it came right after a loss.",
   max_size: "A warning in the moment: they just opened a position bigger than their own max position size (it's live now). Calm and direct: their rule says no more than that.",
   loss_reset: "After a single losing trade: acknowledge it without drama and suggest a 60-second reset before the next trade (a button for it appears under your message). One or two sentences.",
@@ -136,11 +136,25 @@ export async function POST(request: NextRequest) {
       .limit(8)
     const earlierLines = (earlier ?? []).reverse().map(m => `- ${new Date(m.created_at).toLocaleTimeString("en-US", { timeZone: timezone || "America/New_York", hour: "numeric", minute: "2-digit" })}: ${m.content}`)
 
+    // The last few messages between them today, so the check-in fits what the trader just said (for example that they
+    // sized up to win money back) instead of reading like it came from nowhere
+    const { data: recentChat } = await supabase
+      .from("chat_messages")
+      .select("role, content, created_at")
+      .eq("user_id", user.id)
+      .gte("created_at", todayStart.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(6)
+    const conversation = (recentChat ?? []).reverse()
+      .filter(m => typeof m.content === "string" && !m.content.trim().startsWith("{"))
+      .map(m => `${m.role === "user" ? "Trader" : "You"}: ${m.content.replace(/\s+/g, " ").slice(0, 300)}`)
+
     const prompt = [
       `Write this check-in: ${TASKS[kind]}`,
       Object.keys(facts).length ? `Facts (JSON):\n${JSON.stringify(facts)}` : null,
       `The plain version (same facts; keep all of its numbers):\n${plain}`,
       memoryContext(notes, patterns) ?? "You don't know anything else about this trader yet.",
+      conversation.length ? `Your conversation with them in the last while (oldest first). If they told you how they feel or what they're doing, this message must fit it, and never contradict it:\n${conversation.join("\n")}` : null,
       earlierLines.length ? `What you already told them today (don't repeat it; if this is the same problem again, say so plainly):\n${earlierLines.join("\n")}` : null
     ].filter(Boolean).join("\n\n")
 
