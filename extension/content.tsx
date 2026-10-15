@@ -486,36 +486,8 @@ const TradingBuddyWidget = () => {
 
         setSession(result.supabase_session)
 
-        // Fetch initial usage data
-        try {
-          const meResponse = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
-            headers: {
-              Authorization: `Bearer ${result.supabase_session.access_token}`
-            }
-          })
-          if (meResponse.ok) {
-            const meData = await meResponse.json()
-            setTradingLimits(meData.user?.trading_limits ?? null)
-            firstNameRef.current = meData.user?.first_name ?? null
-            dayRuleRef.current = dayRuleOf(meData.user?.trading_profile)
-            setLimitsLoaded(true)
-            if (meData.usage?.favorites) setSavedCount({ used: meData.usage.favorites.used, limit: meData.usage.favorites.limit })
-            if (meData.usage) {
-              setCurrentUsage({
-                messages: meData.usage.messages.used,
-                screenshots: meData.usage.screenshots.used,
-                limits: {
-                  maxMessages: meData.usage.messages.limit,
-                  maxScreenshots: meData.usage.screenshots.limit
-                },
-                credits: meData.usage.credits,
-                canBuyMore: meData.usage.canBuyMore
-              })
-            }
-          }
-        } catch (error) {
-          console.error('[Content] Failed to fetch initial usage:', error)
-        }
+        // Profile: limits, name, trading day and usage (also reloaded on every sign-in, below)
+        await loadProfile(result.supabase_session.access_token)
 
         // Fetch full chat history from Supabase (initial load: 20 messages)
         setIsLoadingHistory(true)
@@ -531,8 +503,10 @@ const TradingBuddyWidget = () => {
     // Listen for session updates from chrome.storage
     const handleStorageChange = (changes: any, areaName: string) => {
       if (areaName === 'local' && changes.supabase_session) {
-
-        setSession(changes.supabase_session.newValue)
+        const next = changes.supabase_session.newValue
+        setSession(next)
+        // A new sign-in (not just a token refresh): load this account's profile again
+        if (next?.access_token && next?.user?.id !== changes.supabase_session.oldValue?.user?.id) loadProfile(next.access_token)
       }
 
       if (areaName === 'local' && changes.auto_detect_trades) {
@@ -555,10 +529,49 @@ const TradingBuddyWidget = () => {
     }
   }, [])
 
+  // The trader's profile from the server: limits, first name, when their trading day starts, and usage. Loaded when
+  // the page opens signed in and again on every sign-in. Today's trades wait for it, so they're counted from the right
+  // start of day (a futures trader's evening session is a new day).
+  const profileReadyRef = useRef<Promise<void> | null>(null)
+  const loadProfile = useCallback((accessToken: string) => {
+    const load = (async () => {
+      try {
+        const meResponse = await fetch(`${process.env.PLASMO_PUBLIC_API_URL}/api/me`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+        if (meResponse.ok) {
+          const meData = await meResponse.json()
+          setTradingLimits(meData.user?.trading_limits ?? null)
+          firstNameRef.current = meData.user?.first_name ?? null
+          dayRuleRef.current = dayRuleOf(meData.user?.trading_profile)
+          setLimitsLoaded(true)
+          if (meData.usage?.favorites) setSavedCount({ used: meData.usage.favorites.used, limit: meData.usage.favorites.limit })
+          if (meData.usage) {
+            setCurrentUsage({
+              messages: meData.usage.messages.used,
+              screenshots: meData.usage.screenshots.used,
+              limits: {
+                maxMessages: meData.usage.messages.limit,
+                maxScreenshots: meData.usage.screenshots.limit
+              },
+              credits: meData.usage.credits,
+              canBuyMore: meData.usage.canBuyMore
+            })
+          }
+        }
+      } catch (error) {
+        console.error('[Content] Failed to load the profile:', error)
+      }
+    })()
+    profileReadyRef.current = load
+    return load
+  }, [])
+
   // Today's trades, counted from the start of the trader's trading day
   const fetchTradeStats = useCallback(async () => {
     const { supabase_session } = await chrome.storage.local.get('supabase_session')
     if (!supabase_session?.access_token) return
+    await profileReadyRef.current?.catch(() => {})
     const midnight = currentTradingDayStart(dayRuleRef.current)
     try {
       const response = await fetch(
