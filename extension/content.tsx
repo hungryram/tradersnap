@@ -87,6 +87,8 @@ const ON_PIP_SITE = (() => {
 const CHECKIN_TYPING_MS = 1500
 // How long Pip may take to write a check-in in his own words before the plain version is used
 const COMPOSE_TIMEOUT_MS = { warning: 3000, info: 6000 }
+// Longest message you can send Pip (the server allows 4000); the counter shows from 80% of it
+const MESSAGE_MAX = 2000
 // Gap kept between the chat window and the edges of the screen
 const SCREEN_MARGIN = 8
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -194,6 +196,8 @@ const TradingBuddyWidget = () => {
   const [pipTyping, setPipTyping] = useState(false)
   // Pip's reply is arriving piece by piece (the thinking bubble gives way to the text itself)
   const [replyStreaming, setReplyStreaming] = useState(false)
+  // The last paste was too long for the message box and got cut
+  const [pasteTrimmed, setPasteTrimmed] = useState(false)
   // The 60-second reset after a loss, and the discipline streak (days in a row, no rule broken)
   const [resetOpen, setResetOpen] = useState(false)
   // Which strategy chart checks and answers use ('' = all of the trader's active strategies)
@@ -3296,7 +3300,7 @@ const TradingBuddyWidget = () => {
                   ref={inputRef}
                   rows={1}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => { setInputText(e.target.value); if (e.target.value.length < MESSAGE_MAX) setPasteTrimmed(false) }}
                   onKeyDown={(e) => {
                     e.stopPropagation()
                     // Enter sends, Shift+Enter starts a new line; Ctrl+Enter (Cmd+Enter on Mac) sends with the chart
@@ -3311,7 +3315,14 @@ const TradingBuddyWidget = () => {
                   onKeyPress={(e) => e.stopPropagation()}
                   onKeyUp={(e) => e.stopPropagation()}
                   placeholder={isSending ? "Coach is replying..." : attachChart ? "Ask about this chart..." : "Ask your coach anything..."}
-                  maxLength={500}
+                  maxLength={MESSAGE_MAX}
+                  onPaste={(e) => {
+                    // Say so when a paste doesn't fit, instead of cutting it off silently
+                    const pasted = e.clipboardData.getData('text')
+                    const box = e.currentTarget
+                    const room = MESSAGE_MAX - (inputText.length - (box.selectionEnd - box.selectionStart))
+                    if (pasted.length > room) setPasteTrimmed(true)
+                  }}
                   className={`block min-w-0 flex-1 resize-none bg-transparent py-1 leading-relaxed ${getTextSizeClass()} focus:outline-none ${theme === 'dark' ? 'text-white placeholder-dark-placeholder' : 'text-slate-900 placeholder-slate-500'}`}
                 />
                   {!ON_PIP_SITE && (
@@ -3357,7 +3368,7 @@ const TradingBuddyWidget = () => {
                       </button>
                     )}
                 </div>
-                {(strategyOptions.length > 1 || inputText.length >= 400) && (
+                {(strategyOptions.length > 1 || inputText.length >= MESSAGE_MAX * 0.8 || pasteTrimmed) && (
                   <div className="flex items-center justify-between gap-2 px-2 pb-1.5">
                   {strategyOptions.length > 1 ? (
                     <select
@@ -3375,8 +3386,10 @@ const TradingBuddyWidget = () => {
                       {strategyOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   ) : <span />}
-                    {inputText.length >= 400 && (
-                      <span className={`text-[11px] tabular-nums ${inputText.length >= 500 ? 'text-red-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>{inputText.length}/500</span>
+                    {(inputText.length >= MESSAGE_MAX * 0.8 || pasteTrimmed) && (
+                      <span className={`text-[11px] tabular-nums ${inputText.length >= MESSAGE_MAX ? 'text-red-500' : theme === 'dark' ? 'text-dark-text' : 'text-slate-500'}`}>
+                        {pasteTrimmed ? `Cut to ${MESSAGE_MAX.toLocaleString()} characters · ` : ''}{inputText.length.toLocaleString()}/{MESSAGE_MAX.toLocaleString()}
+                      </span>
                     )}
                   </div>
                 )}
