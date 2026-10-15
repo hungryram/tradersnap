@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { api, forAccount, loadTradeWindow, pnlOf, realTrades, type StrategyOption, type Trade, type TradingLimits } from "@/lib/dashboard-data"
 import { brokenRules, dayKeyOf, hasLimits } from "@/lib/discipline"
 import { tradingDayStart } from "@/lib/trading-day"
@@ -24,10 +24,12 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Month calendar of trading days: trades and P&L per day, plus whether the day's
 // rules were kept. Colors by discipline by default; P&L is one click away.
-export default function JournalCalendar({ dayRule = null, limits, strategies, onStrategyChange, account = "", load = loadTradeWindow, loadNotes = loadMonthNotes }: {
+export default function JournalCalendar({ openDay = null, dayRule = null, limits, strategies, onStrategyChange, account = "", load = loadTradeWindow, loadNotes = loadMonthNotes }: {
   limits: TradingLimits | null
   // When the trading day starts (lib/trading-day); null = the trader's midnight
   dayRule?: string | null
+  // A day to open on (YYYY-MM-DD), for example from a link in the extension
+  openDay?: string | null
   // Show one account's trades ("" = all of them)
   account?: string
   strategies: StrategyOption[]
@@ -36,7 +38,14 @@ export default function JournalCalendar({ dayRule = null, limits, strategies, on
   load?: typeof loadTradeWindow
   loadNotes?: typeof loadMonthNotes
 }) {
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const [month, setMonth] = useState(() => {
+    const [y, m] = (openDay ?? "").split("-").map(Number)
+    if (y && m) return new Date(y, m - 1, 1)
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+  // The day to open once its month has loaded (then it's forgotten, so later month changes start clear)
+  const pendingDayRef = useRef(openDay)
   const [data, setData] = useState<{ trades: Trade[]; historyFrom: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
@@ -53,7 +62,15 @@ export default function JournalCalendar({ dayRule = null, limits, strategies, on
     setSelected(null)
     const next = new Date(month.getFullYear(), month.getMonth() + 1, 1)
     // A trading day can start the evening before, so the month's trades are the ones between its first and last day boundaries
-    load(tradingDayStart(cellKey(month), dayRule), tradingDayStart(cellKey(next), dayRule)).then(setData).catch(err => setError(err instanceof Error ? err.message : "Couldn't load trades"))
+    load(tradingDayStart(cellKey(month), dayRule), tradingDayStart(cellKey(next), dayRule)).then(result => {
+      setData(result)
+      const pending = pendingDayRef.current
+      if (pending && pending.startsWith(cellKey(month).slice(0, 7))) {
+        pendingDayRef.current = null
+        setSelected(pending)
+        setTimeout(() => document.getElementById("journal-day")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
+      }
+    }).catch(err => setError(err instanceof Error ? err.message : "Couldn't load trades"))
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0)
     loadNotes(cellKey(month), cellKey(last), dayKeyOf(new Date().toISOString(), dayRule)).then(setNotes).catch(() => setNotes({}))
   }, [month, dayRule])
@@ -238,7 +255,7 @@ export default function JournalCalendar({ dayRule = null, limits, strategies, on
       </div>
 
       {selectedDay && (
-        <div className="mt-5 border-t border-ink-border pt-5">
+        <div id="journal-day" className="mt-5 border-t border-ink-border pt-5">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
             {selectedDay.trades.length > 0 && <span className="text-sm text-ink-text">{realTrades(selectedDay.trades).length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>}

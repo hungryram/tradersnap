@@ -21,6 +21,11 @@ export default function JournalPage() {
   const [limits, setLimits] = useState<TradingLimits | null>(null)
   // When the trading day starts; undefined until it's known, so the first load already uses the right day
   const [dayRule, setDayRule] = useState<string | null | undefined>(undefined)
+  // ?day=YYYY-MM-DD opens the calendar on that day (links from the extension's "trade closed" rows)
+  const [openDay] = useState(() => {
+    const day = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("day") : null
+    return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null
+  })
   const [strategies, setStrategies] = useState<StrategyOption[]>([])
 
   useEffect(() => {
@@ -86,7 +91,7 @@ export default function JournalPage() {
       )}
 
       <div className="mb-6">
-        <JournalCalendar dayRule={dayRule ?? null} limits={limits} strategies={strategies} onStrategyChange={setStrategy} account={account} />
+        <JournalCalendar openDay={openDay} dayRule={dayRule ?? null} limits={limits} strategies={strategies} onStrategyChange={setStrategy} account={account} />
       </div>
 
       {historyFrom && days > 7 && (

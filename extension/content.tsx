@@ -363,7 +363,7 @@ const TradingBuddyWidget = () => {
         )
         
         // "Trade closed" rows come from the trades themselves, so they match the journal on every device
-        const tradeRows = (closedTrades ?? []).map(closedTradeRow)
+        const tradeRows = (closedTrades ?? []).map((t: any) => closedTradeRow(t, dayRuleRef.current))
         const images = await loadChartImages()
         setMessages(prev => withLocalLog(
           withChartImages([...formattedMessages, ...tradeRows], images).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
@@ -961,7 +961,7 @@ const TradingBuddyWidget = () => {
       : []
     seenTradesRef.current = new Set([...(seen ?? []), ...tradesToday.map(keyOf)])
     if (fresh.length === 0) return
-    setMessages(prev => [...prev, ...fresh.map(closedTradeRow)])
+    setMessages(prev => [...prev, ...fresh.map(t => closedTradeRow(t, dayRuleRef.current))])
   }, [tradesToday])
 
   // A trade closed (today's trades reloaded)
@@ -1620,7 +1620,7 @@ const TradingBuddyWidget = () => {
         })
 
         // Prepend older messages (and the trades that closed among them) to the beginning
-        const tradeRows = (closedTrades ?? []).map(closedTradeRow)
+        const tradeRows = (closedTrades ?? []).map((t: any) => closedTradeRow(t, dayRuleRef.current))
         const images = await loadChartImages()
         setMessages(prev => [...withChartImages([...formattedMessages, ...tradeRows], images).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), ...prev])
       }
@@ -2944,8 +2944,15 @@ const TradingBuddyWidget = () => {
                         : msg.tone === 'loss' ? 'border-red-200 bg-red-50 text-red-700'
                         : msg.tone === 'opened' ? 'border-blue-200 bg-blue-50 text-blue-700'
                         : 'border-slate-200 bg-slate-100 text-slate-600'
-                  }`}>
+                  } ${msg.tone !== 'opened' ? 'cursor-pointer hover:brightness-125' : ''}`}
+                    {...(msg.tone !== 'opened' ? {
+                      role: 'link',
+                      title: 'Logged to your journal. Click to open that day',
+                      onClick: () => window.open(`${process.env.PLASMO_PUBLIC_API_URL}/dashboard/journal?day=${msg.journalDay ?? tradingDayKey(new Date(msg.timestamp), dayRuleRef.current)}`, '_blank')
+                    } : {})}
+                  >
                     {msg.content}
+                    {msg.tone !== 'opened' && <span className="ml-1.5 opacity-70">· In journal ›</span>}
                   </div>
                 )}
 
@@ -3580,11 +3587,11 @@ async function readChatStream(body: ReadableStream<Uint8Array>, onText: (textSoF
 const isLocalOnly = (m: any) => (m.type === 'checkin' || m.type === 'event') && !m.id
 
 // One "trade closed" row per trade; a trade copied to several accounts is one row with the combined result
-function closedTradeRow(t: { symbol: string | null; closed_at: string; realized_pnl: number | null; group_pnl?: number; copies?: number }) {
+function closedTradeRow(t: { symbol: string | null; closed_at: string; realized_pnl: number | null; group_pnl?: number; copies?: number }, dayRule: string | null = null) {
   const pnl = Number(t.group_pnl ?? t.realized_pnl ?? 0)
   const money = `${pnl < 0 ? '-' : pnl > 0 ? '+' : ''}$${Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const accounts = (t.copies ?? 1) > 1 ? ` · ${t.copies} accounts` : ''
-  return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol ?? '?')} trade closed · ${money}${accounts}`, timestamp: new Date(t.closed_at) }
+  return { type: 'event', tone: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'flat', content: `${eventTime(new Date(t.closed_at))} · ${shortSymbol(t.symbol ?? '?')} trade closed · ${money}${accounts}`, timestamp: new Date(t.closed_at), journalDay: tradingDayKey(t.closed_at, dayRule) }
 }
 const localKeyOf = (m: any) => `${m.type}|${new Date(m.timestamp).getTime()}|${typeof m.content === 'string' ? m.content : ''}`
 
