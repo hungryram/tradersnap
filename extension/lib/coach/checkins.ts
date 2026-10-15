@@ -229,6 +229,18 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
             `${streak} losses in a row, and your limit is ${streakLimit}. The best trade left today is no trade.`,
           ], streakId)
     })
+  } else if (streakLimit && streak >= 2 && streak === streakLimit - 1) {
+    // One loss away from their stop rule: a heads-up instead of another "take 60 seconds"
+    out.push({
+      id: streakId,
+      kind: "loss_streak",
+      level: "info",
+      text: pick([
+        `${streak} losses in a row. Your rule stops you at ${streakLimit}, so the next trade decides the day. Make sure it's an A setup.`,
+        `That's ${streak} in a row, one away from your ${streakLimit}-loss stop. A short break before the next one is worth it.`,
+        `${streak} straight losses. One more and your rule calls it for today. Slow down before you look for the next one.`,
+      ], streakId)
+    })
   } else if (!streakLimit && streak >= 3) {
     out.push({
       id: streakId,
@@ -244,8 +256,12 @@ function afterTradesFor(ctx: CoachContext, scope: ReturnType<typeof scopeOf>): C
 
   for (const c of out) if (c.kind === "loss_streak") c.offerReset = true
 
-  // A single loss (no streak warning above): a gentle offer to reset before the next trade
-  if (pnlOf(last) < 0 && !out.some(c => c.kind === "loss_streak")) {
+  // A loss after a win (or the day's first trade), with no other loss in the last 30 minutes: a gentle offer to reset.
+  // Not after every loss: the second in a row gets the streak heads-up above, and a run of small losses doesn't
+  // need the same reminder each time.
+  const earlierLoss = trades.slice(0, -1).reverse().find(t => pnlOf(t) < 0)
+  const recentLoss = !!earlierLoss && Date.parse(last.closed_at) - Date.parse(earlierLoss.closed_at) < 30 * 60_000
+  if (pnlOf(last) < 0 && streak === 1 && !recentLoss && !out.some(c => c.kind === "loss_streak")) {
     const id = `${day}:loss_reset:${last.closed_at}`
     const amount = amountOf(last, ctx, scope.label)
     out.push({
