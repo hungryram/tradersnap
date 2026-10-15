@@ -48,6 +48,8 @@ export default function AccountPage() {
   const [email, setEmail] = useState("")
   const [profileMessage, setProfileMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  // "Clear all trades": closed, asking to confirm, working, or done
+  const [clearState, setClearState] = useState<"idle" | "confirm" | "busy" | "done" | string>("idle")
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -262,6 +264,45 @@ export default function AccountPage() {
           >
             Chrome Web Store
           </a>
+        </Card>
+
+        <Card title="Your trades">
+          {clearState === "confirm" || clearState === "busy" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-ink-text">
+                This permanently deletes every trade in your journal, on every account, and Pip&apos;s reviews of those days. Your notes, rules and chat stay.
+                Trades your platform still shows won&apos;t be imported again; trades you take from now on are logged as usual. This can&apos;t be undone.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={async () => {
+                    setClearState("busy")
+                    try {
+                      await api("/api/trades", { method: "DELETE", body: JSON.stringify({ all: true }) })
+                      setClearState("done")
+                    } catch (err) {
+                      setClearState(err instanceof Error ? err.message : "Couldn't clear your trades. Try again.")
+                    }
+                  }}
+                  disabled={clearState === "busy"}
+                  className={buttonDanger}
+                >
+                  {clearState === "busy" ? "Deleting..." : "Yes, delete all my trades"}
+                </button>
+                <button onClick={() => setClearState("idle")} disabled={clearState === "busy"} className={buttonSecondary}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink-text">
+                {clearState === "done"
+                  ? "All your trades are deleted. New trades will be logged as you take them."
+                  : "Start your journal fresh: permanently delete every trade. To delete just one, use the ✕ next to it in your journal."}
+              </p>
+              {clearState !== "done" && <button onClick={() => setClearState("confirm")} className={buttonDanger}>Clear all trades</button>}
+            </div>
+          )}
+          {clearState !== "idle" && clearState !== "confirm" && clearState !== "busy" && clearState !== "done" && <div className="mt-3"><Notice tone="bad">{clearState}</Notice></div>}
         </Card>
 
         {user.plan !== "admin" && (

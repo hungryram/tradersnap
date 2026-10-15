@@ -131,10 +131,14 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(NextResponse.json({ error: "Invalid trade" }, { status: 400 }), origin)
     }
 
+    // Trades the trader deleted stay deleted, even though the platform still has them and sends them again
+    const incoming = await withoutDeleted(user.id, parsed.data)
+    if (incoming.length === 0) return addCorsHeaders(NextResponse.json({ success: true }), origin)
+
     // Reloads and other open tabs re-send the same trades; the unique key keeps one row each
     const { error } = await supabase
       .from("trades")
-      .upsert(parsed.data.map(trade => ({ ...trade, user_id: user.id })), { onConflict: "user_id,client_trade_id", ignoreDuplicates: true })
+      .upsert(incoming.map(trade => ({ ...trade, user_id: user.id })), { onConflict: "user_id,client_trade_id", ignoreDuplicates: true })
 
     if (error) {
       console.error("[Trades] Insert error:", error)
@@ -211,19 +215,65 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE /api/trades { id } — removes a result the trader logged by hand. Trades read from the
-// platform stay (they would be read again), so only manual ones can be deleted.
+// DELETE /api/trades { ids } — permanently deletes trades. A detected trade is remembered as deleted, so when the
+// platform sends it again it isn't imported. DELETE /api/trades { all: true } clears every trade: nothing that
+// closed before now is imported again, while new trades keep coming in.
 export async function DELETE(request: NextRequest) {
   const origin = request.headers.get("origin")
   const user = await getUser(request)
   if (!user) return addCorsHeaders(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), origin)
 
-  const parsed = z.object({ id: z.string().uuid() }).safeParse(await request.json().catch(() => null))
+  const parsed = z.union([
+    z.object({ all: z.literal(true) }),
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(100) }),
+    z.object({ id: z.string().uuid() }) // older dashboards
+  ]).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return addCorsHeaders(NextResponse.json({ error: "Invalid request" }, { status: 400 }), origin)
+  const fail = () => addCorsHeaders(NextResponse.json({ error: "Couldn't delete that. Try again." }, { status: 500 }), origin)
 
-  const { error } = await supabase.from("trades").delete().eq("id", parsed.data.id).eq("user_id", user.id).eq("source", "manual")
-  if (error) return addCorsHeaders(NextResponse.json({ error: "Couldn't delete the trade" }, { status: 500 }), origin)
-  return addCorsHeaders(NextResponse.json({ success: true }), origin)
+  if ("all" in parsed.data) {
+    const { error: cutoffError } = await supabase.from("profiles").update({ trades_cleared_at: new Date().toISOString() }).eq("id", user.id)
+    if (cutoffError) {
+      // Without the cut-off (20261029_deleted_trades.sql not run), cleared trades would come straight back
+      console.error("[Trades] Clear all: cut-off not saved:", cutoffError.message)
+      return fail()
+    }
+    const { error } = await supabase.from("trades").delete().eq("user_id", user.id)
+    if (error) return fail()
+    // Reviews were about trades that are gone; notes are the trader's own words and stay
+    await supabase.from("day_reviews").delete().eq("user_id", user.id)
+    return addCorsHeaders(NextResponse.json({ success: true }), origin)
+  }
+
+  const ids = "ids" in parsed.data ? parsed.data.ids : [parsed.data.id]
+  const { data: rows, error: findError } = await supabase.from("trades").select("id, client_trade_id, source").eq("user_id", user.id).in("id", ids)
+  if (findError) return fail()
+  const detected = (rows ?? []).filter(r => r.source !== "manual")
+  if (detected.length) {
+    const { error: rememberError } = await supabase.from("deleted_trades").upsert(
+      detected.map(r => ({ user_id: user.id, client_trade_id: r.client_trade_id })),
+      { onConflict: "user_id,client_trade_id", ignoreDuplicates: true }
+    )
+    if (rememberError) {
+      // Without the list (20261029_deleted_trades.sql not run), a deleted trade would come straight back
+      console.error("[Trades] Delete: not remembered:", rememberError.message)
+      return fail()
+    }
+  }
+  const { error } = await supabase.from("trades").delete().eq("user_id", user.id).in("id", ids)
+  if (error) return fail()
+  return addCorsHeaders(NextResponse.json({ success: true, deleted: rows?.length ?? 0 }), origin)
+}
+
+// Drops trades the trader deleted (one by one, or everything before "Clear all trades")
+async function withoutDeleted<T extends { client_trade_id: string; closed_at: string }>(userId: string, trades: T[]): Promise<T[]> {
+  const [{ data: profile }, { data: deleted }] = await Promise.all([
+    supabase.from("profiles").select("trades_cleared_at").eq("id", userId).single(),
+    supabase.from("deleted_trades").select("client_trade_id").eq("user_id", userId).in("client_trade_id", trades.map(t => t.client_trade_id))
+  ])
+  const clearedAt = profile?.trades_cleared_at ? Date.parse(profile.trades_cleared_at) : null
+  const gone = new Set((deleted ?? []).map(d => d.client_trade_id))
+  return trades.filter(t => !gone.has(t.client_trade_id) && !(clearedAt && Date.parse(t.closed_at) <= clearedAt))
 }
 
 // PATCH /api/trades { id, strategy_id } — the trader sets (or clears) a trade's strategy

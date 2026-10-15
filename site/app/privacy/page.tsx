@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Privacy Policy" }
 export default function Page() {
   const mail = <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
   return (
-    <Legal title="Privacy Policy" updated="October 14, 2026">
+    <Legal title="Privacy Policy" updated="October 15, 2026">
       <h2>The short version</h2>
       <ul>
         <li>Pip never asks for your broker login and can&apos;t place, change or close trades.</li>
@@ -50,7 +50,8 @@ export default function Page() {
         inside your browser. From that it records each trade: the symbol, side, quantity, entry and exit prices, fill times, order IDs, commissions, the
         calculated profit or loss, the account name or number exactly as the panel displays it, and which of your strategies it was (from your chart check just before it, or as you set it). This is sent to our servers so Pip can coach you
         and show your journal. We don&apos;t connect to your broker, never see your broker credentials, and can&apos;t place or change orders. You can turn
-        Auto-detect trades off in the extension menu at any time.
+        Auto-detect trades off in the extension menu at any time. You can delete any trade from your journal, or all of them from your account page.
+        Because your platform keeps showing a deleted trade, we keep only its platform ID (or, when you clear all trades, the time you did it) so it isn&apos;t imported again.
       </p>
       <p>
         If you tell Pip how a trade went in chat (for example &quot;I just made 200&quot;), Pip may offer to log it. Nothing is saved unless you tap to
