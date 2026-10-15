@@ -723,6 +723,9 @@ const TradingBuddyWidget = () => {
   const isTradovate = window.location.hostname.endsWith('tradovate.com')
   // TopstepX and Tradovate are read from what the page itself loads; TradingView from its trading panel
   const platformName = isTopstep ? 'TopstepX' : isTradovate ? 'Tradovate' : 'TradingView'
+  // Signed in on a platform Pip can track, with tracking switched off: Pip says so wherever he shows (it's easy to miss,
+  // and without it there are no check-ins, limits or journal)
+  const trackingOff = !autoDetectTrades && !!session && (isTradingView || isTopstep || isTradovate)
   // What to tell the trader when Pip isn't seeing their trades yet, per platform
   const noTrackingHint = isTopstep || isTradovate ? `reload ${platformName} so Pip can see your trades` : "open TradingView's trading panel (it can be small)"
 
@@ -2316,10 +2319,11 @@ const TradingBuddyWidget = () => {
 
   if (!isOpen) {
     const losingStreak = !!(autoDetectTrades && tradeStats && tradeStats.lossStreak >= 2)
-    const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' ? 'bg-red-400' : null
+    const statusDot = trackingStatus === 'tracking' ? 'bg-green-400' : trackingStatus === 'loading' ? 'bg-amber-400' : trackingStatus === 'no-panel' || trackingOff ? 'bg-red-400' : null
     const tip = [
       'Open Pip (Alt+Shift+S). Drag to move.',
       trackingStatus === 'no-panel' ? `Not tracking trades: ${noTrackingHint}.` : null,
+      trackingOff ? 'Trade tracking is off. Open Pip to turn it on.' : null,
       losingStreak ? `${tradeStats!.lossStreak} losses in a row. Consider a break.` : null,
       streak && streak.days > 0 && !streak.brokenToday ? `🔥 ${streak.days} ${streak.days === 1 ? 'day' : 'days'} in a row with no rules broken` : null
     ].filter(Boolean).join('\n')
@@ -2711,6 +2715,15 @@ const TradingBuddyWidget = () => {
             </button>
           </div>
         </div>
+
+        {/* Tracking is off: say so up top, with one click to turn it on */}
+        {trackingOff && (
+          <div className={`flex items-center gap-2 px-3 py-1.5 text-xs border-b ${theme === 'dark' ? 'bg-amber-500/10 border-dark-border text-amber-200' : 'bg-amber-50 border-slate-200 text-amber-900'}`}>
+            <span className="inline-block w-2 h-2 rounded-full shrink-0 bg-red-500" />
+            <span className="min-w-0 flex-1">Trade tracking is off. Pip can't see your trades, warn you near your limits or fill your journal.</span>
+            <button onClick={() => setAutoDetect(true)} className="shrink-0 rounded-md bg-blue-600 px-2 py-0.5 font-medium text-white hover:bg-blue-700">Turn on</button>
+          </div>
+        )}
 
         {/* Today's detected trades */}
         {autoDetectTrades && session && (
