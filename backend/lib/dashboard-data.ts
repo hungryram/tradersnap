@@ -13,6 +13,7 @@ export type Trade = {
   is_copy?: boolean // copied to several accounts: only the first of the group counts as a trade
   copies?: number // how many accounts the same trade was copied to (1 when alone)
   group_pnl?: number // profit and loss of the whole group, for win/loss decisions
+  group_of?: string | null // shared by every trade in a copied group
   kind?: "trade" | "day_total" // "day_total": an adjustment so the day matches the total the trader reported; not a trade
   source?: "auto" | "manual" // "manual": the trader reported it in chat, so there is no entry or exit
   entry_price: number | null
@@ -128,7 +129,7 @@ const decisionPnl = (t: Trade) => t.group_pnl ?? pnlOf(t)
 
 // The trades of one account (or all of them). Within one account nothing is a copy, so counts are plain.
 export function forAccount(trades: Trade[], account: string): Trade[] {
-  return account ? trades.filter(t => t.account === account).map(t => ({ ...t, is_copy: false, copies: 1, group_pnl: undefined })) : trades
+  return account ? trades.filter(t => t.account === account).map(t => ({ ...t, is_copy: false, copies: 1, group_pnl: undefined, group_of: null })) : trades
 }
 export const accountsOf = (trades: Trade[]) => [...new Set(trades.map(t => t.account).filter((a): a is string => !!a))].sort()
 // "tradovate:LMX0505" -> "LMX0505"

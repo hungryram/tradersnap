@@ -20,6 +20,21 @@ async function loadMonthNotes(from: string, to: string, today: string): Promise<
   return Object.fromEntries((data.notes ?? []).map(n => [n.day, n.text]))
 }
 
+// The same break on several accounts is one line ("5 trades (limit 3) on all 5 accounts"), not one per account
+function groupedBreaks(broken: string[]): string[] {
+  const byRule = new Map<string, string[]>()
+  const plain: string[] = []
+  for (const b of broken) {
+    const m = b.match(/^([^:]+): (.+)$/)
+    if (m) byRule.set(m[2], [...(byRule.get(m[2]) ?? []), m[1]])
+    else plain.push(b)
+  }
+  const accounts = new Set([...byRule.values()].flat()).size
+  return [...plain, ...[...byRule.entries()].map(([rule, on]) => on.length > 1 && on.length === accounts
+    ? `${rule} on all ${on.length} accounts`
+    : `${rule} on ${on.length === 1 ? "account" : "accounts"} ${on.map(a => `…${a.slice(-4)}`).join(", ")}`)]
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 // Month calendar of trading days: trades and P&L per day, plus whether the day's
@@ -209,7 +224,12 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
                 return (
                   <button
                     key={day.key}
-                    onClick={() => openable && setSelected(selected === day.key ? null : day.key)}
+                    onClick={() => {
+                      if (!openable) return
+                      const next = selected === day.key ? null : day.key
+                      setSelected(next)
+                      if (next) setTimeout(() => document.getElementById("journal-day")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
+                    }}
                     disabled={!openable}
                     className={`relative h-20 rounded-lg border p-1.5 text-left transition-colors ${tone} ${!inMonth ? "invisible" : ""} ${selected === day.key ? "ring-2 ring-brand-400" : ""} ${openable ? "hover:border-ink-muted" : "cursor-default"}`}
                   >
@@ -255,39 +275,58 @@ export default function JournalCalendar({ openDay = null, dayRule = null, limits
       </div>
 
       {selectedDay && (
-        <div id="journal-day" className="mt-5 border-t border-ink-border pt-5">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
-            {selectedDay.trades.length > 0 && <span className="text-sm text-ink-text">{realTrades(selectedDay.trades).length} trades · <span className={selectedDay.net >= 0 ? "text-green-400" : "text-red-400"}>{money(selectedDay.net)}</span></span>}
+        <div id="journal-day" className="mt-5 scroll-mt-4 border-t border-ink-border pt-5">
+          {/* The day at a glance */}
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h3 className="text-lg font-semibold">{selectedDay.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
+            {selectedDay.trades.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className={`rounded-full px-2.5 py-0.5 font-medium tabular-nums ${selectedDay.net > 0 ? "bg-green-500/10 text-green-400" : selectedDay.net < 0 ? "bg-red-500/10 text-red-400" : "bg-ink-elevated text-ink-text"}`}>{money(selectedDay.net)}</span>
+                <span className="rounded-full bg-ink-elevated px-2.5 py-0.5 text-ink-text">{realTrades(selectedDay.trades).length} {realTrades(selectedDay.trades).length === 1 ? "trade" : "trades"}</span>
+                {tracksRules && (selectedDay.broken.length
+                  ? <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-amber-300">{groupedBreaks(selectedDay.broken).length} {groupedBreaks(selectedDay.broken).length === 1 ? "rule" : "rules"} broken</span>
+                  : <span className="rounded-full bg-brand-500/10 px-2.5 py-0.5 text-brand-300">No rules broken</span>)}
+              </div>
+            )}
+            <button onClick={() => setSelected(null)} className="ml-auto text-sm text-ink-muted hover:text-ink-body" aria-label="Close this day">Close ✕</button>
           </div>
-          {selectedDay.trades.length > 0 && tracksRules && (
-            selectedDay.broken.length
-              ? <ul className="mb-4 space-y-1 text-sm text-amber-200">{selectedDay.broken.map(b => <li key={b}>• {b}</li>)}</ul>
-              : <p className="mb-4 text-sm text-brand-300">No rules broken. That&apos;s the win.</p>
-          )}
-          {selectedDay.trades.length > 0
-            ? <TradeTable trades={selectedDay.trades} strategies={strategies} onStrategyChange={onStrategyChange} />
-            : <p className="mb-2 text-sm text-ink-muted">No trades this day.</p>}
 
-          <div className="mt-5">
-            <label className="mb-1.5 block text-xs text-ink-text">Your notes for the day</label>
-            <textarea
-              value={draft}
-              onChange={e => { setDraft(e.target.value); setNoteState("idle") }}
-              maxLength={4000}
-              rows={4}
-              placeholder="How did it go? What did you feel before your worst trade? What will you do differently tomorrow?"
-              className={inputClass}
-            />
-            <div className="mt-2 flex items-center gap-3">
-              <button onClick={saveNote} disabled={noteState === "saving" || draft === (notes[selectedDay.key] ?? "")} className={buttonPrimary}>
-                {noteState === "saving" ? "Saving..." : "Save note"}
-              </button>
-              {noteState === "saved" && <span className="text-xs text-brand-300">Saved.</span>}
-              {noteState !== "idle" && noteState !== "saving" && noteState !== "saved" && <span className="text-xs text-red-300">{noteState}</span>}
+          {/* Trades on the left; Pip's review and the day's note beside them, staying in view */}
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+            <div className="min-w-0">
+              {tracksRules && selectedDay.broken.length > 0 && (
+                <ul className="mb-3 space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-200">
+                  {groupedBreaks(selectedDay.broken).map(b => <li key={b}>• {b}</li>)}
+                </ul>
+              )}
+              {selectedDay.trades.length > 0
+                ? <TradeTable trades={selectedDay.trades} strategies={strategies} onStrategyChange={onStrategyChange} bleed={false} />
+                : <p className="text-sm text-ink-muted">No trades this day.</p>}
             </div>
+
+            <aside className="grid gap-4 md:grid-cols-2 xl:sticky xl:top-4 xl:block xl:max-h-[calc(100vh-2rem)] xl:space-y-4 xl:overflow-y-auto">
+              <DayReview day={selectedDay.key} hasContent={selectedDay.trades.length > 0 || !!notes[selectedDay.key]} noteUnsaved={draft !== (notes[selectedDay.key] ?? "")} />
+              <div className="rounded-xl border border-ink-border bg-ink-elevated/40 p-4">
+                <label htmlFor="day-note" className="mb-1.5 block text-sm font-medium">Your note</label>
+                <textarea
+                  id="day-note"
+                  value={draft}
+                  onChange={e => { setDraft(e.target.value); setNoteState("idle") }}
+                  maxLength={4000}
+                  rows={3}
+                  placeholder="How did it go? What did you feel before your worst trade? What will you do differently?"
+                  className={inputClass}
+                />
+                <div className="mt-2 flex items-center gap-3">
+                  <button onClick={saveNote} disabled={noteState === "saving" || draft === (notes[selectedDay.key] ?? "")} className={buttonPrimary}>
+                    {noteState === "saving" ? "Saving..." : "Save note"}
+                  </button>
+                  {noteState === "saved" && <span className="text-xs text-brand-300">Saved.</span>}
+                  {noteState !== "idle" && noteState !== "saving" && noteState !== "saved" && <span className="text-xs text-red-300">{noteState}</span>}
+                </div>
+              </div>
+            </aside>
           </div>
-          <DayReview day={selectedDay.key} hasContent={selectedDay.trades.length > 0 || !!notes[selectedDay.key]} noteUnsaved={draft !== (notes[selectedDay.key] ?? "")} />
         </div>
       )}
     </Card>
