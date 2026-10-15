@@ -141,6 +141,12 @@ function limitReachedText(plan: string, canBuyMore?: boolean) {
 // Shown on the "Check this setup" button while a check runs
 const ANALYZE_STAGES = ["Capturing your chart...", "Reading price action...", "Checking your rules...", "Writing your verdict..."]
 
+// Next to Pip's thinking dots while he works on a reply: what he's actually doing, in order, then a few lines that
+// cycle until the text starts (with a chart attached he reads that first)
+const REPLY_STAGES = ["Thinking...", "Reading your rules...", "Looking at today's trades...", "Choosing my words..."]
+const CHART_REPLY_STAGES = ["Looking at your chart...", "Reading price action...", "Checking your rules...", "Choosing my words..."]
+const REPLY_STAGES_LATER = ["Still thinking...", "Almost there...", "Getting this right..."]
+
 // Tap-to-ask starters for an empty chat (chart ones turn on the Chart toggle)
 const SUGGESTIONS = [
   { text: "What should I wait for here?", chart: true },
@@ -167,6 +173,9 @@ const TradingBuddyWidget = () => {
   const [attachChart, setAttachChart] = useState(false)
   // Step shown while an analysis runs (~15s)
   const [analyzeStage, setAnalyzeStage] = useState(0)
+  // The line next to Pip's thinking dots while he writes a reply
+  const [replyStage, setReplyStage] = useState(0)
+  const replyWithChartRef = useRef(false)
   const [isSending, setIsSending] = useState(false)
   const [lastChartImage, setLastChartImage] = useState<string | null>(null)
   const [lastChartToken, setLastChartToken] = useState<string | null>(null)
@@ -1118,6 +1127,18 @@ const TradingBuddyWidget = () => {
     }
   }, [isOpen])
 
+  // Walk through what Pip is doing while a reply is on its way (until the text starts arriving)
+  useEffect(() => {
+    if (!isSending || replyStreaming) {
+      setReplyStage(0)
+      return
+    }
+    const timer = setInterval(() => setReplyStage(stage => stage + 1), 2200)
+    return () => clearInterval(timer)
+  }, [isSending, replyStreaming])
+  const stages = replyWithChartRef.current ? CHART_REPLY_STAGES : REPLY_STAGES
+  const replyStageText = replyStage < stages.length ? stages[replyStage] : REPLY_STAGES_LATER[(replyStage - stages.length) % REPLY_STAGES_LATER.length]
+
   // Walk through what the analysis is doing while it runs
   useEffect(() => {
     if (!isAnalyzing) {
@@ -1692,6 +1713,7 @@ const TradingBuddyWidget = () => {
   }
 
   const handleSendMessage = async (text: string, includeChart: boolean = false) => {
+    replyWithChartRef.current = includeChart
     if (!text.trim() || isSending) return
     if (ON_PIP_SITE) includeChart = false
     
@@ -3225,7 +3247,9 @@ const TradingBuddyWidget = () => {
               <div className="mr-2 mt-0.5 shrink-0"><Pip mood="thinking" size={26} /></div>
               <div className={`px-4 py-3 rounded-2xl rounded-tl-sm ${getTextSizeClass()} ${theme === 'dark' ? 'bg-dark-elevated border border-dark-border text-dark-text' : 'bg-white border border-slate-200 text-slate-400'}`}>
                 <div className="flex items-center gap-1">
-                  {isAnalyzing && <span className="mr-1.5">{ANALYZE_STAGES[analyzeStage]}</span>}
+                  {isAnalyzing
+                    ? <span className="mr-1.5">{ANALYZE_STAGES[analyzeStage]}</span>
+                    : isSending && <span key={replyStage} className="pip-reveal mr-1.5">{replyStageText}</span>}
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_infinite]"></span>
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]"></span>
                   <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-[bounce_1.4s_ease-in-out_0.4s_infinite]"></span>
