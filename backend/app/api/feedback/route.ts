@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
   if ((lastHour ?? 0) >= 200) return NextResponse.json({ success: true })
 
-  const row = {
+  const row: Record<string, unknown> = {
     reason: parsed.data.reason,
     details: parsed.data.details?.trim() || null,
     extension_version: parsed.data.version ?? null
