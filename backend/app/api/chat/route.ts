@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { aiBudgetBlock } from "@/lib/ai-budget"
+import { isAllowedOrigin } from "@/lib/cors"
 import { effectivePlan, features, isPaid } from "@/lib/plans"
 import { APP_ORIGINS, APP_URL, SUPPORT_EMAIL } from "@/lib/urls"
 import { z } from "zod"
@@ -20,6 +22,20 @@ import { alreadyLogged, detectTradeClaim, loggedToday } from "@/lib/trade-claims
 // then jumps forward; it always has at least HISTORY_MIN recent messages.
 const HISTORY_MIN = 12
 const HISTORY_STEP = 8
+
+// The conversation sent with a message is capped in size (newest kept), so a client can't make every message
+// carry a huge, expensive history
+const HISTORY_MAX_CHARS = 24_000
+function capHistory<T extends { content: string }>(turns: T[]): T[] {
+  let total = 0
+  const kept: T[] = []
+  for (const turn of [...turns].reverse()) {
+    total += turn.content.length
+    if (total > HISTORY_MAX_CHARS) break
+    kept.unshift(turn)
+  }
+  return kept
+}
 
 function historyWindow<T>(turns: T[], historyStart?: number): T[] {
   if (historyStart === undefined) return turns.slice(-HISTORY_MIN) // older extensions
@@ -165,33 +181,12 @@ const chatRequestSchema = z.object({
 })
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  const allowedOrigins = [
-    ...APP_ORIGINS,
-    'https://www.tradingview.com',
-    'https://tradingview.com'
-  ]
-  
-  // Trading platforms and exchanges supported by the extension
-  const tradingDomains = [
-    'tradingview.com', 'tradovate.com', 'thinkorswim.com', 'tdameritrade.com',
-    'ninjatrader.com', 'tradestation.com', 'interactivebrokers.com', 'etrade.com',
-    'schwab.com', 'fidelity.com', 'robinhood.com', 'webull.com', 'tastytrade.com',
-    'tastyworks.com', 'metatrader4.com', 'metatrader5.com', 'ctrader.com',
-    'tradier.com', 'lightspeed.com', 'speedtrader.com', 'topstepx.com', 'rithmic.com',
-    'binance.com', 'coinbase.com', 'kraken.com', 'bybit.com'
-  ]
-  
-  const isAllowed = origin && (
-    allowedOrigins.includes(origin) ||
-    origin.startsWith('chrome-extension://') ||
-    tradingDomains.some(domain => origin.includes(domain))
-  )
+  const isAllowed = isAllowedOrigin(origin)
   
   if (isAllowed && origin) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-    response.headers.set("Access-Control-Allow-Credentials", "true")
   }
   return response
 }
@@ -261,6 +256,10 @@ export async function POST(request: NextRequest) {
 
     const hasImage = !!validatedRequest.image
     const isNewScreenshot = hasImage && !validatedRequest.isContextImage
+
+    // Spending guard (lib/ai-budget): what this account, and Free accounts together, may cost today
+    const budgetBlock = await aiBudgetBlock(supabase, user.id)
+    if (budgetBlock) return addCorsHeaders(NextResponse.json({ error: "Daily AI limit reached", message: budgetBlock }, { status: 429 }), origin)
 
     // 5. Atomically check + reserve usage (refunded below if the response fails)
     const cost: UsageCost = { messages: 1, screenshots: isNewScreenshot ? 1 : 0 }
@@ -379,7 +378,7 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
 
     // Recent conversation, the same size on every plan (see historyWindow)
     const fullHistory = validatedRequest.conversationHistory ?? []
-    const history = historyWindow(fullHistory, validatedRequest.historyStart)
+    const history = capHistory(historyWindow(fullHistory, validatedRequest.historyStart))
 
     // Message with chart image (either new capture or context from previous analysis)
     const imageDescription = validatedRequest.isContextImage
@@ -619,7 +618,7 @@ Use it for time-based coaching (the next candle, how long they've been at it, th
     }
 
     const response = NextResponse.json(
-      { error: "Internal server error", message: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Internal server error", message: "Something went wrong on our side. Please try again." },
       { status: 500 }
     )
     return addCorsHeaders(response, origin)

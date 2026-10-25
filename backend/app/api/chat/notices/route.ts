@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAllowedOrigin } from "@/lib/cors"
 import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import { APP_ORIGINS } from "@/lib/urls"
 
 // POST /api/chat/notices { items } — saves Pip's check-ins and "position opened" notices with the chat, so they
 // show on every device and Pip sees them in the conversation. The same item from two tabs is saved once (client_key).
@@ -10,10 +10,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const TRADING_DOMAINS = ["tradingview.com", "tradovate.com", "topstepx.com"]
-
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  const allowed = origin && (APP_ORIGINS.includes(origin) || origin.startsWith("chrome-extension://") || TRADING_DOMAINS.some(d => origin.includes(d)))
+  const allowed = isAllowedOrigin(origin)
   if (allowed) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -52,6 +50,15 @@ export async function POST(request: NextRequest) {
     .filter(item => Math.abs(Date.parse(item.created_at) - now) < 24 * 60 * 60 * 1000)
     .map(item => ({ user_id: user.id, role: "assistant", kind: item.kind, content: item.content, meta: item.meta ?? null, client_key: item.client_key, created_at: item.created_at }))
   if (rows.length === 0) return reply({ saved: 0 })
+
+  // Check-ins and "position opened" rows: a busy day is a few hundred at most; more is a script filling the table
+  const { count: today } = await supabase
+    .from("chat_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .not("kind", "is", null)
+    .gte("created_at", new Date(now - 24 * 60 * 60 * 1000).toISOString())
+  if ((today ?? 0) >= 1000) return reply({ saved: 0, dropped: true })
 
   const { error } = await supabase.from("chat_messages").upsert(rows, { onConflict: "user_id,client_key", ignoreDuplicates: true })
   if (error) {

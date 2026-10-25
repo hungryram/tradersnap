@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAllowedOrigin } from "@/lib/cors"
 import { loadPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase-client"
 import { createAdminClient } from "@/lib/supabase-admin"
@@ -7,7 +8,7 @@ import { getLimits } from "@/lib/usage"
 export const runtime = "nodejs"
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  if (isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")

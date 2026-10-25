@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAllowedOrigin } from "@/lib/cors"
 import { effectivePlan, inTrial, trialDaysLeft } from "@/lib/plans"
 import { APP_ORIGINS, APP_URL } from "@/lib/urls"
 import { z } from "zod"
@@ -13,48 +14,12 @@ const supabase = createClient(
 
 // CORS headers helper
 function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = [
-    ...APP_ORIGINS,
-    'chrome-extension://',
-    // Trading platforms
-    'tradingview.com',
-    'tradovate.com',
-    'thinkorswim.com',
-    'tdameritrade.com',
-    'ninjatrader.com',
-    'tradestation.com',
-    'interactivebrokers.com',
-    'etrade.com',
-    'schwab.com',
-    'fidelity.com',
-    'robinhood.com',
-    'webull.com',
-    'tastytrade.com',
-    'tastyworks.com',
-    'metatrader4.com',
-    'metatrader5.com',
-    'ctrader.com',
-    'tradier.com',
-    'lightspeed.com',
-    'speedtrader.com',
-    'topstepx.com',
-    'rithmic.com',
-    // Crypto exchanges
-    'binance.com',
-    'coinbase.com',
-    'kraken.com',
-    'bybit.com'
-  ]
-  
-  const isAllowed = origin && allowedOrigins.some(allowed => 
-    origin.includes(allowed) || origin.startsWith('chrome-extension://')
-  )
-  
+  const isAllowed = isAllowedOrigin(origin)
+
   return {
     'Access-Control-Allow-Origin': isAllowed ? origin : APP_URL,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Credentials': 'true'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 }
 

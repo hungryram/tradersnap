@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { aiBudgetBlock } from "@/lib/ai-budget"
+import { isAllowedOrigin } from "@/lib/cors"
 import { z } from "zod"
 import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
 import { createClient } from "@supabase/supabase-js"
@@ -20,7 +22,7 @@ const supabase = createClient(
 const MAX_PER_DAY = 30
 
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  if (isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -113,6 +115,8 @@ export async function POST(request: NextRequest) {
     .eq("feature", "checkin")
     .gte("created_at", new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString())
   if (!countError && (count ?? 0) >= MAX_PER_DAY) return fallback("daily_cap")
+  if (JSON.stringify(parsed.data.facts).length > 4000) return fallback("facts_too_long")
+  if (await aiBudgetBlock(supabase, user.id)) return fallback("budget")
 
   try {
     const { data: profile } = await supabase.from("profiles").select("memory_enabled, trading_limits, trading_profile").eq("id", user.id).single()

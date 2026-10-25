@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { isAllowedOrigin } from "@/lib/cors"
 import { disciplineStreak, markChecked } from "@/lib/trade-insights"
 import { prepareTrades } from "@/lib/copy-trades"
 import { features, loadPlan } from "@/lib/plans"
@@ -12,7 +13,7 @@ const supabase = createClient(
 
 // CORS helper
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  if (isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { aiBudgetBlock } from "@/lib/ai-budget"
 import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
 import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
   if (!countError && (count ?? 0) >= MAX_PER_DAY) {
     return NextResponse.json({ error: "Pip has reviewed your rules a lot today. Try again tomorrow." }, { status: 429 })
   }
+  const budgetBlock = await aiBudgetBlock(supabase, user.id)
+  if (budgetBlock) return NextResponse.json({ error: budgetBlock }, { status: 429 })
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
   const maxChars = features(effectivePlan(profile)).rulesChars

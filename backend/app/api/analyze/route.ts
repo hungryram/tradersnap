@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { aiBudgetBlock } from "@/lib/ai-budget"
+import { isAllowedOrigin } from "@/lib/cors"
 import { effectivePlan, isPaid as isPaidPlan } from "@/lib/plans"
 import { logLlmUsage } from "@/lib/llm-cost"
 import { z } from "zod"
@@ -33,7 +35,7 @@ const analyzeRequestSchema = z.object({
 
 // Helper to add CORS headers
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  if (isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -103,6 +105,10 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
     const alwaysRules = await loadAlwaysRules(supabase, user.id)
+
+    // Spending guard (lib/ai-budget)
+    const budgetBlock = await aiBudgetBlock(supabase, user.id)
+    if (budgetBlock) return addCorsHeaders(NextResponse.json({ error: "Daily AI limit reached", message: budgetBlock }, { status: 429 }), origin)
 
     // 5. Atomically check + reserve one screenshot (refunded below if the analysis fails)
     const limits = getLimits(profile.plan)

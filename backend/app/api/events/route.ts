@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAllowedOrigin } from "@/lib/cors"
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 
@@ -9,7 +10,7 @@ const supabase = createClient(
 
 // CORS helper
 function addCorsHeaders(response: NextResponse, origin: string | null) {
-  if (origin) {
+  if (isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin)
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS")
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -77,9 +78,20 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, origin)
     }
 
-    // Validate request
+    // Validate request (metadata is small: a few labels and numbers)
     const body = await request.json()
     const validated = eventSchema.parse(body)
+    if (JSON.stringify(validated.metadata ?? {}).length > 2000) {
+      return addCorsHeaders(NextResponse.json({ error: "Event too large" }, { status: 400 }), origin)
+    }
+
+    // A real person sends at most a few hundred events a day; more is a script filling the table
+    const { count: today } = await supabase
+      .from("usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    if ((today ?? 0) >= 1000) return addCorsHeaders(NextResponse.json({ success: true, dropped: true }), origin)
 
     // Log event
     const { error: insertError } = await supabase

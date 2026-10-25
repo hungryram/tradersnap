@@ -10,7 +10,7 @@ const supabase = createClient(
 const updateProfileSchema = z.object({
   first_name: z.string().max(50).optional(),
   last_name: z.string().max(50).optional(),
-  email: z.string().email().optional()
+  email: z.string().email().optional() // ignored: see below
 })
 
 // PATCH /api/profile - Update user profile
@@ -52,26 +52,9 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // Update email if provided (requires email verification)
-    if (validated.email && validated.email !== user.email) {
-      const { error: emailError } = await supabase.auth.admin.updateUserById(
-        user.id,
-        { email: validated.email }
-      )
-
-      if (emailError) {
-        console.error("Email update error:", emailError)
-        return NextResponse.json(
-          { error: "Failed to update email" },
-          { status: 500 }
-        )
-      }
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      message: validated.email ? "Profile updated. Please check your email to verify the new address." : "Profile updated successfully"
-    })
+    // Email changes don't happen here: the dashboard asks Supabase directly, which only switches the address once
+    // the link sent to the new one is clicked (changing it here, with admin rights, skipped that check)
+    return NextResponse.json({ success: true, message: "Profile updated successfully" })
 
   } catch (error) {
     console.error("PATCH /api/profile error:", error)

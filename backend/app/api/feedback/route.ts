@@ -23,6 +23,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid feedback" }, { status: 400 })
   }
 
+  // Anyone can post here (there's no login after uninstalling): cap the whole table's intake per hour
+  const { count: lastHour } = await supabase
+    .from("uninstall_feedback")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+  if ((lastHour ?? 0) >= 200) return NextResponse.json({ success: true })
+
   const row = {
     reason: parsed.data.reason,
     details: parsed.data.details?.trim() || null,

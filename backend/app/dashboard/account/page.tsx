@@ -77,15 +77,22 @@ export default function AccountPage() {
     setBusy(true)
     setProfileMessage(null)
     try {
-      const data = await api("/api/profile", {
+      await api("/api/profile", {
         method: "PATCH",
-        body: JSON.stringify({
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          email: email.trim() !== userData?.user.email ? email.trim() : undefined
-        })
+        body: JSON.stringify({ first_name: firstName.trim(), last_name: lastName.trim() })
       })
-      setProfileMessage({ tone: "good", text: data.message || "Profile saved." })
+      // A new email only takes effect once the link sent to it is clicked
+      const newEmail = email.trim()
+      let emailNote = ""
+      if (newEmail && newEmail !== userData?.user.email) {
+        const { error: emailError } = await createClient().auth.updateUser(
+          { email: newEmail },
+          { emailRedirectTo: `${window.location.origin}/dashboard/account` }
+        )
+        if (emailError) throw emailError
+        emailNote = ` To switch your email to ${newEmail}, click the link we sent there.`
+      }
+      setProfileMessage({ tone: "good", text: `Profile saved.${emailNote}` })
       setEditing(false)
       await load()
     } catch {

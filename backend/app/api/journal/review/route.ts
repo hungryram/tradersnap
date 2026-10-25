@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { aiBudgetBlock } from "@/lib/ai-budget"
 import { effectivePlan, features } from "@/lib/plans"
 import { z } from "zod"
 import { PIP_BOUNDARIES, PIP_IDENTITY, PIP_VOICE } from "@/lib/pip-voice"
@@ -114,6 +115,8 @@ export async function POST(request: NextRequest) {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
   const dayRule = dayRuleOf(profile?.trading_profile)
   const plan = effectivePlan(profile)
+  const budgetBlock = await aiBudgetBlock(supabase, user.id)
+  if (budgetBlock) return NextResponse.json({ error: budgetBlock }, { status: 429 })
   const { period, limit, used } = await allowance(user.id, plan)
   if (!period) return NextResponse.json({ error: "Day reviews are part of Pro.", requiresUpgrade: true }, { status: 403 })
   if (used >= limit) {
